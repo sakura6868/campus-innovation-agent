@@ -66,7 +66,13 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 GROUND_TRUTH_DIR = PROJECT_ROOT / "data" / "ground_truth" / "samples"
 DEFAULT_DB_PATH = PROJECT_ROOT / "data" / "campus_agent.db"
 
-DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{DEFAULT_DB_PATH.as_posix()}")
+# Render / 部分云厂商注入的 DATABASE_URL 使用 postgres:// 协议头，
+# 而 SQLAlchemy 2.0 只认 postgresql://，需在此统一归一化，否则连库失败。
+_DATABASE_URL_RAW = os.getenv("DATABASE_URL", f"sqlite:///{DEFAULT_DB_PATH.as_posix()}")
+if _DATABASE_URL_RAW.startswith("postgres://"):
+    DATABASE_URL = _DATABASE_URL_RAW.replace("postgres://", "postgresql://", 1)
+else:
+    DATABASE_URL = _DATABASE_URL_RAW
 
 
 # ---------------------------------------------------------------------------

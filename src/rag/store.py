@@ -33,8 +33,8 @@ from typing import Optional
 # 允许脚本直接运行（python rag/store.py）或模块运行（python -m rag.store）
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import chromadb
-from chromadb.config import Settings
+# chromadb 为可选依赖：仅在显式配置 Chroma（CHROMA_HOST）或需要真实向量检索时，
+# 才在 CompetitionRAG.__init__ 内惰性导入；未安装时自动降级到纯本地检索，避免启动失败。
 
 import db  # 延迟可用的数据访问层（用于 Chroma 不可用时的本地降级检索）
 from fact_formatting import format_team_size
@@ -137,6 +137,17 @@ class CompetitionRAG:
     """按赛事隔离的向量检索封装（真实 Chroma）。"""
 
     def __init__(self, persist_dir: str | Path = "data/chunks"):
+        # chromadb 为可选依赖：未安装时自动降级到纯本地检索（不依赖 Chroma，
+        # 引用仍来自官方标注），保证服务在缺 Chroma 的环境下也能正常启动。
+        try:
+            import chromadb
+            from chromadb.config import Settings
+        except Exception:
+            self.client = None
+            self.backend = "none"
+            self._collection_cache: dict = {}
+            return
+
         host = os.getenv("CHROMA_HOST")
         if host:
             # 真实 Chroma 服务端
@@ -161,6 +172,8 @@ class CompetitionRAG:
         return f"rag_{competition_id.replace('-', '_')}"
 
     def _get_collection(self, competition_id: str):
+        if self.client is None:
+            return None
         name = self._collection_name(competition_id)
         if name not in self._collection_cache:
             self._collection_cache[name] = self.client.get_or_create_collection(
@@ -300,7 +313,11 @@ class CompetitionRAG:
         doc_version: Optional[str] = None,
         top_k: int = 3,
     ) -> list[Citation]:
+        if self.client is None:
+            return []
         collection = self._get_collection(competition_id)
+        if collection is None:
+            return []
         conditions: list[dict] = [{"competition_id": competition_id}]
         if document_year is not None:
             conditions.append({"document_year": document_year})
