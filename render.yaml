@@ -5,7 +5,7 @@ services:
     name: campus-innovation-agent
     runtime: docker
     plan: free                 # 免费套餐；15 分钟无访问会休眠，首次访问冷启动稍慢
-    branch: main
+    branch: master
     healthCheckPath: /health   # 对应 api.py 的 /health 端点
     envVars:
       - key: DATABASE_URL
