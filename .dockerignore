@@ -1,0 +1,11 @@
+venv/
+__pycache__/
+*.pyc
+*.log
+.git/
+.env
+tmp/
+src/data/chunks/
+.playwright-cli/
+output/
+demo/

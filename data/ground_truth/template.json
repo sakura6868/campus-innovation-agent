@@ -1,0 +1,36 @@
+{
+  "competition_name": "示例赛事",
+  "document_year": 2026,
+  "organizer": "官方主办单位",
+  "category": "programming | modeling | innovation | software",
+  "eligible_students": ["本科生", "研究生"],
+  "allowed_grades": ["大二", "大三", "大四"],
+  "allowed_majors": ["计算机科学与技术", "软件工程"],
+  "team_required": true,
+  "team_min": 1,
+  "team_max": 3,
+  "registration_deadline": "2026-08-10",
+  "submission_deadline": "2026-09-01",
+  "required_materials": ["项目报告PDF", "演示视频", "源代码"],
+  "evaluation_dimensions": ["创新性", "技术实现", "落地价值"],
+  "required_skills": ["Python", "前端", "答辩"],
+  "official_source_url": "https://example.com/notice/2026",
+  "source_acquired_date": "2026-07-16",
+  "trusted_level": "A | B | C",
+  "data_status": "verified | unverified | stale",
+  "last_verified_at": "2026-07-16",
+  "doc_version": "2026_v1",
+  "evidence": [
+    {
+      "field": "team_max",
+      "page": 3,
+      "source_text": "每支团队由1至3名学生组成",
+      "document_name": "示例赛事_2026_官方通知.pdf",
+      "source_url": "https://example.com/notice/2026",
+      "acquired_date": "2026-07-16",
+      "last_verified_at": "2026-07-16",
+      "trusted_level": "A"
+    }
+  ],
+  "notes": "不确定字段请返回 null（如 allowed_majors 未知则填 null），不要编造。"
+}

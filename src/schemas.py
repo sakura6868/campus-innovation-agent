@@ -1,0 +1,345 @@
+"""核心数据结构契约（五条开发轨道共享）。
+
+本文件冻结三类核心 Schema：
+  1. Competition  —— 赛事结构化信息（来自官方通知抽取 + 人工 Ground Truth）
+  2. UserProfile  —— 用户画像（前端填写，隐私授权后保存）
+  3. Citation     —— 引用证据（字段 -> 页码 + 原文 + 来源 + 核验信息）
+
+所有 API 响应包裹结构（CompetitionDetail、RecommendationResult 等）也在此定义，
+保证前端、Agent、后端在「第零周」即可并行开发。
+"""
+
+from __future__ import annotations
+
+from datetime import date
+from enum import Enum
+from typing import Any, Literal, Optional
+
+from pydantic import BaseModel, Field
+
+# ---------------------------------------------------------------------------
+# 枚举与常量
+# ---------------------------------------------------------------------------
+
+
+class CompetitionCategory(str, Enum):
+    """赛事四大类别，对应 data/raw 下的子目录。"""
+
+    PROGRAMMING = "programming"   # 程序设计类
+    MODELING = "modeling"         # 数学建模类
+    INNOVATION = "innovation"     # 创新创业类
+    SOFTWARE = "software"         # 软件作品类
+
+
+class EducationLevel(str, Enum):
+    UNDERGRADUATE = "本科生"
+    POSTGRADUATE = "研究生"
+    JUNIOR_COLLEGE = "专科生"
+    VOCATIONAL_COLLEGE = "高职高专生"
+    VOCATIONAL_COLLEGE_STUDENT = "高职高专学生"
+    SECONDARY_VOCATIONAL = "中职生"
+    VOCATIONAL_UNDERGRADUATE = "职业本科生"
+    RECENT_GRADUATE = "毕业生（毕业5年内）"
+
+
+class Grade(str, Enum):
+    FRESHMAN = "大一"
+    SOPHOMORE = "大二"
+    JUNIOR = "大三"
+    SENIOR = "大四"
+
+
+class TrustedLevel(str, Enum):
+    """数据可信等级：A=已人工确认，B=部分确认，C=待核验。"""
+
+    A = "A"
+    B = "B"
+    C = "C"
+
+
+class DataStatus(str, Enum):
+    VERIFIED = "verified"         # 已人工确认
+    UNVERIFIED = "unverified"     # 待人工确认
+    STALE = "stale"               # 超过 90 天未核验
+
+
+class ProjectStatus(str, Enum):
+    PLANNED = "planned"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+
+
+class ProjectItemType(str, Enum):
+    TASK = "task"
+    MATERIAL = "material"
+
+
+class ProjectItemStatus(str, Enum):
+    TODO = "todo"
+    IN_PROGRESS = "in_progress"
+    DONE = "done"
+
+
+class FactTag(str, Enum):
+    """前端区分「事实 / 计算 / 建议 / 待确认」的标签。"""
+
+    OFFICIAL = "官方规则"
+    SYSTEM = "系统计算"
+    SUGGESTION = "智能建议"
+    PENDING = "待人工确认"
+
+
+# ---------------------------------------------------------------------------
+# 引用证据（Citation / Evidence）
+# ---------------------------------------------------------------------------
+
+
+class Citation(BaseModel):
+    """单条字段级引用证据，用于前端角标与原文定位。"""
+
+    field: str = Field(..., description="被佐证的结构化字段名，如 team_max")
+    page: Optional[int] = Field(None, description="来源页码；无法定位时返回 null")
+    source_text: str = Field(..., description="官方通知中的原文片段")
+    document_name: Optional[str] = Field(None, description="文档名称，如 蓝桥杯_2026_官方通知.pdf")
+    source_url: Optional[str] = Field(None, description="官方链接")
+    acquired_date: Optional[str] = Field(None, description="数据获取日期 YYYY-MM-DD")
+    last_verified_at: Optional[str] = Field(None, description="最后人工核验日期 YYYY-MM-DD")
+    trusted_level: TrustedLevel = Field(TrustedLevel.A, description="本条证据可信等级")
+
+
+# ---------------------------------------------------------------------------
+# 赛事（Competition）
+# ---------------------------------------------------------------------------
+
+
+class TimelineItem(BaseModel):
+    """赛事时间轴节点。"""
+
+    label: str
+    event_date: Optional[date] = None
+    date_text: Optional[str] = None
+
+
+class RequirementItem(BaseModel):
+    """赛事要求条目，带事实标签与可选引用。"""
+
+    tag: FactTag = FactTag.OFFICIAL
+    text: str
+    citation: Optional[Citation] = None
+
+
+class SourceItem(BaseModel):
+    """来源记录。"""
+
+    name: str
+    url: Optional[str] = None
+    acquired_date: Optional[str] = None
+    trusted_level: TrustedLevel = TrustedLevel.A
+
+
+class Verification(BaseModel):
+    """核验状态包裹，统一出现在赛事详情响应中。"""
+
+    status: DataStatus = DataStatus.UNVERIFIED
+    last_verified_at: Optional[str] = None
+    trusted_level: TrustedLevel = TrustedLevel.C
+    note: Optional[str] = None
+
+
+class Competition(BaseModel):
+    """赛事结构化信息（来自官方通知抽取 + 人工 Ground Truth）。"""
+
+    competition_id: str = Field(..., description="全局唯一 ID，如 lanqiao_2026")
+    competition_name: str
+    document_year: int = Field(..., description="通知所属年份（不同年份不得混用）")
+    category: CompetitionCategory
+    organizer: Optional[str] = None
+
+    # —— 资格相关（硬性门控字段）——
+    eligible_students: list[EducationLevel] = Field(default_factory=list)
+    allowed_grades: Optional[list[Grade]] = None          # null = 不限年级
+    allowed_majors: Optional[list[str]] = None            # null = 不限专业
+    team_required: bool = False
+    team_min: Optional[int] = None
+    team_max: Optional[int] = None
+
+    # —— 时间相关 ——
+    registration_deadline: Optional[date] = None
+    submission_deadline: Optional[date] = None
+
+    # —— 材料与能力 ——
+    required_materials: list[str] = Field(default_factory=list)
+    evaluation_dimensions: list[str] = Field(default_factory=list)
+    required_skills: list[str] = Field(default_factory=list)
+
+    # —— 来源与可信 ——
+    official_source_url: Optional[str] = None
+    source_acquired_date: Optional[str] = None
+    trusted_level: TrustedLevel = TrustedLevel.C
+    data_status: DataStatus = DataStatus.UNVERIFIED
+    last_verified_at: Optional[str] = None
+
+    # —— 证据 ——
+    evidence: list[Citation] = Field(default_factory=list)
+
+    # —— 文档版本隔离用 ——
+    doc_version: str = Field("1.0", description="同一赛事同一年份的文档版本，如 2026_v1")
+
+    def is_registration_open(self, current: date) -> bool:
+        return self.registration_deadline is not None and self.registration_deadline >= current
+
+
+# ---------------------------------------------------------------------------
+# 用户画像（UserProfile）
+# ---------------------------------------------------------------------------
+
+
+class UserProfile(BaseModel):
+    """用户画像。隐私授权前不得保存个性化字段。"""
+
+    user_id: str
+    education_level: EducationLevel
+    grade: Grade
+    major: str
+    skills: list[str] = Field(default_factory=list)
+    experiences: list[str] = Field(default_factory=list, description="过往参赛经历，如 蓝桥杯省赛")
+    weekly_available_hours: int = Field(10, ge=0, le=168)
+    expected_team_size: int = Field(1, ge=1, le=10)
+    privacy_consent: bool = Field(False, description="是否已勾选隐私授权")
+
+    # —— 登录/展示用（可选，不参与门控与评分）——
+    display_name: Optional[str] = Field(None, description="昵称，用于登录页与顶栏展示")
+    persona: Optional[str] = Field(None, description="一句话特色，如「算法竞赛型选手」")
+    avatar: Optional[str] = Field(None, description="头像 emoji，用于登录卡片")
+
+    def can_store_profile(self) -> bool:
+        return self.privacy_consent
+
+
+# ---------------------------------------------------------------------------
+# API 响应包裹（第零周冻结的接口契约）
+# ---------------------------------------------------------------------------
+
+
+class CompetitionDetail(BaseModel):
+    """赛事详情接口统一返回结构。"""
+
+    competition: Competition
+    timeline: list[TimelineItem] = Field(default_factory=list)
+    requirements: list[RequirementItem] = Field(default_factory=list)
+    sources: list[SourceItem] = Field(default_factory=list)
+    verification: Verification
+
+
+# ---------------------------------------------------------------------------
+# 推荐结果（门控 + 评分）
+# ---------------------------------------------------------------------------
+
+
+class GateReason(BaseModel):
+    """门控不通过的单条原因。"""
+
+    reason: str
+    possible_action: Optional[str] = None
+
+
+class MatchBreakdown(BaseModel):
+    """软性匹配评分拆解。"""
+
+    skill_score: float = Field(..., description="S 技能匹配度 0-100")
+    experience_score: float = Field(..., description="E 经历匹配度 0-100")
+    resource_score: float = Field(..., description="R 资源匹配度 0-100")
+    workload_score: float = Field(..., description="W 工作量可承受度 0-100")
+    total: float = Field(..., description="0.40S+0.25E+0.20R+0.15W")
+
+
+class RecommendationResult(BaseModel):
+    """单条推荐结果。"""
+
+    competition_id: str
+    competition_name: str
+    recommendation_status: Literal[
+        "highly_suitable",   # 85-100 高度适合
+        "suitable",          # 70-84 比较适合
+        "marginal",          # 55-69 可参加但需补充
+        "not_prioritized",   # 0-54 不优先推荐
+        "candidate_only",    # 数据待核验，仅展示候选信息，不评分
+        "ineligible",        # 硬规则不符合，不进入评分
+    ]
+    score: Optional[float] = None
+    eligible: bool = True
+    gate_reasons: list[GateReason] = Field(default_factory=list)
+    match_breakdown: Optional[MatchBreakdown] = None
+    explanation: dict[str, Any] = Field(default_factory=dict, description="资格/匹配/缺口/队友/时间/下一步")
+    urgent: bool = Field(False, description="临近截止标签，不因此提高适配度")
+    pending_review: bool = Field(False, description="数据基于AI整理、待人工终审；UI 显示「待人工确认」标签")
+
+
+# ---------------------------------------------------------------------------
+# 我的项目（只引用赛事，不复制官方截止日期）
+# ---------------------------------------------------------------------------
+
+
+class ProjectItem(BaseModel):
+    item_id: int
+    item_type: ProjectItemType
+    title: str
+    due_date: Optional[date] = None
+    status: ProjectItemStatus = ProjectItemStatus.TODO
+    sort_order: int = 0
+
+
+class ProjectItemCreate(BaseModel):
+    item_type: ProjectItemType = ProjectItemType.TASK
+    title: str = Field(..., min_length=1, max_length=200)
+    due_date: Optional[date] = None
+
+
+class ProjectItemUpdate(BaseModel):
+    title: Optional[str] = Field(None, min_length=1, max_length=200)
+    due_date: Optional[date] = None
+    status: Optional[ProjectItemStatus] = None
+
+
+class UserProject(BaseModel):
+    project_id: int
+    user_id: str
+    competition_id: str
+    competition_name: str
+    document_year: int
+    registration_deadline: Optional[date] = None
+    submission_deadline: Optional[date] = None
+    status: ProjectStatus = ProjectStatus.PLANNED
+    created_at: str
+    items: list[ProjectItem] = Field(default_factory=list)
+
+
+class ProjectCreate(BaseModel):
+    competition_id: str
+
+
+class ProjectUpdate(BaseModel):
+    status: ProjectStatus
+
+
+# ---------------------------------------------------------------------------
+# 文档解析结果
+# ---------------------------------------------------------------------------
+
+
+class ParsedBlock(BaseModel):
+    """PDF/Word 解析后的单段文本块，保留页码与段落序号。"""
+
+    page: int
+    paragraph_index: int
+    text: str
+    competition_id: Optional[str] = None
+
+
+class ParseResult(BaseModel):
+    """一次文档解析结果。"""
+
+    document_name: str
+    category: CompetitionCategory
+    document_year: int
+    blocks: list[ParsedBlock] = Field(default_factory=list)

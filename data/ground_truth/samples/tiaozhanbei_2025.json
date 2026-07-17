@@ -1,0 +1,90 @@
+{
+  "competition_name": "第十九届“挑战杯”全国大学生课外学术科技作品竞赛（大挑）",
+  "document_year": 2025,
+  "organizer": "共青团中央、中国科协、教育部、中国社会科学院、全国学联和地方政府",
+  "category": "innovation",
+  "eligible_students": ["专科生", "本科生", "研究生"],
+  "allowed_grades": null,
+  "allowed_majors": null,
+  "team_required": false,
+  "team_min": 1,
+  "team_max": 10,
+  "registration_deadline": null,
+  "submission_deadline": null,
+  "required_materials": [
+    "作品申报书",
+    "参赛作品（自然科学类学术论文/哲学社会科学类社会调查报告/科技发明制作）",
+    "支撑证明材料（专利、鉴定等）"
+  ],
+  "evaluation_dimensions": ["科学性", "先进性", "现实意义"],
+  "required_skills": ["科研与学术研究", "学术写作", "创新设计", "AI工具应用"],
+  "official_source_url": "https://2025.tiaozhanbei.net",
+  "source_acquired_date": "2026-07-16",
+  "trusted_level": "B",
+  "data_status": "unverified",
+  "last_verified_at": "2026-07-16",
+  "doc_version": "2025_v1",
+  "evidence": [
+    {
+      "field": "eligible_students",
+      "page": null,
+      "source_text": "2025年6月1日以前正式注册的国内全日制非成人教育的各类高等院校在校专科生、本科生、硕士研究生和博士研究生(均不含在职研究生)均可申报作品参赛，以个人或团队形式参赛均可",
+      "document_name": "第十九届挑战杯官网_人工智能+专项赛赛事介绍",
+      "source_url": "https://2025.tiaozhanbei.net/d49/article/630/",
+      "acquired_date": "2026-07-16",
+      "last_verified_at": "2026-07-16",
+      "trusted_level": "B"
+    },
+    {
+      "field": "team_min",
+      "page": null,
+      "source_text": "以个人或团队形式参赛均可",
+      "document_name": "第十九届挑战杯官网_人工智能+专项赛赛事介绍",
+      "source_url": "https://2025.tiaozhanbei.net/d49/article/630/",
+      "acquired_date": "2026-07-16",
+      "last_verified_at": "2026-07-16",
+      "trusted_level": "B"
+    },
+    {
+      "field": "team_max",
+      "page": null,
+      "source_text": "每个团队不超过10人（含作品申报者）",
+      "document_name": "第十九届挑战杯官网_人工智能+专项赛赛事介绍",
+      "source_url": "https://2025.tiaozhanbei.net/d49/article/630/",
+      "acquired_date": "2026-07-16",
+      "last_verified_at": "2026-07-16",
+      "trusted_level": "B"
+    },
+    {
+      "field": "required_materials",
+      "page": null,
+      "source_text": "申报参赛的作品分为自然科学类学术论文、哲学社会科学类社会调查报告、科技发明制作三类。自然科学类学术论文作者限本专科生。",
+      "document_name": "挑战杯全国大学生课外学术科技作品竞赛章程(试行)",
+      "source_url": "https://news.dhu.edu.cn/_upload/article/files/89/ef/cc73fbb1435fa51fb58dba1af0bf/f7857b12-c311-41c9-8c63-9cfa1843c3bb.pdf",
+      "acquired_date": "2026-07-16",
+      "last_verified_at": "2026-07-16",
+      "trusted_level": "B"
+    },
+    {
+      "field": "required_skills",
+      "page": null,
+      "source_text": "借助大模型技术，通过零代码或低代码完成人工智能原生应用的设计、开发和线上运行，体验人工智能原生应用从开发、展示到运行的全流程",
+      "document_name": "第十九届挑战杯官网_人工智能+专项赛赛事介绍",
+      "source_url": "https://2025.tiaozhanbei.net/d49/article/630/",
+      "acquired_date": "2026-07-16",
+      "last_verified_at": "2026-07-16",
+      "trusted_level": "B"
+    },
+    {
+      "field": "evaluation_dimensions",
+      "page": null,
+      "source_text": "国赛将按照学历最高的参赛成员划分至专科组、本科组、硕士组和博士组分开评审",
+      "document_name": "第十九届挑战杯官网_人工智能+专项赛赛事介绍",
+      "source_url": "https://2025.tiaozhanbei.net/d49/article/630/",
+      "acquired_date": "2026-07-16",
+      "last_verified_at": "2026-07-16",
+      "trusted_level": "B"
+    }
+  ],
+  "notes": "本标注由 AI 基于官网（2025.tiaozhanbei.net）及竞赛章程整理，截止日期与细则最终需人工访问官方页面确认。大挑主体赛作品分个人作品（1人）与集体作品（不超过10人），故 team_min=1、team_max=10；无全国统一报名截止日期，由各校/省自定，国赛申报集中在6-8月，registration_deadline 记为 null。evaluation_dimensions（科学性/先进性/现实意义）为挑战杯主体赛通用评审维度，评审细则以官方章程为准；人工智能+专项赛与主体赛团队上限一致（不超过10人）。"
+}

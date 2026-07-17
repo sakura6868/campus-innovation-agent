@@ -1,0 +1,86 @@
+{
+  "competition_name": "蓝桥杯全国软件和信息技术专业人才大赛",
+  "document_year": 2026,
+  "organizer": "蓝桥杯全国大学生软件和信息技术大赛组委会",
+  "category": "programming",
+  "eligible_students": ["本科生", "研究生", "高职高专学生"],
+  "allowed_grades": null,
+  "allowed_majors": null,
+  "team_required": false,
+  "team_min": 1,
+  "team_max": 1,
+  "registration_deadline": "2026-03-11",
+  "submission_deadline": null,
+  "required_materials": ["身份证正反面照片", "学生证电子版", "2寸彩色证件照"],
+  "evaluation_dimensions": ["算法与编程能力", "解题正确率", "代码质量"],
+  "required_skills": ["C/C++", "Java", "Python", "算法", "Web应用开发", "软件测试", "网络安全"],
+  "official_source_url": "https://dasai.lanqiao.cn/",
+  "source_acquired_date": "2026-07-16",
+  "trusted_level": "B",
+  "data_status": "unverified",
+  "last_verified_at": "2026-07-16",
+  "doc_version": "2026_v1",
+  "evidence": [
+    {
+      "field": "registration_deadline",
+      "page": null,
+      "source_text": "现因部分院校反馈在组织学生报名过程中时间较为紧迫，难以在报名截止前完成学生选拔等相关工作，经大赛组委会研究决定，现将部分科目报名和缴费截止时间调整至 2026年3月11日14:00。",
+      "document_name": "关于第十七届蓝桥杯大赛部分科目报名时间调整的通知（蓝桥杯组委会字〔2026〕2号）",
+      "source_url": "https://dasai.lanqiao.cn/notices/1882",
+      "acquired_date": "2026-07-16",
+      "last_verified_at": "2026-07-16",
+      "trusted_level": "B"
+    },
+    {
+      "field": "team_max",
+      "page": null,
+      "source_text": "1.软件赛(个人赛) (1)C/C++程序设计(研究生组、大学A组、B组、C组) (2)Java软件开发(研究生组、大学A组、B组、C组) (3)Python程序设计(研究生组、大学A组、B组、C组) (4)Web应用开发 (5)软件测试 (6)网络安全",
+      "document_name": "关于组织参加2026年第十七届蓝桥杯全国大学生软件和信息技术大赛的通知（高校转发）",
+      "source_url": "https://ggxy.cueb.edu.cn/tzgg/96c8710748f746f9bd198ba532f0ad7e.htm",
+      "acquired_date": "2026-07-16",
+      "last_verified_at": "2026-07-16",
+      "trusted_level": "B"
+    },
+    {
+      "field": "team_min",
+      "page": null,
+      "source_text": "省赛、全国总决赛均采用封闭、限时方式举办。选手以个人为单位，独立进行作答。",
+      "document_name": "第十七届蓝桥杯大赛软件赛(软件测试科目)竞赛规则及说明（官网）",
+      "source_url": "https://dasai.lanqiao.cn/pages/dasai/news_detail.html?id=1821",
+      "acquired_date": "2026-07-16",
+      "last_verified_at": "2026-07-16",
+      "trusted_level": "B"
+    },
+    {
+      "field": "eligible_students",
+      "page": null,
+      "source_text": "具有正式全日制学籍且符合相关科目报名要求的研究生、本科生及高职高专学生(以报名时状态为准)。",
+      "document_name": "关于2026年第十七届“蓝桥杯”全国软件和信息技术人才大赛报名的通知（高校转发）",
+      "source_url": "https://cxcyxy.sylu.edu.cn/info/1089/2930.htm",
+      "acquired_date": "2026-07-16",
+      "last_verified_at": "2026-07-16",
+      "trusted_level": "B"
+    },
+    {
+      "field": "required_materials",
+      "page": null,
+      "source_text": "学籍身份验证(验证学生证件照、身份证和学生证电子版)",
+      "document_name": "关于组织参加2026年第十七届蓝桥杯全国大学生软件和信息技术大赛的通知（高校转发）",
+      "source_url": "https://ggxy.cueb.edu.cn/tzgg/96c8710748f746f9bd198ba532f0ad7e.htm",
+      "acquired_date": "2026-07-16",
+      "last_verified_at": "2026-07-16",
+      "trusted_level": "B"
+    },
+    {
+      "field": "required_skills",
+      "page": null,
+      "source_text": "软件赛(个人赛) (1)C/C++程序设计 (2)Java软件开发 (3)Python程序设计 (4)Web应用开发 (5)软件测试 (6)网络安全",
+      "document_name": "关于组织参加2026年第十七届蓝桥杯全国大学生软件和信息技术大赛的通知（高校转发）",
+      "source_url": "https://ggxy.cueb.edu.cn/tzgg/96c8710748f746f9bd198ba532f0ad7e.htm",
+      "acquired_date": "2026-07-16",
+      "last_verified_at": "2026-07-16",
+      "trusted_level": "B"
+    }
+  ],
+  "notes": "第十七届蓝桥杯2026年举办，省赛2026年4月（部分科目4月11-12日），全国总决赛2026年6月中上旬。截止时间差异：多所高校校内通知称报名截止2025-12-15，但官网组委会《部分科目报名时间调整的通知》（蓝桥杯组委会字〔2026〕2号）将软件赛等科目报名缴费截止延长至2026-03-11 14:00，本标注以官网调整通知为准。主办单位差异：校内通知有称'工业和信息化部人才交流中心决定举办'，官网/转发通知称主办为'蓝桥杯全国大学生软件和信息技术大赛组委会'、指导单位为中国软件行业协会，以官网章程为准。不同赛项（数字科技创新赛、视觉艺术设计赛、专项赛）报名与作品提交截止各异，本标注仅取软件赛主赛项可确认时间。本标注由AI基于官网及高校官方转发整理，最终须人工访问官网确认。"
+}
