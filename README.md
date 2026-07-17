@@ -66,6 +66,43 @@ python -m venv venv
 .\venv\Scripts\python.exe -m uvicorn api:app --app-dir src --host 127.0.0.1 --port 8000
 ```
 
+## ☁️ 云端部署（Render）与更新
+
+本项目已配置 GitHub + Render 自动部署：代码 push 到 GitHub 的 `master` 分支后，Render 通过 `render.yaml`（Blueprint）自动重新构建并上线，**无需手动操作 Render 控制台**。
+
+### 首次部署（一次性）
+
+1. 在 GitHub 创建仓库（本仓库为 `sakura6868/campus-innovation-agent`，私有，`master` 分支）。
+2. 打开预填链接用 GitHub 登录 Render：
+   `https://dashboard.render.com/new/blueprint?repo=https://github.com/sakura6868/campus-innovation-agent`
+3. 授权时勾选允许访问该私有仓库；确认将创建两个资源：
+   - `campus-innovation-agent`（Web 服务，free）
+   - `campus-db`（PostgreSQL，free，数据持久化）
+4. 点 **Deploy Blueprint**，等待 3–8 分钟构建完成，即可访问
+   `https://campus-innovation-agent.onrender.com`。
+
+### 部署踩过的坑（已修复，记录备查）
+
+- `requirements.txt` 中 `pdfplumber>=3.0` 版本不存在（最新 `0.11.10`）→ 已改为 `>=0.11`；并补充 `psycopg2-binary>=2.9`（连接 Postgres 必需）。
+- `render.yaml` 旧版把 Postgres 写在 `services:` 下（`type: postgres`）→ 报 `unknown type "postgres"`；Postgres 必须放在顶层 `databases:` 块，且 `fromDatabase.name` 与该块 `name` 一致。
+- `rag/store.py` 原本在模块顶层 `import chromadb` → Render 未装该库时启动即崩溃；已改为构造器内**惰性导入 + 未安装自动降级本地检索**。
+- Render 注入的 `DATABASE_URL` 协议头为 `postgres://`，而 SQLAlchemy 2.0 只认 `postgresql://` → `db.py` 已做归一化。
+
+### 以后怎么更新
+
+> 核心：把新代码 push 到 GitHub `master` → Render 自动重新部署。
+
+- **方式 A（找我改）**：在对话里说明要改什么，我直接在沙箱改代码、提交并 push；每次 push 需要你的 GitHub PAT（建议用完即 revoke）。
+- **方式 B（自己改）**：本地 `git clone` 后修改，`git push` 即触发自动部署。
+
+push 后一般无需去 Render 点按钮（auto-sync 会自动触发）；若未自动部署，到服务页点 **Manual Deploy → Deploy latest commit**。
+
+### 免费套餐注意事项
+
+- **冷启动**：15 分钟无访问服务休眠，首次打开需等 10–30 秒唤醒。
+- **数据库保留**：免费 Postgres 90 天无访问会被自动删库；可设置定时访问（如每 10 天请求一次 `/health`）保活。
+- **访问量**：无硬性人数上限，但单实例资源有限，适合教学/作业展示级别的几十人访问。
+
 ## 自动测试
 
 ```powershell
