@@ -20,8 +20,9 @@ services:
       # - key: AGENT_LLM_BASE_URL
       #   value: "https://api.openai.com/v1"
 
-  - type: postgres
-    name: campus-db
+# 数据库必须放在顶层 databases: 下（不能塞进 services: 里用 type: postgres）
+databases:
+  - name: campus-db            # 此 name 须与上面 fromDatabase.name 一致
     plan: free                 # 免费 Postgres；数据持久化，重启不丢
     databaseName: campus
     user: campus
