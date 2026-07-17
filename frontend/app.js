@@ -84,10 +84,6 @@ const STATUS_LABEL = {
   candidate_only: "候选信息·未评分",
   ineligible: "不符合·一票否决",
 };
-const FACTTAG_CLASS = {
-  "官方规则": "fact", "系统计算": "system",
-  "智能建议": "suggest",
-};
 
 // ---------------------------------------------------------------------------
 // 引用证据弹窗
@@ -374,32 +370,44 @@ async function renderDetail(id) {
   const majors = c.allowed_majors && c.allowed_majors.length ? c.allowed_majors.join("、") : "不限专业";
   const teamTxt = `${c.team_min ?? 1}—${c.team_max ?? 1} 人${c.team_required ? "（组队赛）" : "（个人或组队）"}`;
 
-  const timelineHtml = (detail.timeline || []).map((t) => {
-    if (t.label === "奖项设置" && c.award_distribution && c.award_distribution.length) {
-      const rows = c.award_distribution.map((a) =>
-        `<div class="award-row"><span class="award-name">${escapeHtml(a.award)}</span><span class="award-prop">${escapeHtml(a.proportion || "—")}</span></div>`
-      ).join("");
-      return `<div class="kv kv-awards"><span class="k">${escapeHtml(t.label)}</span><span class="v">${rows}</span></div>`;
-    }
-    return `<div class="kv"><span class="k">${escapeHtml(t.label)}</span><span class="v">${escapeHtml(t.event_date || t.date_text || "—")}</span></div>`;
-  }).join("") || `<div class="muted">暂无时间轴</div>`;
+  // 适合谁参加（基于资格要求自动拼接）
+  const whoItems = [];
+  if (c.eligible_students && c.eligible_students.length) whoItems.push(c.eligible_students.join("、") + "可参加");
+  if (grades !== "不限年级") whoItems.push(grades);
+  if (majors !== "不限专业") whoItems.push(majors);
+  whoItems.push(teamTxt);
+  const whoText = whoItems.join("；") + "。";
 
-  const reqHtml = (detail.requirements || []).map((r) => {
-    const cls = FACTTAG_CLASS[r.tag] || "system";
-    return `<div class="kv"><span class="tag ${cls}">${escapeHtml(r.tag)}</span><span class="v">${escapeHtml(r.text)}</span></div>`;
-  }).join("");
+  // 比赛时间范围
+  let compRange = null;
+  if (c.competition_start_date && c.competition_end_date) compRange = `${c.competition_start_date} 至 ${c.competition_end_date}`;
+  else if (c.competition_start_date) compRange = `${c.competition_start_date} 起`;
+  else if (c.competition_end_date) compRange = `至 ${c.competition_end_date}`;
 
-  const sourcesHtml = (detail.sources || []).map((s) =>
-    `<div class="kv"><span class="k">${escapeHtml(s.name || "来源")}</span><span class="v">${
-      s.url ? `<a href="${escapeHtml(s.url)}" target="_blank" rel="noopener">${escapeHtml(s.url)}</a>` : "—"
-    }（获取 ${escapeHtml(s.acquired_date || "—")}）</span></div>`
-  ).join("");
+  // 关键时间（按时间顺序排列）
+  const keyTimeItems = [];
+  if (c.registration_deadline) keyTimeItems.push({ label: "报名截止", date: c.registration_deadline });
+  if (c.submission_deadline) keyTimeItems.push({ label: "提交截止", date: c.submission_deadline });
+  if (compRange) keyTimeItems.push({ label: "比赛时间", date: compRange });
+  if (c.result_announcement_date) keyTimeItems.push({ label: "成绩公布", date: String(c.result_announcement_date) });
+  const keyTimeHtml = keyTimeItems.length
+    ? keyTimeItems.map((t) => `<div class="kv"><span class="k">${escapeHtml(t.label)}</span><span class="v">${escapeHtml(t.date)}</span></div>`).join("")
+    : `<div class="muted">暂无时间安排</div>`;
 
-  const legend = `<div class="factnote">
-    <span class="tag fact">官方规则</span>
-    <span class="tag system">系统计算</span>
-    <span class="tag suggest">智能建议</span>
-  </div>`;
+  // 奖项设置（奖项 + 比例）
+  let awardHtml = "";
+  if (c.award_distribution && c.award_distribution.length) {
+    const rows = c.award_distribution.map((a) =>
+      `<div class="award-row"><span class="award-name">${escapeHtml(a.award)}</span><span class="award-prop">${escapeHtml(a.proportion || "—")}</span></div>`
+    ).join("");
+    awardHtml = `<div class="kv kv-awards"><span class="k">奖项设置</span><span class="v">${rows}</span></div>`;
+  } else if (c.award_settings) {
+    awardHtml = `<div class="kv"><span class="k">奖项设置</span><span class="v">${escapeHtml(c.award_settings)}</span></div>`;
+  }
+
+  // 顶部“访问官网”链接
+  const officialUrl = c.official_source_url || (detail.sources && detail.sources[0] && detail.sources[0].url) || "";
+
 
   $("#detail-content").innerHTML = `
     <div class="card">
@@ -409,8 +417,16 @@ async function renderDetail(id) {
         <span class="tag cat">${CAT_LABEL[c.category] || c.category}</span>
         <span class="tag year">${c.document_year}</span>
       </div>
-      </div><button id="join-project" class="btn primary">加入我的项目</button></div>
+      </div>
+      <div class="detail-actions">
+        ${officialUrl ? `<a class="btn ghost" href="${escapeHtml(officialUrl)}" target="_blank" rel="noopener">访问官网</a>` : ""}
+        <button id="join-project" class="btn primary">加入我的项目</button>
+      </div>
     </div>
+
+    ${c.brief_description ? `<div class="section"><h3>比赛简介</h3><div class="card"><p class="brief-desc" style="line-height:1.7;color:#30343a;margin:0;white-space:pre-wrap;">${escapeHtml(c.brief_description)}</p></div></div>` : ""}
+
+    <div class="section"><h3>适合谁参加</h3><div class="card"><p class="who-text" style="line-height:1.7;color:#30343a;margin:0;">${escapeHtml(whoText)}</p></div></div>
 
     <div class="section"><h3>资格要求</h3><div class="card">
       ${kv("参赛对象", (c.eligible_students || []).join("、") || "—", "eligible_students")}
@@ -419,26 +435,18 @@ async function renderDetail(id) {
       ${kv("团队规模", teamTxt, "team_max")}
     </div></div>
 
-    <div class="section"><h3>时间要求</h3><div class="card">
-      ${kv("报名截止", escapeHtml(c.registration_deadline || "未明确"), "registration_deadline")}
-      ${kv("提交截止", escapeHtml(c.submission_deadline || "未明确"), "submission_deadline")}
+    <div class="section"><h3>关键时间</h3><div class="card">
+      ${keyTimeHtml}
+      ${awardHtml}
     </div></div>
 
     <div class="section"><h3>材料与能力</h3><div class="card">
-      ${kv("所需材料", (c.required_materials || []).join("、") || "—", "required_materials")}
-      ${kv("所需技能", (c.required_skills || []).join("、") || "—", "required_skills")}
-      ${kv("评价维度", (c.evaluation_dimensions || []).join("、") || "—", "")}
+      ${(c.required_materials && c.required_materials.length) ? kv("所需材料", c.required_materials.join("、"), "required_materials") : ""}
+      ${(c.required_skills && c.required_skills.length) ? kv("所需技能", c.required_skills.join("、"), "required_skills") : ""}
+      ${(c.evaluation_dimensions && c.evaluation_dimensions.length) ? kv("评价维度", c.evaluation_dimensions.join("、")) : ""}
     </div></div>
 
-    <div class="section"><h3>时间轴</h3><div class="card">${timelineHtml}</div></div>
-
-    <div class="section"><h3>要求条目（事实 / 计算 / 建议 分层）</h3><div class="card">${reqHtml}</div>${legend}</div>
-
-    <div class="section"><h3>来源</h3><div class="card">
-      ${kv("版本", escapeHtml(c.doc_version || "—"))}
-      ${sourcesHtml}
-      <div class="kv"><span class="k">说明</span><span class="v">以上信息来自赛事官方通知，请以学校官网或赛事官网最新发布为准。</span></div>
-    </div></div>
+    <div class="section source-note"><p class="muted">以上信息来自赛事官方通知，请以学校官网或赛事官网最新发布为准。</p></div>
   `;
 
   $("#join-project").addEventListener("click", () => joinProject(c.competition_id));
@@ -1026,9 +1034,12 @@ $("#adm-form").addEventListener("submit", async (e) => {
     team_max: $("#adm-tmax").value ? Number($("#adm-tmax").value) : null,
     registration_deadline: $("#adm-reg").value || null,
     submission_deadline: $("#adm-sub").value || null,
+    competition_start_date: $("#adm-comp-start").value || null,
+    competition_end_date: $("#adm-comp-end").value || null,
     result_announcement_date: $("#adm-result").value || null,
     award_settings: $("#adm-award-settings").value.trim() || null,
     award_distribution: parseAwardDistribution($("#adm-award-distribution").value),
+    brief_description: $("#adm-brief").value.trim() || null,
     required_materials: csv($("#adm-materials").value),
     evaluation_dimensions: [],
     required_skills: csv($("#adm-skills").value),

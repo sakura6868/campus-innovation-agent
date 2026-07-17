@@ -11,8 +11,11 @@
   "team_max": 3,
   "registration_deadline": "2026-08-10",
   "submission_deadline": "2026-09-01",
+  "competition_start_date": "2026-08-20",
+  "competition_end_date": "2026-09-01",
   "result_announcement_date": "2026-10-15",
   "award_settings": "设一等奖、二等奖、三等奖及优秀奖。",
+  "brief_description": "示例赛事简介：一句话说明比赛内容、参赛形式与亮点，例如「面向高校学生的 XX 类竞赛，以组队形式在 X 天内完成作品并提交评审」。",
   "award_distribution": [
     { "award": "一等奖", "proportion": "5%", "note": "示例比例" },
     { "award": "二等奖", "proportion": "10%", "note": "示例比例" },

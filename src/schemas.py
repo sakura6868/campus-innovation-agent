@@ -175,10 +175,15 @@ class Competition(BaseModel):
     registration_deadline: Optional[date] = None
     submission_deadline: Optional[date] = None
     result_announcement_date: Optional[date] = None  # 成绩公布日期
+    competition_start_date: Optional[date] = None    # 比赛开始日期
+    competition_end_date: Optional[date] = None      # 比赛结束日期
 
     # —— 奖项设置 ——
     award_settings: Optional[str] = None             # 奖项设置文本说明
     award_distribution: list[AwardDistributionItem] = Field(default_factory=list)  # 各奖项比例
+
+    # —— 比赛说明 ——
+    brief_description: Optional[str] = None          # 比赛简要说明
 
     # —— 材料与能力 ——
     required_materials: list[str] = Field(default_factory=list)

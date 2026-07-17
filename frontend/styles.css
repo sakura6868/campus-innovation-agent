@@ -1827,12 +1827,19 @@ label input, label select, .agent-input textarea, .login-custom input,
 }
 .award-name {
   color: #30343a;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
 }
 .award-prop {
   color: #1769e0;
   font-weight: 600;
   white-space: nowrap;
 }
+.detail-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.detail-actions .btn { white-space: nowrap; }
+.source-note { margin-top: 2px; }
+.source-note .muted { font-size: 12px; }
 
 /* Data pipeline */
 .admin-page-head {

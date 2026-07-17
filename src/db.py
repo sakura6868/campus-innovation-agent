@@ -106,10 +106,13 @@ class CompetitionModel(Base):
     registration_deadline: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     submission_deadline: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     result_announcement_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    competition_start_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    competition_end_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
 
     # 奖项设置
     award_settings: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     award_distribution: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # JSON list[AwardDistributionItem]
+    brief_description: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # 比赛简要说明
 
     # 材料与能力
     required_materials: Mapped[list] = mapped_column(String, nullable=False, default="[]")
@@ -247,13 +250,17 @@ def _migrate_competition_columns() -> None:
     """
     from sqlalchemy import text
 
-    wanted = {"result_announcement_date", "award_settings", "award_distribution"}
+    wanted = {
+        "result_announcement_date", "award_settings", "award_distribution",
+        "competition_start_date", "competition_end_date", "brief_description",
+    }
+    date_cols = {"result_announcement_date", "competition_start_date", "competition_end_date"}
     if DATABASE_URL.startswith("sqlite"):
         with _engine.begin() as conn:
             rows = conn.execute(text("PRAGMA table_info(competitions)")).fetchall()
             existing = {r[1] for r in rows}
             for col in wanted - existing:
-                col_type = "DATE" if col == "result_announcement_date" else "VARCHAR"
+                col_type = "DATE" if col in date_cols else "VARCHAR"
                 conn.execute(text(f"ALTER TABLE competitions ADD COLUMN {col} {col_type}"))
     else:
         with _engine.begin() as conn:
@@ -262,7 +269,7 @@ def _migrate_competition_columns() -> None:
             ).fetchall()
             existing = {r[0] for r in rows}
             for col in wanted - existing:
-                col_type = "DATE" if col == "result_announcement_date" else "VARCHAR"
+                col_type = "DATE" if col in date_cols else "VARCHAR"
                 conn.execute(text(f"ALTER TABLE competitions ADD COLUMN {col} {col_type}"))
 
 
@@ -373,8 +380,11 @@ def _competition_to_pydantic(m: CompetitionModel) -> Competition:
         registration_deadline=m.registration_deadline,
         submission_deadline=m.submission_deadline,
         result_announcement_date=m.result_announcement_date,
+        competition_start_date=m.competition_start_date,
+        competition_end_date=m.competition_end_date,
         award_settings=m.award_settings,
         award_distribution=[AwardDistributionItem(**a) for a in _load_json(m.award_distribution)],
+        brief_description=m.brief_description,
         required_materials=_load_json(m.required_materials),
         evaluation_dimensions=_load_json(m.evaluation_dimensions),
         required_skills=_load_json(m.required_skills),
@@ -516,8 +526,11 @@ def _upsert_competition_from_raw(raw: dict, session) -> None:
         "registration_deadline": _to_date(raw.get("registration_deadline")),
         "submission_deadline": _to_date(raw.get("submission_deadline")),
         "result_announcement_date": _to_date(raw.get("result_announcement_date")),
+        "competition_start_date": _to_date(raw.get("competition_start_date")),
+        "competition_end_date": _to_date(raw.get("competition_end_date")),
         "award_settings": raw.get("award_settings"),
         "award_distribution": _dump_json(raw.get("award_distribution") or []),
+        "brief_description": raw.get("brief_description"),
         "required_materials": _dump_json(raw.get("required_materials") or []),
         "evaluation_dimensions": _dump_json(raw.get("evaluation_dimensions") or []),
         "required_skills": _dump_json(raw.get("required_skills") or []),
@@ -651,6 +664,15 @@ def get_competition_detail(competition_id: str) -> Optional[CompetitionDetail]:
     timeline = []
     if comp.result_announcement_date:
         timeline.append(TimelineItem(label="成绩公布", event_date=comp.result_announcement_date))
+    comp_range = None
+    if comp.competition_start_date and comp.competition_end_date:
+        comp_range = f"{comp.competition_start_date} 至 {comp.competition_end_date}"
+    elif comp.competition_start_date:
+        comp_range = f"{comp.competition_start_date} 起"
+    elif comp.competition_end_date:
+        comp_range = f"至 {comp.competition_end_date}"
+    if comp_range:
+        timeline.append(TimelineItem(label="比赛时间", date_text=comp_range))
     if comp.award_settings:
         timeline.append(TimelineItem(label="奖项设置", date_text=comp.award_settings))
     if not timeline:
@@ -971,10 +993,13 @@ def upsert_competition(comp: Competition) -> Competition:
         existing.registration_deadline = comp.registration_deadline
         existing.submission_deadline = comp.submission_deadline
         existing.result_announcement_date = comp.result_announcement_date
+        existing.competition_start_date = comp.competition_start_date
+        existing.competition_end_date = comp.competition_end_date
         existing.award_settings = comp.award_settings
         existing.award_distribution = _dump_json(
             [a.model_dump(mode="json") for a in comp.award_distribution]
         )
+        existing.brief_description = comp.brief_description
         existing.required_materials = _dump_json(comp.required_materials)
         existing.evaluation_dimensions = _dump_json(comp.evaluation_dimensions)
         existing.required_skills = _dump_json(comp.required_skills)

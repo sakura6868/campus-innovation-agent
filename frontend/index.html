@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>校园科创导航智能体</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='10' fill='%2316181d'/%3E%3Ctext x='32' y='40' text-anchor='middle' font-family='Arial' font-size='25' font-weight='700' fill='white'%3ECI%3C/text%3E%3C/svg%3E" />
-  <link rel="stylesheet" href="/static/styles.css?v=20260718.2" />
+  <link rel="stylesheet" href="/static/styles.css?v=20260718.4" />
 </head>
 <body>
   <header class="topnav">
@@ -266,6 +266,12 @@
             <label>提交截止
               <input id="adm-sub" type="date" />
             </label>
+            <label>比赛开始日期
+              <input id="adm-comp-start" type="date" />
+            </label>
+            <label>比赛结束日期
+              <input id="adm-comp-end" type="date" />
+            </label>
             <label>成绩公布日期
               <input id="adm-result" type="date" />
             </label>
@@ -274,6 +280,9 @@
             </label>
             <label>奖项比例（格式：奖项 比例，多行或逗号分隔）
               <textarea id="adm-award-distribution" rows="3" placeholder="一等奖 5%&#10;二等奖 15%&#10;三等奖 25%"></textarea>
+            </label>
+            <label>比赛简要说明
+              <textarea id="adm-brief" rows="4" placeholder="一句话介绍比赛内容、形式与亮点"></textarea>
             </label>
             <label>团队最少人数
               <input id="adm-tmin" type="number" min="1" />
@@ -364,6 +373,6 @@
 
   <div id="toast" class="toast hidden"></div>
 
-  <script src="/static/app.js?v=20260718.2"></script>
+  <script src="/static/app.js?v=20260718.4"></script>
 </body>
 </html>
