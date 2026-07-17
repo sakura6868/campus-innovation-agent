@@ -9,7 +9,7 @@
   --fact: #2563eb;       /* 官方规则 */
   --system: #64748b;     /* 系统计算 */
   --suggest: #16a34a;    /* 智能建议 */
-  --pending: #ea580c;    /* 待人工确认 */
+  --pending: #ea580c;    /* 候选/提醒 */
   --urgent: #dc2626;
 }
 

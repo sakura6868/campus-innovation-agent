@@ -86,7 +86,7 @@ const STATUS_LABEL = {
 };
 const FACTTAG_CLASS = {
   "官方规则": "fact", "系统计算": "system",
-  "智能建议": "suggest", "待人工确认": "pending",
+  "智能建议": "suggest",
 };
 
 // ---------------------------------------------------------------------------
@@ -102,9 +102,7 @@ function openCiteModal(i) {
     <div class="kv"><span class="k">佐证字段</span><span class="v">${escapeHtml(e.field)}</span></div>
     <div class="kv"><span class="k">文档</span><span class="v">${escapeHtml(e.document_name || "—")}</span></div>
     <div class="kv"><span class="k">页码</span><span class="v">${page}</span></div>
-    <div class="kv"><span class="k">可信等级</span><span class="v">${escapeHtml(e.trusted_level || "—")} 级</span></div>
     <div class="kv"><span class="k">获取日期</span><span class="v">${escapeHtml(e.acquired_date || "—")}</span></div>
-    <div class="kv"><span class="k">最后核验</span><span class="v">${escapeHtml(e.last_verified_at || "—")}</span></div>
     <div class="kv"><span class="k">官方链接</span><span class="v">${
       e.source_url ? `<a href="${escapeHtml(e.source_url)}" target="_blank" rel="noopener">${escapeHtml(e.source_url)}</a>` : "—"
     }</span></div>
@@ -410,7 +408,6 @@ async function renderDetail(id) {
       <div class="comp-meta">
         <span class="tag cat">${CAT_LABEL[c.category] || c.category}</span>
         <span class="tag year">${c.document_year}</span>
-        ${detail.verification && detail.verification.note ? `<span class="muted">${escapeHtml(detail.verification.note)}</span>` : ""}
       </div>
       </div><button id="join-project" class="btn primary">加入我的项目</button></div>
     </div>
@@ -437,11 +434,10 @@ async function renderDetail(id) {
 
     <div class="section"><h3>要求条目（事实 / 计算 / 建议 分层）</h3><div class="card">${reqHtml}</div>${legend}</div>
 
-    <div class="section"><h3>来源与可信</h3><div class="card">
-      ${kv("数据状态", `<span class="tag status-${escapeHtml(c.data_status)}">${escapeHtml(c.data_status)}</span>`)}
+    <div class="section"><h3>来源</h3><div class="card">
       ${kv("版本", escapeHtml(c.doc_version || "—"))}
-      ${kv("最后核验", escapeHtml(c.last_verified_at || "—"))}
       ${sourcesHtml}
+      <div class="kv"><span class="k">说明</span><span class="v">以上信息来自赛事官方通知，请以学校官网或赛事官网最新发布为准。</span></div>
     </div></div>
   `;
 
@@ -476,7 +472,7 @@ async function ragSearch(compId, year) {
     return `<div class="card" style="margin-bottom:8px;">
       <div class="row between">
         <span class="tag fact">命中字段：${escapeHtml(h.field)}</span>
-        <span class="muted">${page} · ${escapeHtml(h.trusted_level || "A")}级</span>
+        <span class="muted">${page}</span>
       </div>
       <p style="margin:8px 0 0;background:#f8fafc;border-left:3px solid var(--fact);padding:10px;border-radius:6px;">${escapeHtml(h.source_text)}</p>
     </div>`;
@@ -502,7 +498,7 @@ async function renderRecommend() {
   }
   const formalCount = recs.filter((r) => r.eligible).length;
   const candidateCount = recs.filter((r) => r.recommendation_status === "candidate_only").length;
-  $("#recommend-hint").textContent = `共 ${recs.length} 项赛事：${formalCount} 项正式推荐，${candidateCount} 项待核验候选。只有已核验且通过硬性门控的赛事才会评分。`;
+  $("#recommend-hint").textContent = `共 ${recs.length} 项赛事：${formalCount} 项正式推荐，${candidateCount} 项候选参考。`;
 
   // 排序：可推荐在前
   const order = { highly_suitable: 0, suitable: 1, marginal: 2, not_prioritized: 3, candidate_only: 4, ineligible: 5 };
@@ -532,7 +528,7 @@ async function renderRecommend() {
       <div class="comp-meta">${tags}</div>
       ${gate}
       ${explain ? `<ul class="explain">${explain}</ul>` : ""}
-      ${r.recommendation_status === "candidate_only" ? `<div class="muted" style="font-size:12px;margin-top:6px;">该赛事仅作为候选信息展示，完成人工核验前不会进行资格判断或匹配评分。</div>` : ""}
+      ${r.recommendation_status === "candidate_only" ? `<div class="muted" style="font-size:12px;margin-top:6px;">该赛事仅作为候选信息展示，暂未纳入匹配评分。</div>` : ""}
       ${r.eligible && !r.pending_review ? `<div class="row"><button class="btn primary join-btn" data-id="${escapeHtml(r.competition_id)}">加入我的项目</button></div>` : ""}
     </article>`;
   }).join("");
@@ -963,8 +959,6 @@ function renderAdminBlocks(blocks) {
         document_name: admDocName,
         source_url: ($("#adm-url").value || "").trim() || null,
         acquired_date: todayStr(),
-        last_verified_at: todayStr(),
-        trusted_level: "A",
       });
       renderAdminEvidence();
       toast("已关联「" + field + "」引用");
@@ -1040,9 +1034,6 @@ $("#adm-form").addEventListener("submit", async (e) => {
     required_skills: csv($("#adm-skills").value),
     official_source_url: urlVal || null,
     source_acquired_date: todayStr(),
-    trusted_level: "A",
-    data_status: "verified",
-    last_verified_at: todayStr(),
     evidence: admEvidence,
     doc_version: `${$("#adm-year").value || 2026}_v1`,
   };
@@ -1050,7 +1041,7 @@ $("#adm-form").addEventListener("submit", async (e) => {
   setAdminStep(3);
   try {
     const d = await apiPost("/api/admin/competitions", comp);
-    $("#adm-save-msg").textContent = `✓ 已入库 ${d.competition_id}（${d.data_status}，证据 ${d.evidence_count} 条，RAG ${d.rag_chunks} 块）`;
+    $("#adm-save-msg").textContent = `✓ 已入库 ${d.competition_id}（证据 ${d.evidence_count} 条，RAG ${d.rag_chunks} 块）`;
     $("#adm-save-msg").className = "msg ok";
     setAdminStep(4);
     toast("入库成功，已刷新检索库");
