@@ -5,7 +5,7 @@ uvicorn>=0.29
 pydantic>=2.6
 sqlalchemy>=2.0
 psycopg2-binary>=2.9        # Render 免费 Postgres 所需驱动（本地 SQLite 不受影响）
-pdfplumber>=3.0
+pdfplumber>=0.11
 python-docx>=1.1
 
 # —— 以下均为可选依赖，应用内置等价实现，未安装也能完整运行 ——
