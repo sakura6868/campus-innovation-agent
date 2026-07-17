@@ -104,6 +104,10 @@ class CompetitionModel(Base):
     # 时间相关
     registration_deadline: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     submission_deadline: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    result_announcement_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+
+    # 奖项设置
+    award_settings: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
     # 材料与能力
     required_materials: Mapped[list] = mapped_column(String, nullable=False, default="[]")
@@ -227,9 +231,37 @@ def init_db() -> None:
     get_engine()
     Base.metadata.create_all(_engine)
     _migrate_user_profile_columns()
+    _migrate_competition_columns()
     # 必须在 seed 之前置位，避免 seed -> session_scope -> init_db 递归
     _initialized = True
     seed_all()
+
+
+def _migrate_competition_columns() -> None:
+    """幂等增量迁移：为已存在的 competitions 表补齐新增时间/奖项列。
+
+    SQLAlchemy 的 create_all 不会向已存在的表添加新列，因此这里检查缺失列
+    并 ALTER TABLE 补齐（SQLite 用 PRAGMA；PostgreSQL 用 information_schema）。
+    """
+    from sqlalchemy import text
+
+    wanted = {"result_announcement_date", "award_settings"}
+    if DATABASE_URL.startswith("sqlite"):
+        with _engine.begin() as conn:
+            rows = conn.execute(text("PRAGMA table_info(competitions)")).fetchall()
+            existing = {r[1] for r in rows}
+            for col in wanted - existing:
+                col_type = "DATE" if col == "result_announcement_date" else "VARCHAR"
+                conn.execute(text(f"ALTER TABLE competitions ADD COLUMN {col} {col_type}"))
+    else:
+        with _engine.begin() as conn:
+            rows = conn.execute(
+                text("SELECT column_name FROM information_schema.columns WHERE table_name = 'competitions'")
+            ).fetchall()
+            existing = {r[0] for r in rows}
+            for col in wanted - existing:
+                col_type = "DATE" if col == "result_announcement_date" else "VARCHAR"
+                conn.execute(text(f"ALTER TABLE competitions ADD COLUMN {col} {col_type}"))
 
 
 def _migrate_user_profile_columns() -> None:
@@ -338,6 +370,8 @@ def _competition_to_pydantic(m: CompetitionModel) -> Competition:
         team_max=m.team_max,
         registration_deadline=m.registration_deadline,
         submission_deadline=m.submission_deadline,
+        result_announcement_date=m.result_announcement_date,
+        award_settings=m.award_settings,
         required_materials=_load_json(m.required_materials),
         evaluation_dimensions=_load_json(m.evaluation_dimensions),
         required_skills=_load_json(m.required_skills),
@@ -478,6 +512,8 @@ def _upsert_competition_from_raw(raw: dict, session) -> None:
         "team_max": raw.get("team_max"),
         "registration_deadline": _to_date(raw.get("registration_deadline")),
         "submission_deadline": _to_date(raw.get("submission_deadline")),
+        "result_announcement_date": _to_date(raw.get("result_announcement_date")),
+        "award_settings": raw.get("award_settings"),
         "required_materials": _dump_json(raw.get("required_materials") or []),
         "evaluation_dimensions": _dump_json(raw.get("evaluation_dimensions") or []),
         "required_skills": _dump_json(raw.get("required_skills") or []),
@@ -609,10 +645,12 @@ def get_competition_detail(competition_id: str) -> Optional[CompetitionDetail]:
         return None
 
     timeline = []
-    if comp.registration_deadline:
-        timeline.append(TimelineItem(label="报名截止", event_date=comp.registration_deadline))
-    if comp.submission_deadline:
-        timeline.append(TimelineItem(label="提交截止", event_date=comp.submission_deadline))
+    if comp.result_announcement_date:
+        timeline.append(TimelineItem(label="成绩公布", event_date=comp.result_announcement_date))
+    if comp.award_settings:
+        timeline.append(TimelineItem(label="奖项设置", date_text=comp.award_settings))
+    if not timeline:
+        timeline.append(TimelineItem(label="暂无后续安排", date_text="以官方通知为准"))
 
     requirements = [
         RequirementItem(
@@ -928,6 +966,8 @@ def upsert_competition(comp: Competition) -> Competition:
         existing.team_max = comp.team_max
         existing.registration_deadline = comp.registration_deadline
         existing.submission_deadline = comp.submission_deadline
+        existing.result_announcement_date = comp.result_announcement_date
+        existing.award_settings = comp.award_settings
         existing.required_materials = _dump_json(comp.required_materials)
         existing.evaluation_dimensions = _dump_json(comp.evaluation_dimensions)
         existing.required_skills = _dump_json(comp.required_skills)

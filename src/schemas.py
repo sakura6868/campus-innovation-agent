@@ -166,6 +166,10 @@ class Competition(BaseModel):
     # —— 时间相关 ——
     registration_deadline: Optional[date] = None
     submission_deadline: Optional[date] = None
+    result_announcement_date: Optional[date] = None  # 成绩公布日期
+
+    # —— 奖项设置 ——
+    award_settings: Optional[str] = None             # 奖项设置文本说明
 
     # —— 材料与能力 ——
     required_materials: list[str] = Field(default_factory=list)
