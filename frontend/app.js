@@ -376,10 +376,8 @@ async function renderDetail(id) {
   const pending = c.data_status !== "verified";
   const trustCls = "trust-" + (c.trusted_level || "C");
 
-  const kv = (k, v, field) =>
-    `<div class="kv"><span class="k">${escapeHtml(k)}</span><span class="v">${v}${
-      field ? chipsForField(ev, field) : ""
-    }</span></div>`;
+  const kv = (k, v) =>
+    `<div class="kv"><span class="k">${escapeHtml(k)}</span><span class="v">${v}</span></div>`;
 
   const grades = c.allowed_grades && c.allowed_grades.length ? c.allowed_grades.join("、") : "不限年级";
   const majors = c.allowed_majors && c.allowed_majors.length ? c.allowed_majors.join("、") : "不限专业";
@@ -399,12 +397,6 @@ async function renderDetail(id) {
       s.url ? `<a href="${escapeHtml(s.url)}" target="_blank" rel="noopener">${escapeHtml(s.url)}</a>` : "—"
     }（获取 ${escapeHtml(s.acquired_date || "—")}）</span></div>`
   ).join("");
-
-  const evHtml = ev.length ? ev.map((e) =>
-    `<div class="kv"><span class="k">${escapeHtml(e.field)}</span><span class="v">
-      <span class="muted">${escapeHtml((e.document_name || "") + (e.page ? " 第" + e.page + "页" : ""))}</span>
-    </span></div>`
-  ).join("") : `<div class="muted">暂无引用证据</div>`;
 
   const legend = `<div class="factnote">
     <span class="tag fact">官方规则</span>
@@ -451,43 +443,14 @@ async function renderDetail(id) {
     <div class="section"><h3>要求条目（事实 / 计算 / 建议 分层）</h3><div class="card">${reqHtml}</div>${legend}</div>
 
     <div class="section"><h3>来源与可信</h3><div class="card">
-      ${kv("数据状态", `<span class="tag status-${escapeHtml(c.data_status)}">${escapeHtml(c.data_status)}</span>`, "")}
-      ${kv("版本", escapeHtml(c.doc_version || "—"), "")}
-      ${kv("最后核验", escapeHtml(c.last_verified_at || "—"), "")}
+      ${kv("数据状态", `<span class="tag status-${escapeHtml(c.data_status)}">${escapeHtml(c.data_status)}</span>`)}
+      ${kv("版本", escapeHtml(c.doc_version || "—"))}
+      ${kv("最后核验", escapeHtml(c.last_verified_at || "—"))}
       ${sourcesHtml}
     </div></div>
-
-    <div class="section"><h3>引用证据（点击角标查看原文）</h3><div class="card">${evHtml}</div></div>
-
-    <div class="section"><h3>官方规则检索（赛事隔离 RAG）</h3>
-      <div class="card">
-        <p class="muted" style="margin-top:0;">仅在本赛事（${escapeHtml(c.competition_id)}）范围内检索，不会串入其他赛事或年份的规则。命中结果给出原文与官方链接。</p>
-        <div class="row">
-          <input id="rag-q" type="text" placeholder="如：团队人数要求 / 报名截止 / 需要哪些材料" style="flex:1;min-width:220px;" />
-          <button id="rag-btn" class="btn primary">检索</button>
-        </div>
-        <div class="row" style="gap:6px;flex-wrap:wrap;margin-top:6px;">
-          ${["团队人数要求", "报名截止时间", "参赛对象", "需要提交哪些材料"].map((s) =>
-            `<span class="rag-example tag" data-q="${escapeHtml(s)}" style="cursor:pointer;">${escapeHtml(s)}</span>`
-          ).join("")}
-        </div>
-        <div id="rag-result" style="margin-top:10px;"></div>
-      </div>
-    </div>
   `;
 
-  $$("#detail-content .cite-chip").forEach((el) => {
-    el.addEventListener("click", () => openCiteModal(Number(el.dataset.cite)));
-  });
   $("#join-project").addEventListener("click", () => joinProject(c.competition_id));
-
-  // RAG 检索交互
-  const runRag = () => ragSearch(c.competition_id, c.document_year);
-  $("#rag-btn").addEventListener("click", runRag);
-  $("#rag-q").addEventListener("keydown", (e) => { if (e.key === "Enter") runRag(); });
-  $$("#detail-content .rag-example").forEach((el) => {
-    el.addEventListener("click", () => { $("#rag-q").value = el.dataset.q; runRag(); });
-  });
 }
 
 // 赛事隔离 RAG 检索：结果复用引用弹窗
