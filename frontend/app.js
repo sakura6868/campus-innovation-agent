@@ -400,9 +400,8 @@ async function renderDetail(id) {
     }（获取 ${escapeHtml(s.acquired_date || "—")}）</span></div>`
   ).join("");
 
-  const evHtml = ev.length ? ev.map((e, i) =>
+  const evHtml = ev.length ? ev.map((e) =>
     `<div class="kv"><span class="k">${escapeHtml(e.field)}</span><span class="v">
-      <span class="cite-chip" data-cite="${i}">查看依据</span>
       <span class="muted">${escapeHtml((e.document_name || "") + (e.page ? " 第" + e.page + "页" : ""))}</span>
     </span></div>`
   ).join("") : `<div class="muted">暂无引用证据</div>`;
@@ -514,18 +513,16 @@ async function ragSearch(compId, year) {
   // 追加到全局证据数组，复用弹窗
   const base = currentEvidence.length;
   hits.forEach((h) => currentEvidence.push(h));
-  box.innerHTML = hits.map((h, i) => {
-    const idx = base + i;
+  box.innerHTML = hits.map((h) => {
     const page = (h.page === null || h.page === undefined) ? "未定位" : `第 ${h.page} 页`;
     return `<div class="card" style="margin-bottom:8px;">
       <div class="row between">
         <span class="tag fact">命中字段：${escapeHtml(h.field)}</span>
-        <span class="cite-chip" data-cite="${idx}">查看依据（${page} · ${escapeHtml(h.trusted_level || "A")}级）</span>
+        <span class="muted">${page} · ${escapeHtml(h.trusted_level || "A")}级</span>
       </div>
       <p style="margin:8px 0 0;background:#f8fafc;border-left:3px solid var(--fact);padding:10px;border-radius:6px;">${escapeHtml(h.source_text)}</p>
     </div>`;
   }).join("");
-  bindCiteChips(box);
 }
 
 // ---------------------------------------------------------------------------
@@ -553,7 +550,7 @@ async function renderRecommend() {
   const order = { highly_suitable: 0, suitable: 1, marginal: 2, not_prioritized: 3, candidate_only: 4, ineligible: 5 };
   recs.sort((a, b) => (order[a.recommendation_status] ?? 9) - (order[b.recommendation_status] ?? 9));
 
-  $("#recommend-list").innerHTML = recs.map((r, idx) => {
+  $("#recommend-list").innerHTML = recs.map((r) => {
     const score = r.score === null ? "—" : Math.round(r.score * 10) / 10;
     const statusCls = r.recommendation_status === "ineligible" ? "status-stale"
       : r.recommendation_status === "highly_suitable" ? "status-verified"
@@ -570,7 +567,7 @@ async function renderRecommend() {
       r.urgent ? `<span class="tag urgent">临近截止</span>` : "",
       r.pending_review ? `<span class="tag pending">待人工确认</span>` : "",
     ].join("");
-    return `<article class="card rec-card rec-${escapeHtml(r.recommendation_status)}" data-id="${escapeHtml(r.competition_id)}" data-idx="${idx}">
+    return `<article class="card rec-card rec-${escapeHtml(r.recommendation_status)}" data-id="${escapeHtml(r.competition_id)}">
       <div class="rec-head">
         <div><div class="comp-kicker">${escapeHtml(r.competition_id)}</div><div class="comp-title">${escapeHtml(r.competition_name)}</div></div>
         <div class="score-pill"><span>匹配度</span><strong>${score}</strong></div>
@@ -579,18 +576,10 @@ async function renderRecommend() {
       ${gate}
       ${explain ? `<ul class="explain">${explain}</ul>` : ""}
       ${r.recommendation_status === "candidate_only" ? `<div class="muted" style="font-size:12px;margin-top:6px;">该赛事仅作为候选信息展示，完成人工核验前不会进行资格判断或匹配评分。</div>` : ""}
-      <div class="row"><button class="btn cite-btn" data-id="${escapeHtml(r.competition_id)}">查看官方依据</button>
-      ${r.eligible && !r.pending_review ? `<button class="btn primary join-btn" data-id="${escapeHtml(r.competition_id)}">加入我的项目</button>` : ""}</div>
-      <div class="cite-list" id="cite-${idx}" style="margin-top:8px;"></div>
+      ${r.eligible && !r.pending_review ? `<div class="row"><button class="btn primary join-btn" data-id="${escapeHtml(r.competition_id)}">加入我的项目</button></div>` : ""}
     </article>`;
   }).join("");
 
-  $$("#recommend-list .cite-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const target = btn.closest(".rec-card").querySelector(".cite-list");
-      loadCitations(btn.dataset.id, target);
-    });
-  });
   $$("#recommend-list .join-btn").forEach((btn) => {
     btn.addEventListener("click", () => joinProject(btn.dataset.id));
   });
@@ -770,13 +759,9 @@ async function renderAgentView() {
   }
 }
 
-// 将答案文本中的 [1][2] 角标渲染为可点击引用
-function renderAnswerWithCites(text, citeBase) {
-  // text 中的 [n] 对应 citations 的索引（n-1），渲染为可点击 <span>
-  return escapeHtml(text).replace(/\[(\d+)\]/g, (m, num) => {
-    const idx = citeBase + (Number(num) - 1);
-    return `<span class="cite" data-cite="${idx}">[${num}]</span>`;
-  });
+// 将答案文本原样渲染（不再显示可点击引用角标，引用信息仅保留在底层数据与比赛文档中）
+function renderAnswerWithCites(text) {
+  return escapeHtml(text);
 }
 
 function cleanAgentAnswer(text) {
@@ -844,33 +829,18 @@ async function agentAsk() {
   const pendingTag = data.pending_review ? `<span class="pending-tag">待人工确认</span>` : "";
   const intentTag = `<span class="intent-tag">${INTENT_LABEL[data.intent] || data.intent} · ${escapeHtml(data.resolved_name || "自动识别赛事")}</span>${pendingTag}`;
 
-  const refsHtml = (data.citations && data.citations.length)
-    ? `<details class="refs"><summary>官方依据 <span>${data.citations.length} 条</span></summary><div class="refs-list">` + data.citations.map((c, i) => {
-        const page = (c.page === null || c.page === undefined) ? "未定位" : `第 ${c.page} 页`;
-        const lvl = (c.trusted_level || "C");
-        return `<div class="ref"><span class="cite" data-cite="${base + i}">[${i + 1}]</span>
-          <span class="lvl ${lvl}">${lvl}级</span>
-          <span>${escapeHtml(c.document_name || "官方通知")} · ${escapeHtml(page)}</span>
-          <div class="muted" style="margin-top:4px;">${escapeHtml((c.source_text || "").slice(0, 80))}</div></div>`;
-      }).join("") + `</div></details>`
-    : "";
-
-  const traceHtml = (data.trace && data.trace.length)
-    ? `<details class="trace"><summary>查看处理依据</summary>
-        <ol>${data.trace.map((t) => `<li>${escapeHtml(t)}</li>`).join("")}</ol></details>`
-    : "";
+  const refsHtml = "";
+  const traceHtml = "";
 
   aRow.innerHTML = `<div class="msg-a">
     <div class="agent-answer-head"><span class="agent-answer-mark">CI</span><strong>校园科创智能体</strong>${intentTag}</div>
-    <div class="agent-answer-body">${renderAnswerWithCites(cleanAgentAnswer(data.answer), base)}</div>
+    <div class="agent-answer-body">${renderAnswerWithCites(cleanAgentAnswer(data.answer))}</div>
     ${refsHtml}
     ${traceHtml}
   </div>`;
 
-  // 绑定角标点击
-  $$(".cite", aRow).forEach((el) => {
-    el.addEventListener("click", () => openCiteModal(Number(el.dataset.cite)));
-  });
+  // 绑定角标点击（已隐藏证据展示，暂不绑定）
+  // $$(".cite", aRow).forEach((el) => { ... });
   log.scrollTop = log.scrollHeight;
   sendBtn.disabled = false;
   sendBtn.classList.remove("is-loading");
