@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>校园科创导航智能体</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='10' fill='%2316181d'/%3E%3Ctext x='32' y='40' text-anchor='middle' font-family='Arial' font-size='25' font-weight='700' fill='white'%3ECI%3C/text%3E%3C/svg%3E" />
-  <link rel="stylesheet" href="/static/styles.css?v=20260716.6" />
+  <link rel="stylesheet" href="/static/styles.css?v=20260718.1" />
 </head>
 <body>
   <header class="topnav">
@@ -117,7 +117,7 @@
         <div>
           <span class="page-eyebrow">COMPETITIONS / 02</span>
           <h2>赛事大厅</h2>
-          <p class="muted">浏览赛事版本、核验状态与官方截止日期。</p>
+          <p class="muted">浏览赛事版本与官方截止日期。</p>
         </div>
         <div class="filters">
           <select id="filter-cat">
@@ -159,7 +159,7 @@
             <h2>智能问答</h2>
             <p>基于官方通知，为你核对赛事规则与参赛资格</p>
           </div>
-          <span class="agent-trust"><span aria-hidden="true">✓</span> 证据门控已启用</span>
+          <span class="agent-trust"><span aria-hidden="true">✓</span> 智能体已就绪</span>
         </header>
 
         <div class="agent-context-bar" aria-label="问答上下文">
@@ -198,7 +198,7 @@
               <button id="agent-send" class="agent-send" type="button" title="发送问题" aria-label="发送问题">↑</button>
             </div>
           </div>
-          <p class="agent-disclaimer">重要信息请以引用的官方原文为准</p>
+          <p class="agent-disclaimer">重要信息请以官方最新通知为准</p>
         </div>
       </div>
     </section>
@@ -265,6 +265,15 @@
             </label>
             <label>提交截止
               <input id="adm-sub" type="date" />
+            </label>
+            <label>成绩公布日期
+              <input id="adm-result" type="date" />
+            </label>
+            <label>奖项设置说明
+              <input id="adm-award-settings" type="text" placeholder="如：设一等奖、二等奖、三等奖" />
+            </label>
+            <label>奖项比例（格式：奖项 比例，多行或逗号分隔）
+              <textarea id="adm-award-distribution" rows="3" placeholder="一等奖 5%&#10;二等奖 15%&#10;三等奖 25%"></textarea>
             </label>
             <label>团队最少人数
               <input id="adm-tmin" type="number" min="1" />
@@ -355,6 +364,6 @@
 
   <div id="toast" class="toast hidden"></div>
 
-  <script src="/static/app.js?v=20260716.6"></script>
+  <script src="/static/app.js?v=20260718.1"></script>
 </body>
 </html>

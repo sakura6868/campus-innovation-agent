@@ -1815,6 +1815,24 @@ label input, label select, .agent-input textarea, .login-custom input,
 .detail-view .kv .v {
   font-size: 12px;
 }
+.award-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 5px 0;
+  border-bottom: 1px dashed #eceef1;
+}
+.award-row:last-child {
+  border-bottom: 0;
+}
+.award-name {
+  color: #30343a;
+}
+.award-prop {
+  color: #1769e0;
+  font-weight: 600;
+  white-space: nowrap;
+}
 
 /* Data pipeline */
 .admin-page-head {

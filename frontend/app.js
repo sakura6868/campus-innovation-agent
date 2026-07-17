@@ -327,17 +327,13 @@ async function renderHall() {
     return;
   }
   $("#hall-list").innerHTML = list.map((c) => {
-    const pending = c.data_status !== "verified";
-    const trustCls = "trust-" + (c.trusted_level || "C");
-    return `<article class="card comp-card ${pending ? "is-pending" : "is-verified"}" data-id="${escapeHtml(c.competition_id)}" tabindex="0">
+    return `<article class="card comp-card" data-id="${escapeHtml(c.competition_id)}" tabindex="0">
       <div class="comp-card-main">
         <div class="comp-kicker">${escapeHtml(c.competition_id)}</div>
         <div class="comp-title">${escapeHtml(c.competition_name)}</div>
         <div class="comp-meta">
           <span class="tag cat">${CAT_LABEL[c.category] || c.category}</span>
           <span class="tag year">${c.document_year}</span>
-          <span class="tag ${trustCls}">可信 ${escapeHtml(c.trusted_level || "C")} 级</span>
-          ${pending ? `<span class="tag pending">待人工确认</span>` : `<span class="tag status-verified">已确认</span>`}
         </div>
       </div>
       <div class="comp-card-side"><span>报名截止</span><strong>${escapeHtml(c.registration_deadline || "未明确")}</strong><i aria-hidden="true">→</i></div>
@@ -373,9 +369,6 @@ async function renderDetail(id) {
   // 重新构建全局 evidence 索引（保证 data-cite 指向正确）
   currentEvidence = ev;
 
-  const pending = c.data_status !== "verified";
-  const trustCls = "trust-" + (c.trusted_level || "C");
-
   const kv = (k, v) =>
     `<div class="kv"><span class="k">${escapeHtml(k)}</span><span class="v">${v}</span></div>`;
 
@@ -383,9 +376,15 @@ async function renderDetail(id) {
   const majors = c.allowed_majors && c.allowed_majors.length ? c.allowed_majors.join("、") : "不限专业";
   const teamTxt = `${c.team_min ?? 1}—${c.team_max ?? 1} 人${c.team_required ? "（组队赛）" : "（个人或组队）"}`;
 
-  const timelineHtml = (detail.timeline || []).map((t) =>
-    `<div class="kv"><span class="k">${escapeHtml(t.label)}</span><span class="v">${escapeHtml(t.event_date || t.date_text || "—")}</span></div>`
-  ).join("") || `<div class="muted">暂无时间轴</div>`;
+  const timelineHtml = (detail.timeline || []).map((t) => {
+    if (t.label === "奖项设置" && c.award_distribution && c.award_distribution.length) {
+      const rows = c.award_distribution.map((a) =>
+        `<div class="award-row"><span class="award-name">${escapeHtml(a.award)}</span><span class="award-prop">${escapeHtml(a.proportion || "—")}</span></div>`
+      ).join("");
+      return `<div class="kv kv-awards"><span class="k">${escapeHtml(t.label)}</span><span class="v">${rows}</span></div>`;
+    }
+    return `<div class="kv"><span class="k">${escapeHtml(t.label)}</span><span class="v">${escapeHtml(t.event_date || t.date_text || "—")}</span></div>`;
+  }).join("") || `<div class="muted">暂无时间轴</div>`;
 
   const reqHtml = (detail.requirements || []).map((r) => {
     const cls = FACTTAG_CLASS[r.tag] || "system";
@@ -402,7 +401,6 @@ async function renderDetail(id) {
     <span class="tag fact">官方规则</span>
     <span class="tag system">系统计算</span>
     <span class="tag suggest">智能建议</span>
-    <span class="tag pending">待人工确认</span>
   </div>`;
 
   $("#detail-content").innerHTML = `
@@ -412,12 +410,9 @@ async function renderDetail(id) {
       <div class="comp-meta">
         <span class="tag cat">${CAT_LABEL[c.category] || c.category}</span>
         <span class="tag year">${c.document_year}</span>
-        <span class="tag ${trustCls}">可信 ${escapeHtml(c.trusted_level || "C")} 级</span>
-        ${pending ? `<span class="tag pending">待人工确认</span>` : `<span class="tag status-verified">已确认</span>`}
         ${detail.verification && detail.verification.note ? `<span class="muted">${escapeHtml(detail.verification.note)}</span>` : ""}
       </div>
-      </div><button id="join-project" class="btn primary" ${pending ? "disabled" : ""}>加入我的项目</button></div>
-      ${pending ? `<div class="verification-alert">该信息仍待人工确认，报名前请访问官方页面复核。最后核验：${escapeHtml(c.last_verified_at || "—")}</div>` : ""}
+      </div><button id="join-project" class="btn primary">加入我的项目</button></div>
     </div>
 
     <div class="section"><h3>资格要求</h3><div class="card">
@@ -528,7 +523,6 @@ async function renderRecommend() {
     const tags = [
       `<span class="tag ${statusCls}">${STATUS_LABEL[r.recommendation_status] || r.recommendation_status}</span>`,
       r.urgent ? `<span class="tag urgent">临近截止</span>` : "",
-      r.pending_review ? `<span class="tag pending">待人工确认</span>` : "",
     ].join("");
     return `<article class="card rec-card rec-${escapeHtml(r.recommendation_status)}" data-id="${escapeHtml(r.competition_id)}">
       <div class="rec-head">
@@ -789,8 +783,7 @@ async function agentAsk() {
   const base = currentEvidence.length;
   (data.citations || []).forEach((c) => currentEvidence.push(c));
 
-  const pendingTag = data.pending_review ? `<span class="pending-tag">待人工确认</span>` : "";
-  const intentTag = `<span class="intent-tag">${INTENT_LABEL[data.intent] || data.intent} · ${escapeHtml(data.resolved_name || "自动识别赛事")}</span>${pendingTag}`;
+  const intentTag = `<span class="intent-tag">${INTENT_LABEL[data.intent] || data.intent} · ${escapeHtml(data.resolved_name || "自动识别赛事")}</span>`;
 
   const refsHtml = "";
   const traceHtml = "";
@@ -850,6 +843,28 @@ function csv(s) {
 function todayStr() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+// 解析奖项比例文本：支持 "奖项 比例" 或 "奖项:比例"，多行/逗号/空格分隔
+function parseAwardDistribution(s) {
+  if (!s || !s.trim()) return [];
+  const out = [];
+  for (const line of s.split(/\n|[,，]/)) {
+    const t = line.trim();
+    if (!t) continue;
+    const m = t.match(/^(.+?)[:：\s]+(.+)$/);
+    if (m) {
+      out.push({ award: m[1].trim(), proportion: m[2].trim() });
+    } else {
+      const parts = t.split(/\s+/);
+      if (parts.length >= 2) {
+        out.push({ award: parts.slice(0, -1).join(" "), proportion: parts[parts.length - 1] });
+      } else {
+        out.push({ award: t, proportion: "" });
+      }
+    }
+  }
+  return out;
 }
 
 function setAdminStep(step) {
@@ -1017,6 +1032,9 @@ $("#adm-form").addEventListener("submit", async (e) => {
     team_max: $("#adm-tmax").value ? Number($("#adm-tmax").value) : null,
     registration_deadline: $("#adm-reg").value || null,
     submission_deadline: $("#adm-sub").value || null,
+    result_announcement_date: $("#adm-result").value || null,
+    award_settings: $("#adm-award-settings").value.trim() || null,
+    award_distribution: parseAwardDistribution($("#adm-award-distribution").value),
     required_materials: csv($("#adm-materials").value),
     evaluation_dimensions: [],
     required_skills: csv($("#adm-skills").value),

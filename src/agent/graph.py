@@ -512,10 +512,10 @@ def node_team_copy(state: AgentState) -> AgentState:
         f"· 报名截止：{deadline}{reg_mark}\n"
         f"· 我能带来：{my_skills}\n\n"
         f"如果你对{('、'.join(comp.evaluation_dimensions) if comp.evaluation_dimensions else '这项赛事')}感兴趣，"
-        f"欢迎私信我一起冲！所有报名信息均来自官方通知，标注引用可点击核对来源。"
+        f"欢迎私信我一起冲！报名信息以官方通知为准。"
     )
     if comp.data_status.value == "unverified":
-        copy += "\n\n⚠️ 以上赛事信息为 AI 整理初稿、待人工终审，报名前请以官网最新通知为准。"
+        copy += "\n\n⚠️ 以上赛事信息由 AI 整理，报名前请以官网最新通知为准。"
 
     copy = _llm_polish(copy, f"赛事={comp.competition_name}，队伍={team_txt}，技能={skills}，截止={deadline}")
     trace.append("组队文案：已生成（含引用编号）")
@@ -622,14 +622,12 @@ def node_compose(state: AgentState) -> AgentState:
                 tags = []
                 if r.get("urgent"):
                     tags.append("⏰临近截止")
-                if r.get("pending_review"):
-                    tags.append("待人工确认")
                 tag_s = ("（" + "，".join(tags) + "）") if tags else ""
                 sc = f"{r['score']}分" if r.get("score") is not None else "—"
                 lines.append(
                     f"{i}. {r['competition_name']} · {status_map.get(r['recommendation_status'], r['recommendation_status'])} · {sc}{mark}{tag_s}"
                 )
-            lines.append("\n可点击引用角标核对每项赛事的官方来源。候选信息须经人工核验后才会进入正式推荐。")
+            lines.append("\n请以官方通知为准。候选信息须经人工核验后才会进入正式推荐。")
             answer = "\n".join(lines)
         answer += _citations_appendix(citations)
 
@@ -679,10 +677,7 @@ def node_compose(state: AgentState) -> AgentState:
     if state.get("version_resolution_note"):
         answer = state["version_resolution_note"] + "\n\n" + answer
 
-    if state.get("pending_review"):
-        answer += "\n\n（注：相关赛事数据为 AI 整理、待人工确认，请以官方最新通知为准。）"
-
-    trace.append("组装答案：完成（引用已内嵌角标）")
+    trace.append("组装答案：完成")
     return {**state, "answer": answer, "trace": trace}
 
 

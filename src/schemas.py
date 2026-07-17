@@ -120,6 +120,14 @@ class TimelineItem(BaseModel):
     date_text: Optional[str] = None
 
 
+class AwardDistributionItem(BaseModel):
+    """奖项与比例条目。"""
+
+    award: str
+    proportion: Optional[str] = None
+    note: Optional[str] = None
+
+
 class RequirementItem(BaseModel):
     """赛事要求条目，带事实标签与可选引用。"""
 
@@ -170,6 +178,7 @@ class Competition(BaseModel):
 
     # —— 奖项设置 ——
     award_settings: Optional[str] = None             # 奖项设置文本说明
+    award_distribution: list[AwardDistributionItem] = Field(default_factory=list)  # 各奖项比例
 
     # —— 材料与能力 ——
     required_materials: list[str] = Field(default_factory=list)

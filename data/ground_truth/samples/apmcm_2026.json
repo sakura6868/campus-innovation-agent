@@ -12,7 +12,13 @@
   "registration_deadline": "2026-06-12",
   "submission_deadline": "2026-06-15",
   "result_announcement_date": "2026-08-15",
-  "award_settings": "设一等奖、二等奖、三等奖及成功参赛奖，获奖比例以官方评审结果为准。",
+  "award_settings": "设一等奖、二等奖、三等奖及成功参赛奖。",
+  "award_distribution": [
+    { "award": "一等奖", "proportion": "约5%", "note": "按参赛队伍总数比例评选" },
+    { "award": "二等奖", "proportion": "约15%", "note": "按参赛队伍总数比例评选" },
+    { "award": "三等奖", "proportion": "约25%", "note": "按参赛队伍总数比例评选" },
+    { "award": "成功参赛奖", "proportion": "其余成功提交论文队伍", "note": "成功提交完整论文即获" }
+  ],
   "required_materials": ["论文PDF", "支撑材料", "承诺书"],
   "evaluation_dimensions": null,
   "required_skills": ["数学建模", "计算机编程", "论文写作"],

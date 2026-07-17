@@ -12,7 +12,13 @@
   "registration_deadline": "2026-08-10",
   "submission_deadline": "2026-09-01",
   "result_announcement_date": "2026-10-15",
-  "award_settings": "设一等奖、二等奖、三等奖及优秀奖，具体名额比例见官方通知。",
+  "award_settings": "设一等奖、二等奖、三等奖及优秀奖。",
+  "award_distribution": [
+    { "award": "一等奖", "proportion": "5%", "note": "示例比例" },
+    { "award": "二等奖", "proportion": "10%", "note": "示例比例" },
+    { "award": "三等奖", "proportion": "15%", "note": "示例比例" },
+    { "award": "优秀奖", "proportion": "20%", "note": "示例比例" }
+  ],
   "required_materials": ["项目报告PDF", "演示视频", "源代码"],
   "evaluation_dimensions": ["创新性", "技术实现", "落地价值"],
   "required_skills": ["Python", "前端", "答辩"],

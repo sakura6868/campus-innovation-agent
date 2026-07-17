@@ -40,6 +40,7 @@ from sqlalchemy.orm import (
 )
 
 from schemas import (
+    AwardDistributionItem,
     Citation,
     Competition,
     CompetitionCategory,
@@ -108,6 +109,7 @@ class CompetitionModel(Base):
 
     # 奖项设置
     award_settings: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    award_distribution: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # JSON list[AwardDistributionItem]
 
     # 材料与能力
     required_materials: Mapped[list] = mapped_column(String, nullable=False, default="[]")
@@ -245,7 +247,7 @@ def _migrate_competition_columns() -> None:
     """
     from sqlalchemy import text
 
-    wanted = {"result_announcement_date", "award_settings"}
+    wanted = {"result_announcement_date", "award_settings", "award_distribution"}
     if DATABASE_URL.startswith("sqlite"):
         with _engine.begin() as conn:
             rows = conn.execute(text("PRAGMA table_info(competitions)")).fetchall()
@@ -372,6 +374,7 @@ def _competition_to_pydantic(m: CompetitionModel) -> Competition:
         submission_deadline=m.submission_deadline,
         result_announcement_date=m.result_announcement_date,
         award_settings=m.award_settings,
+        award_distribution=[AwardDistributionItem(**a) for a in _load_json(m.award_distribution)],
         required_materials=_load_json(m.required_materials),
         evaluation_dimensions=_load_json(m.evaluation_dimensions),
         required_skills=_load_json(m.required_skills),
@@ -514,6 +517,7 @@ def _upsert_competition_from_raw(raw: dict, session) -> None:
         "submission_deadline": _to_date(raw.get("submission_deadline")),
         "result_announcement_date": _to_date(raw.get("result_announcement_date")),
         "award_settings": raw.get("award_settings"),
+        "award_distribution": _dump_json(raw.get("award_distribution") or []),
         "required_materials": _dump_json(raw.get("required_materials") or []),
         "evaluation_dimensions": _dump_json(raw.get("evaluation_dimensions") or []),
         "required_skills": _dump_json(raw.get("required_skills") or []),
@@ -677,7 +681,7 @@ def get_competition_detail(competition_id: str) -> Optional[CompetitionDetail]:
         status=comp.data_status,
         last_verified_at=comp.last_verified_at,
         trusted_level=comp.trusted_level,
-        note="已人工确认" if comp.data_status == DataStatus.VERIFIED else "AI整理，待人工访问官网复核",
+        note="已人工确认" if comp.data_status == DataStatus.VERIFIED else "AI整理，请以官网最新通知为准",
     )
 
     return CompetitionDetail(
@@ -968,6 +972,9 @@ def upsert_competition(comp: Competition) -> Competition:
         existing.submission_deadline = comp.submission_deadline
         existing.result_announcement_date = comp.result_announcement_date
         existing.award_settings = comp.award_settings
+        existing.award_distribution = _dump_json(
+            [a.model_dump(mode="json") for a in comp.award_distribution]
+        )
         existing.required_materials = _dump_json(comp.required_materials)
         existing.evaluation_dimensions = _dump_json(comp.evaluation_dimensions)
         existing.required_skills = _dump_json(comp.required_skills)
