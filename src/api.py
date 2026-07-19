@@ -12,20 +12,51 @@ from __future__ import annotations
 
 import base64
 import os
+import secrets
 from contextlib import asynccontextmanager
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from uuid import uuid4
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Query
+
+def _load_dotenv() -> None:
+    """零依赖加载项目根目录 .env（本地开发用）。
+
+    仅在文件存在时读取，且**不覆盖已存在的环境变量**——因此 Render 等平台
+    直接注入的变量优先，线上无 .env 时此函数静默跳过，绝不影响生产。
+    """
+    for base in (Path(__file__).resolve().parent, Path(__file__).resolve().parent.parent):
+        env_path = base / ".env"
+        if not env_path.is_file():
+            continue
+        try:
+            for raw in env_path.read_text(encoding="utf-8").splitlines():
+                line = raw.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, _, value = line.partition("=")
+                key = key.strip()
+                value = value.strip().strip('"').strip("'")
+                if key and key not in os.environ:
+                    os.environ[key] = value
+        except Exception:  # noqa: BLE001 - .env 解析失败不应阻断启动
+            pass
+        break
+
+
+_load_dotenv()
+
+from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
+from fastapi.security import APIKeyHeader
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 import db
 from rag.store import get_rag, embedding_backend
 from recommendation.engine import recommend_for_user
+from trust import assess_recommendation_readiness, assess_source_readiness
 from schemas import (
     Citation,
     Competition,
@@ -79,23 +110,41 @@ app.add_middleware(
 @app.get("/health", tags=["系统"])
 def health() -> dict:
     """后端健康检查。"""
+    try:
+        with db.get_engine().connect() as connection:
+            connection.exec_driver_sql("SELECT 1")
+        database_status = "connected"
+    except Exception:
+        database_status = "unavailable"
     return {
-        "status": "ok",
+        "status": "ok" if database_status == "connected" else "degraded",
         "mock": False,
-        "database": db.DATABASE_URL,
+        "database": database_status,
         "date": date.today().isoformat(),
         "embedding_backend": embedding_backend(),
         "llm_backend": "openai-compatible" if is_llm_enabled() else "disabled",
     }
 
 
-@app.get("/api/competitions", response_model=list[Competition], tags=["赛事"])
+@app.get("/api/competitions", tags=["赛事"])
 def list_competitions(
     category: str | None = Query(None, description="programming/modeling/innovation/software"),
     year: int | None = Query(None, description="文档年份，避免跨年混用"),
-) -> list[Competition]:
-    """赛事列表，支持按类别与年份过滤。"""
-    return db.list_competitions(category=category, year=year)
+    readiness: str = Query("all", pattern="^(all|ready|candidate)$"),
+) -> list[dict]:
+    """赛事目录；可按类别、年份与是否具备正式推荐资格过滤。"""
+    rows: list[dict] = []
+    for comp in db.list_competitions(category=category, year=year):
+        assessment = assess_recommendation_readiness(comp, date.today())
+        if readiness == "ready" and not assessment.ready:
+            continue
+        if readiness == "candidate" and assessment.ready:
+            continue
+        payload = comp.model_dump(mode="json")
+        payload["recommendation_ready"] = assessment.ready
+        payload["readiness_reasons"] = list(assessment.reasons)
+        rows.append(payload)
+    return rows
 
 
 @app.get("/api/competitions/{competition_id}", tags=["赛事"])
@@ -169,12 +218,16 @@ def delete_profile(user_id: str) -> dict:
     tags=["推荐"],
 )
 def recommendations(user_id: str) -> list[RecommendationResult]:
-    """门控 + 评分推荐。基于数据库中全部赛事与用户画像计算。"""
+    """只返回通过可信门控并完成评分的正式推荐。"""
     profile = db.get_user_profile(user_id)
     if profile is None:
         raise HTTPException(status_code=404, detail="用户不存在")
     comps = db.get_all_competitions()
-    return recommend_for_user(profile, comps, date.today())
+    return [
+        item
+        for item in recommend_for_user(profile, comps, date.today())
+        if item.eligible and item.score is not None
+    ]
 
 
 # ---------------------------------------------------------------------------
@@ -359,15 +412,46 @@ def agent_ask(
 
 
 # ---------------------------------------------------------------------------
-# 数据维护闭环（上传 → 解析 → 人工确认 → 入库）
+# 数据维护闭环（上传 → 解析 → 来源确认 → 入库）
 # ---------------------------------------------------------------------------
+_ADMIN_API_TOKEN = os.getenv("ADMIN_API_TOKEN", "").strip()
+_ADMIN_API_KEY = APIKeyHeader(name="X-Admin-Token", auto_error=False)
+
+
+def _require_admin_token(token: str | None = Depends(_ADMIN_API_KEY)) -> None:
+    if not _ADMIN_API_TOKEN:
+        raise HTTPException(status_code=503, detail="数据维护接口未启用")
+    if not token or not secrets.compare_digest(token, _ADMIN_API_TOKEN):
+        raise HTTPException(status_code=401, detail="管理员令牌无效")
+
+
+def _classify_submitted_competition(comp: Competition) -> tuple[Competition, list[str]]:
+    """Normalize evidence metadata, then derive trust status from the shared rules."""
+    checked_at = date.today().isoformat()
+    comp.official_source_status = "found" if comp.official_source_url else "not_found"
+    comp.last_verified_at = checked_at
+    for item in comp.evidence:
+        item.source_url = item.source_url or comp.official_source_url
+        item.acquired_date = item.acquired_date or comp.source_acquired_date or checked_at
+        item.last_verified_at = item.last_verified_at or checked_at
+
+    # Assess the strongest possible state; incomplete evidence is immediately downgraded.
+    comp.data_status = DataStatus.VERIFIED
+    comp.trusted_level = TrustedLevel.A
+    assessment = assess_source_readiness(comp)
+    if not assessment.ready:
+        comp.data_status = DataStatus.UNVERIFIED
+        comp.trusted_level = TrustedLevel.B if comp.official_source_status == "found" else TrustedLevel.C
+    return comp, list(assessment.reasons)
+
+
 class AdminUploadPayload(BaseModel):
     filename: str
     content_base64: str
 
 
 @app.post("/api/admin/upload", tags=["数据维护"])
-def admin_upload(payload: AdminUploadPayload) -> dict:
+def admin_upload(payload: AdminUploadPayload, _: None = Depends(_require_admin_token)) -> dict:
     """上传官方通知 PDF/Word（前端 base64 上传，避免依赖 python-multipart），落盘到 data/uploads。"""
     ext = Path(payload.filename or "file.bin").suffix.lower()
     if ext not in (".pdf", ".docx", ".doc"):
@@ -385,7 +469,7 @@ def admin_upload(payload: AdminUploadPayload) -> dict:
 
 
 @app.post("/api/admin/parse", tags=["数据维护"])
-def admin_parse(payload: dict) -> dict:
+def admin_parse(payload: dict, _: None = Depends(_require_admin_token)) -> dict:
     """解析已上传文件，返回带页码文本块 + 字段抽取建议（含证据块 index）。"""
     file_id = payload.get("file_id")
     if not file_id:
@@ -423,12 +507,11 @@ def admin_parse(payload: dict) -> dict:
 
 
 @app.post("/api/admin/competitions", tags=["数据维护"])
-def admin_confirm_competition(comp: Competition) -> dict:
-    """人工确认后入库（upsert）。默认将 data_status 升级为 verified、trusted_level=A，
-    并将用户关联的 evidence 写入；随后刷新该赛事的隔离 RAG 集合。"""
-    comp.data_status = DataStatus.VERIFIED
-    comp.last_verified_at = comp.last_verified_at or date.today().isoformat()
-    comp.trusted_level = TrustedLevel.A
+def admin_confirm_competition(
+    comp: Competition, _: None = Depends(_require_admin_token)
+) -> dict:
+    """关联官方来源后入库；可信等级由统一证据完整性规则自动决定。"""
+    comp, readiness_reasons = _classify_submitted_competition(comp)
     db.upsert_competition(comp)
     try:
         n = get_rag().ingest_competition(comp)
@@ -440,6 +523,8 @@ def admin_confirm_competition(comp: Competition) -> dict:
         "data_status": comp.data_status.value,
         "trusted_level": comp.trusted_level.value,
         "evidence_count": len(comp.evidence),
+        "recommendation_ready": not readiness_reasons,
+        "readiness_reasons": readiness_reasons,
         "rag_chunks": n,
     }
 
@@ -447,15 +532,6 @@ def admin_confirm_competition(comp: Competition) -> dict:
 # ---------------------------------------------------------------------------
 # 定时自动发现：批量入库（不强制 verified/A）
 # ---------------------------------------------------------------------------
-# 可选共享密钥：仅在 Render 设置 ADMIN_API_TOKEN 后启用，避免公网任意写库。
-_ADMIN_API_TOKEN = os.getenv("ADMIN_API_TOKEN")
-
-
-def _require_admin_token(x_admin_token: str | None = Header(None, alias="X-Admin-Token")) -> None:
-    if _ADMIN_API_TOKEN and x_admin_token != _ADMIN_API_TOKEN:
-        raise HTTPException(status_code=401, detail="管理员令牌无效")
-
-
 class AdminBulkIngestPayload(BaseModel):
     competitions: list[Competition]
 
@@ -464,24 +540,31 @@ class AdminBulkIngestPayload(BaseModel):
 def admin_bulk_ingest(
     payload: AdminBulkIngestPayload, _: None = Depends(_require_admin_token)
 ) -> dict:
-    """批量自动入库（保留调用方给定的 trusted_level/data_status，不强制 A/verified）。
+    """批量自动入库；每条记录按官方来源证据重新计算可信状态。
 
-    用于定时发现的新赛事：若库中已存在同 ID 且为人工 verified，则跳过，避免自动
-    流程覆盖人工核验成果。随后刷新对应赛事的隔离 RAG 集合（失败不影响数据）。
+    用于定时发现的新赛事：若库中已存在同 ID 且已通过统一来源规则，则跳过，避免自动
+    流程覆盖推荐级证据。随后刷新对应赛事的隔离 RAG 集合（失败不影响数据）。
     """
     results: list[dict] = []
     for comp in payload.competitions:
         existing = db.get_competition(comp.competition_id)
-        if existing is not None and existing.data_status == DataStatus.VERIFIED:
+        if existing is not None and assess_source_readiness(existing).ready:
             results.append({"competition_id": comp.competition_id, "status": "skipped_verified"})
             continue
+        comp, readiness_reasons = _classify_submitted_competition(comp)
         db.upsert_competition(comp)
         try:
             n = get_rag().ingest_competition(comp)
         except Exception as exc:  # RAG 失败不应阻断主服务
             n = -1
             print(f"[rag] 批量入库后刷新隔离集合失败（不影响数据）：{exc}")
-        results.append({"competition_id": comp.competition_id, "status": "upserted", "rag_chunks": n})
+        results.append({
+            "competition_id": comp.competition_id,
+            "status": "upserted",
+            "recommendation_ready": not readiness_reasons,
+            "readiness_reasons": readiness_reasons,
+            "rag_chunks": n,
+        })
     return {"count": len(results), "results": results}
 
 
