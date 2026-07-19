@@ -11,12 +11,13 @@
 from __future__ import annotations
 
 import base64
+import os
 from contextlib import asynccontextmanager
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from uuid import uuid4
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, Header, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -44,6 +45,7 @@ from schemas import (
 import parsing.pdf_extractor as pdf_extractor
 from admin import suggest as extract_suggest
 from agent.graph import run_agent  # LangGraph 闭环：意图路由→隔离检索→门控→评分→组队文案
+from agent.llm import is_llm_enabled  # 可选 LLM 润色开关（无 key 自动关闭）
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 FRONTEND_DIR = PROJECT_ROOT / "frontend"
@@ -77,7 +79,14 @@ app.add_middleware(
 @app.get("/health", tags=["系统"])
 def health() -> dict:
     """后端健康检查。"""
-    return {"status": "ok", "mock": False, "database": db.DATABASE_URL, "date": date.today().isoformat()}
+    return {
+        "status": "ok",
+        "mock": False,
+        "database": db.DATABASE_URL,
+        "date": date.today().isoformat(),
+        "embedding_backend": embedding_backend(),
+        "llm_backend": "openai-compatible" if is_llm_enabled() else "disabled",
+    }
 
 
 @app.get("/api/competitions", response_model=list[Competition], tags=["赛事"])
@@ -433,6 +442,47 @@ def admin_confirm_competition(comp: Competition) -> dict:
         "evidence_count": len(comp.evidence),
         "rag_chunks": n,
     }
+
+
+# ---------------------------------------------------------------------------
+# 定时自动发现：批量入库（不强制 verified/A）
+# ---------------------------------------------------------------------------
+# 可选共享密钥：仅在 Render 设置 ADMIN_API_TOKEN 后启用，避免公网任意写库。
+_ADMIN_API_TOKEN = os.getenv("ADMIN_API_TOKEN")
+
+
+def _require_admin_token(x_admin_token: str | None = Header(None, alias="X-Admin-Token")) -> None:
+    if _ADMIN_API_TOKEN and x_admin_token != _ADMIN_API_TOKEN:
+        raise HTTPException(status_code=401, detail="管理员令牌无效")
+
+
+class AdminBulkIngestPayload(BaseModel):
+    competitions: list[Competition]
+
+
+@app.post("/api/admin/competitions/bulk", tags=["数据维护"])
+def admin_bulk_ingest(
+    payload: AdminBulkIngestPayload, _: None = Depends(_require_admin_token)
+) -> dict:
+    """批量自动入库（保留调用方给定的 trusted_level/data_status，不强制 A/verified）。
+
+    用于定时发现的新赛事：若库中已存在同 ID 且为人工 verified，则跳过，避免自动
+    流程覆盖人工核验成果。随后刷新对应赛事的隔离 RAG 集合（失败不影响数据）。
+    """
+    results: list[dict] = []
+    for comp in payload.competitions:
+        existing = db.get_competition(comp.competition_id)
+        if existing is not None and existing.data_status == DataStatus.VERIFIED:
+            results.append({"competition_id": comp.competition_id, "status": "skipped_verified"})
+            continue
+        db.upsert_competition(comp)
+        try:
+            n = get_rag().ingest_competition(comp)
+        except Exception as exc:  # RAG 失败不应阻断主服务
+            n = -1
+            print(f"[rag] 批量入库后刷新隔离集合失败（不影响数据）：{exc}")
+        results.append({"competition_id": comp.competition_id, "status": "upserted", "rag_chunks": n})
+    return {"count": len(results), "results": results}
 
 
 # ---------------------------------------------------------------------------

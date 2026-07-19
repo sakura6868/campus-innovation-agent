@@ -88,6 +88,35 @@ def eligibility_gate(
 
 
 # ---------------------------------------------------------------------------
+# 时间门控（用户规则）：仅推送当前仍可报名的赛事
+# ---------------------------------------------------------------------------
+
+
+def is_registerable_now(comp: Competition, current: date) -> bool:
+    """仅当赛事「当前仍可报名」时返回 True；否则（过时 / 已在参赛时间）不推送。
+
+    排除规则：
+      - 已在参赛时间：赛事开始日 <= 今天（报名通常已截止）
+      - 已完全结束：赛事结束日 < 今天
+      - 过时：报名截止日 < 今天
+      - 过时（兜底）：无报名截止信息时，以提交截止日 < 今天判断
+    """
+    if comp.competition_start_date is not None and comp.competition_start_date <= current:
+        return False
+    if comp.competition_end_date is not None and comp.competition_end_date < current:
+        return False
+    if comp.registration_deadline is not None and comp.registration_deadline < current:
+        return False
+    if (
+        comp.registration_deadline is None
+        and comp.submission_deadline is not None
+        and comp.submission_deadline < current
+    ):
+        return False
+    return True
+
+
+# ---------------------------------------------------------------------------
 # 第三层：软性匹配评分
 # ---------------------------------------------------------------------------
 
@@ -199,26 +228,17 @@ def recommend_for_user(
     results: list[RecommendationResult] = []
 
     for comp in competitions:
+        # 时间门控（用户规则）：仅推送当前仍可报名的赛事；
+        # 过时（截止已过）或已在参赛时间的赛事一律不推送。
+        if not is_registerable_now(comp, current):
+            continue
         pending = comp.data_status == DataStatus.UNVERIFIED
         # 第一层：数据有效性
         problems = data_validity_check(comp, current)
-        if pending:
-            results.append(
-                RecommendationResult(
-                    competition_id=comp.competition_id,
-                    competition_name=comp.competition_name,
-                    recommendation_status="candidate_only",
-                    eligible=False,
-                    gate_reasons=[GateReason(reason=f"候选信息：{p}") for p in problems],
-                    explanation={
-                        "数据状态": "待人工核验，仅作为候选信息展示",
-                        "评分状态": "未进入资格门控和软性评分",
-                    },
-                    pending_review=True,
-                )
-            )
-            continue
-        if problems:
+        # 「尚未完成人工核验」仅为软标记，不阻断未核验赛事进入推荐；
+        # 其余数据可用性问题（缺来源/年份/时间等）仍一票否决。
+        blocking = [p for p in problems if not (pending and p == "尚未完成人工核验")]
+        if blocking:
             # 数据不可靠：不进入正式推荐列表，仅记录
             results.append(
                 RecommendationResult(
@@ -226,7 +246,7 @@ def recommend_for_user(
                     competition_name=comp.competition_name,
                     recommendation_status="ineligible",
                     eligible=False,
-                    gate_reasons=[GateReason(reason=f"数据不可用：{p}") for p in problems],
+                    gate_reasons=[GateReason(reason=f"数据不可用：{p}") for p in blocking],
                     explanation={"数据状态": "来源不可靠，未进入正式推荐"},
                     pending_review=pending,
                 )

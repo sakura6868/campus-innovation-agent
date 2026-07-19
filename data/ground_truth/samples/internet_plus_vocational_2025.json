@@ -3,7 +3,11 @@
   "document_year": 2025,
   "organizer": "教育部等部门和河南省人民政府",
   "category": "innovation",
-  "eligible_students": ["高职高专生", "职业本科生", "毕业生（毕业5年内）"],
+  "eligible_students": [
+    "高职高专生",
+    "职业本科生",
+    "毕业生（毕业5年内）"
+  ],
   "allowed_grades": null,
   "allowed_majors": null,
   "team_required": true,
@@ -12,13 +16,23 @@
   "registration_deadline": "2025-07-01",
   "submission_deadline": null,
   "required_materials": [],
-  "evaluation_dimensions": ["技术或工艺创新", "商业模式创新", "商业运营潜力或实效", "工匠精神"],
-  "required_skills": ["技术创新", "工艺改良", "商业策划", "项目运营"],
+  "evaluation_dimensions": [
+    "技术或工艺创新",
+    "商业模式创新",
+    "商业运营潜力或实效",
+    "工匠精神"
+  ],
+  "required_skills": [
+    "技术创新",
+    "工艺改良",
+    "商业策划",
+    "项目运营"
+  ],
   "official_source_url": "https://www.moe.gov.cn/srcsite/A08/s5672/202505/W020250509342349388925.docx",
-  "source_acquired_date": "2026-07-16",
+  "source_acquired_date": "2026-07-18",
   "trusted_level": "A",
   "data_status": "verified",
-  "last_verified_at": "2026-07-16",
+  "last_verified_at": "2026-07-18",
   "doc_version": "2025_moe_official_docx_v1",
   "evidence": [
     {
@@ -92,5 +106,6 @@
       "trusted_level": "A"
     }
   ],
-  "notes": "按职教赛道单独建档。教育部通知只给全国最晚报名日期，各地可更早；官方赛道方案未列统一材料清单和独立提交截止。"
+  "notes": "按职教赛道单独建档。教育部通知只给全国最晚报名日期，各地可更早；官方赛道方案未列统一材料清单和独立提交截止。｜本赛事与 internet_plus_2025、internet_plus_industry_2025、internet_plus_red_dream_2025 同属中国国际大学生创新大赛（2025）不同赛道，全国报名截止最晚2025-07-01，全国总决赛约2025年10月举行。",
+  "official_source_status": "found"
 }

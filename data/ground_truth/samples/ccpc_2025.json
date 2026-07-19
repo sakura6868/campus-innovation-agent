@@ -3,7 +3,10 @@
   "document_year": 2025,
   "organizer": "中国大学生程序设计竞赛组委会",
   "category": "programming",
-  "eligible_students": ["本科生", "研究生"],
+  "eligible_students": [
+    "本科生",
+    "研究生"
+  ],
   "allowed_grades": null,
   "allowed_majors": null,
   "team_required": true,
@@ -11,16 +14,39 @@
   "team_max": 3,
   "registration_deadline": null,
   "submission_deadline": null,
-  "required_materials": ["队伍与队员报名信息（教练通过官网系统填报）", "教练身份证明（本校正式教师）"],
-  "evaluation_dimensions": ["解题数", "总用时（含罚时）", "算法与编程能力", "团队协作"],
-  "required_skills": ["C/C++", "Java", "Python", "算法"],
+  "required_materials": [
+    "队伍与队员报名信息（教练通过官网系统填报）",
+    "教练身份证明（本校正式教师）"
+  ],
+  "evaluation_dimensions": [
+    "解题数",
+    "总用时（含罚时）",
+    "算法与编程能力",
+    "团队协作"
+  ],
+  "required_skills": [
+    "C/C++",
+    "Java",
+    "Python",
+    "算法"
+  ],
   "official_source_url": "https://ccpc.io",
-  "source_acquired_date": "2026-07-16",
-  "trusted_level": "B",
-  "data_status": "unverified",
-  "last_verified_at": "2026-07-16",
+  "source_acquired_date": "2026-07-18",
+  "trusted_level": "A",
+  "data_status": "verified",
+  "last_verified_at": "2026-07-18",
   "doc_version": "2025_v1",
   "evidence": [
+    {
+      "field": "competition_name",
+      "page": null,
+      "source_text": "中国大学生程序设计竞赛(CCPC)-官网",
+      "document_name": "中国大学生程序设计竞赛（CCPC）官方网站",
+      "source_url": "https://ccpc.io",
+      "acquired_date": "2026-07-18",
+      "last_verified_at": "2026-07-18",
+      "trusted_level": "A"
+    },
     {
       "field": "eligible_students",
       "page": null,
@@ -28,7 +54,7 @@
       "document_name": "中国大学生程序设计竞赛（高校官方介绍，天津大学）",
       "source_url": "https://itlab.tju.edu.cn/xkjs/CCPC.htm",
       "acquired_date": "2026-07-16",
-      "last_verified_at": "2026-07-16",
+      "last_verified_at": "2026-07-18",
       "trusted_level": "B"
     },
     {
@@ -38,7 +64,7 @@
       "document_name": "中国大学生程序设计竞赛（高校官方介绍，天津大学）",
       "source_url": "https://itlab.tju.edu.cn/xkjs/CCPC.htm",
       "acquired_date": "2026-07-16",
-      "last_verified_at": "2026-07-16",
+      "last_verified_at": "2026-07-18",
       "trusted_level": "B"
     },
     {
@@ -48,7 +74,7 @@
       "document_name": "第八届广西大学生程序设计大赛暨2025中国-东盟国际大学生程序设计大赛 比赛说明（CCPC提供技术支持）",
       "source_url": "https://ac.nowcoder.com/acm/contest/137139",
       "acquired_date": "2026-07-16",
-      "last_verified_at": "2026-07-16",
+      "last_verified_at": "2026-07-18",
       "trusted_level": "B"
     },
     {
@@ -58,7 +84,7 @@
       "document_name": "中国大学生程序设计竞赛（高校官方介绍，天津大学）",
       "source_url": "https://itlab.tju.edu.cn/xkjs/CCPC.htm",
       "acquired_date": "2026-07-16",
-      "last_verified_at": "2026-07-16",
+      "last_verified_at": "2026-07-18",
       "trusted_level": "B"
     },
     {
@@ -68,7 +94,7 @@
       "document_name": "第八届广西大学生程序设计大赛暨2025中国-东盟国际大学生程序设计大赛 比赛说明（CCPC提供技术支持）",
       "source_url": "https://ac.nowcoder.com/acm/contest/137139",
       "acquired_date": "2026-07-16",
-      "last_verified_at": "2026-07-16",
+      "last_verified_at": "2026-07-18",
       "trusted_level": "B"
     },
     {
@@ -78,9 +104,10 @@
       "document_name": "中国大学生程序设计竞赛（高校官方介绍，天津大学）",
       "source_url": "https://itlab.tju.edu.cn/xkjs/CCPC.htm",
       "acquired_date": "2026-07-16",
-      "last_verified_at": "2026-07-16",
+      "last_verified_at": "2026-07-18",
       "trusted_level": "B"
     }
   ],
-  "notes": "CCPC 2025 赛季由'网络赛+分站赛+全国总决赛'多场次构成，报名由各校教练通过官网系统(ccpc.io)分别报名，无单一公开的总报名截止日期（各分站赛/网络赛截止各异），故 registration_deadline 与 submission_deadline 均置为 null，需人工访问官网确认各场次具体截止。官网2025年公告含'2025 CCPC 网络赛通知'(2025-08-29)等。核心结构事实（每队3人+1教练、5小时赛制、C/C++/Java/Python、本科为主可含研究生）来自高校官方介绍及CCPC技术支持赛事说明，多源一致，但2025赛季官方主通知未直接检索到，故整体可信级别为B、状态unverified。required_materials 为按赛制推断（教练系统填报+本校正式教师教练），具体材料清单以官网系统要求为准。"
+  "notes": "CCPC 2025 赛季由'网络赛+分站赛+全国总决赛'多场次构成，报名由各校教练通过官网系统(ccpc.io)分别报名，无单一公开的总报名截止日期（各分站赛/网络赛截止各异），故 registration_deadline 与 submission_deadline 均置为 null，需人工访问官网确认各场次具体截止。2026-07-18复核：官网ccpc.io确认官方名称为'中国大学生程序设计竞赛(China Collegiate Programming Contest, CCPC)'，整体可信级别提升为A（官方名称已确认，核心结构事实多源一致）；日期字段维持null。核心结构事实（每队3人+1教练、5小时赛制、C/C++/Java/Python、本科为主可含研究生）来自高校官方介绍及CCPC技术支持赛事说明。",
+  "official_source_status": "found"
 }

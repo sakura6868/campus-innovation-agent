@@ -29,6 +29,7 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     String,
+    Text,
     create_engine,
 )
 from sqlalchemy.orm import (
@@ -125,6 +126,10 @@ class CompetitionModel(Base):
     trusted_level: Mapped[str] = mapped_column(String, default="C")
     data_status: Mapped[str] = mapped_column(String, default="unverified")
     last_verified_at: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+
+    # 官方来源核实结论：found（已找到官方来源）/ not_found（未找到官方链接）
+    official_source_status: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     doc_version: Mapped[str] = mapped_column(String, default="1.0")
 
@@ -393,6 +398,8 @@ def _competition_to_pydantic(m: CompetitionModel) -> Competition:
         trusted_level=_to_enum(TrustedLevel, m.trusted_level, TrustedLevel.C),
         data_status=_to_enum(DataStatus, m.data_status, DataStatus.UNVERIFIED),
         last_verified_at=m.last_verified_at,
+        official_source_status=m.official_source_status,
+        notes=m.notes,
         doc_version=m.doc_version,
         evidence=[_citation_to_pydantic(c) for c in m.citations],
     )
@@ -407,8 +414,8 @@ DEMO_USER = UserProfile(
     education_level=EducationLevel.UNDERGRADUATE,
     grade=Grade.SOPHOMORE,
     major="计算机科学与技术",
-    skills=["Python", "前端", "算法"],
-    experiences=["蓝桥杯省赛"],
+    skills=["Python", "C/C++", "算法与数据结构", "Java", "Git", "前端开发", "后端开发", "数据库", "机器学习", "Web开发"],
+    experiences=["蓝桥杯省赛", "全国大学生程序设计竞赛", "中国软件杯", "校园黑客松获奖"],
     weekly_available_hours=12,
     expected_team_size=3,
     privacy_consent=True,
@@ -539,6 +546,8 @@ def _upsert_competition_from_raw(raw: dict, session) -> None:
         "trusted_level": raw.get("trusted_level") or "C",
         "data_status": raw.get("data_status") or "unverified",
         "last_verified_at": raw.get("last_verified_at"),
+        "official_source_status": raw.get("official_source_status"),
+        "notes": raw.get("notes"),
         "doc_version": raw.get("doc_version") or f"{raw.get('document_year')}_v1",
     }
 

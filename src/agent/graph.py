@@ -616,7 +616,7 @@ def node_compose(state: AgentState) -> AgentState:
             if candidate_only:
                 lines = ["当前没有已完成人工核验的赛事可进入正式推荐。以下仅为候选信息，不进行资格判断或匹配评分：\n"]
             else:
-                lines = ["根据你的画像，门控+评分后为你推荐以下赛事（已过滤不符合硬性资格的项）：\n"]
+                lines = ["根据你的画像，门控+评分后为你推荐以下赛事（已过滤不符合硬性资格、以及过时或已开赛的赛事）：\n"]
             for i, r in enumerate(recos, 1):
                 mark = _cite_marker(r["cite_index"]) if r.get("cite_index") is not None else ""
                 tags = []

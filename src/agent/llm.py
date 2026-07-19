@@ -1,18 +1,18 @@
-"""可选 LLM 接口（OpenAI 兼容）。
+"""可选 LLM 润色层（OpenAI 兼容 /chat/completions，零额外依赖）。
 
 设计目标
 --------
-- **零依赖默认可用**：未配置 API Key 时，`polish()` / `complete()` 一律返回 None，
-  调用方原样回退到确定性模板，不影响任何现有行为。
-- **不绑定 langchain**：直接用官方 `openai` SDK（仅当已安装才 import），天然兼容
-  OpenAI / DeepSeek / 通义千问 / 智谱 / 本地 vLLM / 任何 OpenAI 兼容端点
-  （设置 `AGENT_LLM_BASE_URL` 即可）。
+- **零额外依赖默认可用**：仅用标准库 + 已安装的 `requests`（不依赖 `openai` SDK）。
+  未配置 API Key 时，`polish()` / `complete()` 一律返回 None，调用方原样回退到
+  确定性模板，不影响任何现有行为。
+- **兼容任意 OpenAI 兼容端点**：OpenAI / DeepSeek / 通义千问 / 智谱 / 本地 vLLM
+  等，只要暴露 `/chat/completions` 即可（设置 `AGENT_LLM_BASE_URL`）。
 - **引用安全（最重要）**：prompt 强约束「不得改写 [n] 引用编号、门控结论、任何数字」；
   润色后做引用标记校验，若 [n] 集合被破坏（丢失/新增），**自动回退原稿**，
   保证「答案里的引用始终来自官方标注、门控结论始终来自本地可信数据」。
 - **配置（环境变量）**：
     AGENT_LLM_API_KEY      必填（有它才启用；也可同时设 AGENT_LLM=1 显式开）
-    AGENT_LLM_BASE_URL     可选，如 https://api.deepseek.com/v1
+    AGENT_LLM_BASE_URL     可选，如 https://api.deepseek.com/v1 ，默认官方地址
     AGENT_LLM_MODEL        可选，默认 gpt-4o-mini
     AGENT_LLM_TEMPERATURE  可选，默认 0.3
     AGENT_LLM_PROVIDER     可选（仅备注/日志用）
@@ -27,6 +27,11 @@ import os
 import re
 from typing import Optional
 
+try:  # pragma: no cover - requests 为本项目运行依赖，缺失则 LLM 自动关闭
+    import requests
+except Exception:  # noqa: BLE001
+    requests = None  # type: ignore
+
 # 引用标记 [n]：用于润色后校验，保证编号不被模型改动。
 _MARKER_RE = re.compile(r"\[(\d+)\]")
 
@@ -36,49 +41,45 @@ def _citation_markers(text: str) -> set[int]:
 
 
 def is_llm_enabled() -> bool:
-    """是否启用了 LLM 润色。"""
+    """是否启用了 LLM 润色（未配 key 或 requests 缺失则自动关闭）。"""
     if os.getenv("AGENT_LLM") == "0":
+        return False
+    if requests is None:
         return False
     return bool(os.getenv("AGENT_LLM_API_KEY"))
 
 
-def _get_client():
-    """惰性构造 OpenAI 客户端；未装 openai 或缺少 key 时返回 None。"""
-    key = os.getenv("AGENT_LLM_API_KEY")
-    if not key:
-        return None
-    try:
-        from openai import OpenAI  # 仅当已安装才 import
-    except Exception:
-        return None
-    base_url = os.getenv("AGENT_LLM_BASE_URL") or None
-    return OpenAI(api_key=key, base_url=base_url)
-
-
-def _chat(system: str, user: str) -> Optional[str]:
-    """通用 chat 接口：成功返回文本，失败/未配置返回 None。"""
+def _post_chat(system: str, user: str) -> Optional[str]:
+    """调用 OpenAI 兼容 /chat/completions；任何异常都返回 None（优雅降级）。"""
     if not is_llm_enabled():
         return None
-    client = _get_client()
-    if client is None:
-        return None
+    key = os.getenv("AGENT_LLM_API_KEY") or ""
+    base_url = (os.getenv("AGENT_LLM_BASE_URL") or "https://api.openai.com/v1").rstrip("/")
     model = os.getenv("AGENT_LLM_MODEL", "gpt-4o-mini")
     try:
         temperature = float(os.getenv("AGENT_LLM_TEMPERATURE", "0.3"))
     except (TypeError, ValueError):
         temperature = 0.3
+
+    url = f"{base_url}/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {key}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "model": model,
+        "temperature": temperature,
+        "messages": [
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ],
+    }
     try:
-        resp = client.chat.completions.create(
-            model=model,
-            temperature=temperature,
-            messages=[
-                {"role": "system", "content": system},
-                {"role": "user", "content": user},
-            ],
-        )
-        return (resp.choices[0].message.content or "").strip() or None
-    except Exception:
-        # 任何网络/鉴权/限流错误都回退，不让 LLM 失败影响主链路。
+        resp = requests.post(url, headers=headers, json=payload, timeout=20)
+        resp.raise_for_status()
+        data = resp.json()
+        return (data["choices"][0]["message"]["content"] or "").strip() or None
+    except Exception:  # 网络/鉴权/限流/超时/解析错误一律回退，绝不阻断主链路
         return None
 
 
@@ -102,7 +103,7 @@ def polish(draft: str, context: str) -> Optional[str]:
         f"【参考事实 / 上下文】\n{context}\n\n"
         f"【待润色草稿】\n{draft}"
     )
-    out = _chat(_POLISH_SYSTEM, user)
+    out = _post_chat(_POLISH_SYSTEM, user)
     if not out:
         return None
     # 引用标记安全校验：仅当原稿含 [n] 时才校验
@@ -114,7 +115,7 @@ def polish(draft: str, context: str) -> Optional[str]:
 
 def complete(system: str, user: str) -> Optional[str]:
     """通用问答接口（供未来自由对话 / 复杂意图使用）。"""
-    return _chat(system, user)
+    return _post_chat(system, user)
 
 
 if __name__ == "__main__":
@@ -126,4 +127,4 @@ if __name__ == "__main__":
         )
         print("polish test ->", test)
     else:
-        print("未配置 AGENT_LLM_API_KEY，polish 将回退到原稿。")
+        print("未配置 AGENT_LLM_API_KEY（或 requests 缺失），polish 将回退到原稿。")

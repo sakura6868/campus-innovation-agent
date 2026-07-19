@@ -12,8 +12,11 @@ services:
         fromDatabase:
           name: campus-db
           property: connectionString   # 自动注入免费 Postgres 的连接串
-      - key: RAG_USE_ST
-        value: "0"              # 默认轻量关键词检索，启动快、零联网依赖
+      # RAG_USE_ST 不显式设置即「自动」：本地已预热 all-MiniLM-L6-v2 时默认开启真·语义检索；
+      # Render 免费实例未打包模型时自动降级轻量关键词检索，保证启动零联网依赖。
+      # 如需在 Render 启用语义检索，请在 Dockerfile 中把模型打包进镜像后设 RAG_USE_ST=1。
+      # - key: RAG_USE_ST
+      #   value: "1"
       # 可选：接真实 LLM 润色时取消下面两行注释并填入（OpenAI 兼容接口）
       # - key: AGENT_LLM_API_KEY
       #   sync: false           # 在 Render 控制台手动填，不入仓库

@@ -592,6 +592,23 @@ label input, label select, .agent-input textarea, .login-custom input,
   color: #75450d;
   font-size: 12px;
 }
+.verify-warn {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-left: 4px solid #dc2626;
+  background: #fef2f2;
+  color: #991b1b;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.verify-warn strong { display: block; font-size: 14px; margin-bottom: 2px; }
+.verify-warn div { color: #b91c1c; }
+.verify-warn details { margin-top: 6px; }
+.verify-warn summary { cursor: pointer; color: #7f1d1d; }
+.verify-warn details > div { margin-top: 4px; color: #7f1d1d; white-space: pre-wrap; font-size: 12px; }
+.tag.src-unverified { background: #fff1f0; color: #cf1322; border: 1px solid #ffccc7; }
+.tag.src-verified { background: #f0fbf4; color: #1a7a4c; border: 1px solid #b7e4c7; }
 .section h3 {
   margin: 0 0 8px;
   color: #444b55;
@@ -1179,6 +1196,20 @@ label input, label select, .agent-input textarea, .login-custom input,
   border-radius: 3px;
   font-size: 8px;
 }
+/* 推荐理由折叠 & 问答角标定位 */
+.rec-why { margin: 13px 0 0; }
+.rec-why summary {
+  cursor: pointer;
+  color: var(--suggest);
+  font-size: 11px;
+  font-weight: 650;
+  list-style: none;
+  user-select: none;
+}
+.rec-why summary::-webkit-details-marker { display: none; }
+.rec-why summary span { color: #969ba3; font-weight: 500; margin-left: 4px; }
+.rec-why .explain { margin-top: 10px; }
+.ref { scroll-margin: 80px; transition: background .35s ease; }
 .trace ol {
   margin-bottom: 0;
 }
@@ -2103,3 +2134,38 @@ label input, label select, .agent-input textarea, .login-custom input,
     margin-left: 15px;
   }
 }
+
+/* —— 赛事大厅：专业优先推荐条 —— */
+.reco-strip {
+  background: linear-gradient(135deg, #eef4ff 0%, #f7f0ff 100%);
+  border: 1px solid #d7e2ff;
+  border-radius: 14px;
+  padding: 14px 16px 16px;
+  margin-bottom: 14px;
+}
+.reco-head {
+  font-size: 14px;
+  font-weight: 650;
+  color: #2b3a67;
+  margin-bottom: 10px;
+}
+.reco-cards {
+  margin-top: 0;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+}
+.tag.major-match {
+  background: #e7f7ec;
+  color: #1a7f43;
+  border-color: #b7e6c6;
+}
+.tag.major-open {
+  background: #f3f4f6;
+  color: #6b7280;
+  border-color: #e3e5e9;
+}
+
+/* 报名状态标签（与后端时间门控呼应）：报名中=绿，已截止/已开赛/已结束=灰 */
+.tag.status-open { background: #e7f7ec; color: #1a7f43; border-color: #b7e6c6; }
+.tag.status-closed { background: #f3f4f6; color: #6b7280; border-color: #e3e5e9; }
+.tag.status-progress { background: #eef2ff; color: #5b6b8c; border-color: #dbe2f1; }
+.tag.status-ended { background: #f3f4f6; color: #9ca3af; border-color: #e3e5e9; }

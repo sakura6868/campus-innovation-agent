@@ -102,7 +102,9 @@ class TrustRulesTests(unittest.TestCase):
                 self.assertIsNone(result.match_breakdown)
                 self.assertIn(expected_reason, [reason.reason for reason in result.gate_reasons])
 
-    def test_unverified_competition_is_candidate_without_score(self) -> None:
+    def test_unverified_competition_is_recommended_with_pending_review(self) -> None:
+        # 新设计：未核验但数据完整（有来源/年份/时间）的赛事，仍进入门控+评分推荐，
+        # 仅以 pending_review=True 标记「待人工核验」，而不再被直接打入 candidate_only。
         candidate = _competition(
             data_status=DataStatus.UNVERIFIED,
             trusted_level=TrustedLevel.B,
@@ -110,11 +112,12 @@ class TrustRulesTests(unittest.TestCase):
         )
         result = recommend_for_user(_user(), [candidate], date.today())[0]
 
-        self.assertEqual(result.recommendation_status, "candidate_only")
-        self.assertFalse(result.eligible)
+        self.assertNotEqual(result.recommendation_status, "ineligible")
+        self.assertNotEqual(result.recommendation_status, "candidate_only")
         self.assertTrue(result.pending_review)
-        self.assertIsNone(result.score)
-        self.assertIsNone(result.match_breakdown)
+        self.assertIsNotNone(result.score)
+        self.assertIsNotNone(result.match_breakdown)
+        self.assertTrue(result.eligible)
 
     def test_education_levels_are_complete_and_unknown_values_fail(self) -> None:
         for path in sorted(GROUND_TRUTH_DIR.glob("*.json")):

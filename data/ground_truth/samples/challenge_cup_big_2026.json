@@ -1,0 +1,78 @@
+{
+  "competition_id": "challenge_cup_big_2026",
+  "competition_name": "挑战杯全国大学生课外学术科技作品竞赛（大挑）",
+  "document_year": 2026,
+  "category": "innovation",
+  "organizer": "共青团中央 / 中国科协 / 教育部 / 中国社会科学院 / 全国学联",
+  "eligible_students": [
+    "本科生",
+    "研究生",
+    "毕业生（毕业5年内）"
+  ],
+  "allowed_grades": [
+    "大二",
+    "大三",
+    "大四"
+  ],
+  "allowed_majors": null,
+  "team_required": true,
+  "team_min": 1,
+  "team_max": 5,
+  "registration_deadline": null,
+  "submission_deadline": null,
+  "competition_start_date": null,
+  "competition_end_date": null,
+  "result_announcement_date": null,
+  "award_settings": "设特等奖、一等奖、二等奖、三等奖（由全国组委会评定）。",
+  "award_distribution": [
+    {
+      "award": "一等奖",
+      "proportion": "约5%",
+      "note": "全国"
+    },
+    {
+      "award": "二等奖",
+      "proportion": "约15%",
+      "note": "全国"
+    },
+    {
+      "award": "三等奖",
+      "proportion": "约25%",
+      "note": "全国"
+    },
+    {
+      "award": "优秀奖",
+      "proportion": "其余",
+      "note": "省市赛"
+    }
+  ],
+  "brief_description": "挑战杯全国大学生课外学术科技作品竞赛（大挑）是由共青团中央、中国科协、教育部、中国社会科学院、全国学联共同主办的学术科技创新类赛事，主要面向本科生、研究生及毕业5年内校友，考察课外学术科技作品（自然科学类论文、哲社类调查报告、科技发明制作）的学术价值与创新能力。",
+  "required_materials": [
+    "申报书",
+    "作品正文（论文/调查报告/发明制作）",
+    "支撑材料",
+    "答辩PPT"
+  ],
+  "evaluation_dimensions": [
+    "科学性",
+    "先进性",
+    "现实意义",
+    "创新性"
+  ],
+  "required_skills": [
+    "科研能力",
+    "学术写作",
+    "作品打磨",
+    "答辩展示",
+    "团队协作"
+  ],
+  "official_source_url": "https://www.tiaozhanbei.net/",
+  "source_acquired_date": "2026-07-18",
+  "trusted_level": "C",
+  "data_status": "unverified",
+  "official_source_status": "not_found",
+  "last_verified_at": "2026-07-18",
+  "doc_version": "2026_v1",
+  "evidence": [],
+  "notes": "字段<registration_deadline><submission_deadline><competition_start_date><competition_end_date><result_announcement_date>未能找到官方依据，且原值为占位值，已置空待人工确认。重要：大挑（挑战杯全国大学生课外学术科技作品竞赛）逢单数年举办（2023、2025、2027…），2026年为“小挑”（创业计划竞赛）年，国家级大挑不在2026年举办；本记录按年份误建，正确年份见 tiaozhanbei_2025.json（大挑2025，第十九届）。另：本文件原内容（商业价值、商业计划书、路演PPT）实际描述的是小挑，疑似与大挑混淆。建议核对或删除本记录。【核实结论 2026-07-18】未找到官方链接，数据来源待确认，请勿当作定论。另：经复核挑战杯官网（tiaozhanbei.net）简介，大挑/小挑交叉轮流、每两年一届；2026年举办的是第十五届“挑战杯”中国大学生创业计划竞赛（小挑），国家级大挑（课外学术科技作品竞赛）2026年不举办，故本2026大挑记录无对应官方赛事。"
+}

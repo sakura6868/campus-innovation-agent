@@ -3,7 +3,9 @@
   "document_year": 2026,
   "organizer": "中国大学生计算机设计大赛组织委员会",
   "category": "software",
-  "eligible_students": ["本科生"],
+  "eligible_students": [
+    "本科生"
+  ],
   "allowed_grades": null,
   "allowed_majors": null,
   "team_required": true,
@@ -11,14 +13,17 @@
   "team_max": 9,
   "registration_deadline": null,
   "submission_deadline": "2026-05-30",
-  "required_materials": ["可安装运行的作品文档或可访问的网站地址", "演示视频（不超过10分钟）"],
+  "required_materials": [
+    "可安装运行的作品文档或可访问的网站地址",
+    "演示视频（不超过10分钟）"
+  ],
   "evaluation_dimensions": [],
   "required_skills": [],
   "official_source_url": "https://jwc.swjtu.edu.cn/download/ueditor/jsp/upload/file/20260403/1775202363348070358.pdf",
-  "source_acquired_date": "2026-07-16",
+  "source_acquired_date": "2026-07-18",
   "trusted_level": "A",
   "data_status": "verified",
-  "last_verified_at": "2026-07-16",
+  "last_verified_at": "2026-07-18",
   "doc_version": "2026_official_pdf_v1",
   "evidence": [
     {
@@ -82,5 +87,6 @@
       "trusted_level": "A"
     }
   ],
-  "notes": "人工逐页核验组委会通知与竞赛规程。校赛和省赛由各赛区自行组织，文件没有全国统一报名截止日，因此registration_deadline保持null；2026-05-30仅作为上推国赛作品数据及信息填报核查截止日。材料字段按软件应用与开发类要求标注。"
+  "notes": "人工逐页核验组委会通知与竞赛规程。校赛和省赛由各赛区自行组织，文件没有全国统一报名截止日，因此registration_deadline保持null；2026-05-30仅作为上推国赛作品数据及信息填报核查截止日。材料字段按软件应用与开发类要求标注。",
+  "official_source_status": "found"
 }

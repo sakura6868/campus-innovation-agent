@@ -14,9 +14,16 @@ Chroma 连接（生产可切真实服务）：
   - 设环境变量 CHROMA_HOST（可选 CHROMA_PORT，默认 8000）即切换到
     真实 Chroma 服务端（HttpClient），业务代码无需改动。
 
-embedding：
-  - 优先使用 sentence-transformers 的 all-MiniLM-L6-v2（若已安装）。
-  - 否则回退到内置轻量哈希向量（离线可用，仅用于演示隔离检索）。
+embedding（诚实标注的混合检索架构）：
+  - 默认优先使用 sentence-transformers 的 all-MiniLM-L6-v2（all-MiniLM-L6-v2 已离线
+    打包到本地缓存 ~88MB，零联网即可加载）。当本地模型存在时，RAG 默认即为「真·语义检索」。
+  - 检索融合三层信号（详见 docs/RAG_ARCHITECTURE.md）：
+      ① 语义向量余弦（MiniLM 句向量，可命中 paraphrase，如「组队几个人」≈ team_max）；
+      ② 关键词重叠（lexical，兜底精确术语召回）；
+      ③ 结构化字段召回（报名截止/专业限制等字段级精确匹配）。
+    最终以 0.8*语义 + 0.2*关键词 混合打分重排，兼顾语义泛化与术语精确。
+  - 环境变量 RAG_USE_ST=0 强制关闭（退回轻量哈希向量 + 关键词），=1 强制开启；
+    不设则「本地有模型即自动开启」，缺失模型时优雅降级到轻量向量 + 关键词检索。
 
 检索流程：
   DB -> ingest(每赛事字段+证据构造检索块，带 metadata) -> add
@@ -26,6 +33,7 @@ embedding：
 from __future__ import annotations
 
 import os
+import pathlib
 import sys
 from pathlib import Path
 from typing import Optional
@@ -46,19 +54,29 @@ from schemas import Citation, Competition, TrustedLevel
 _EMBED_DIM = 256
 _ST_MODEL = None
 _ST_TRIED = False
+# 语义块向量缓存：competition_id -> (blocks, 归一化向量)，数据静态时复用，避免重复编码
+_SEM_CACHE: dict[str, tuple[list, list]] = {}
+
+
+def _model_cached_locally() -> bool:
+    """all-MiniLM-L6-v2 是否已离线打包到本地 HF 缓存（~88MB）。"""
+    _hf_cache = (
+        pathlib.Path(os.path.expanduser("~")) / ".cache" / "huggingface" / "hub"
+    )
+    return (_hf_cache / "models--sentence-transformers--all-MiniLM-L6-v2").exists()
 
 
 def _try_load_st():
-    """惰性尝试加载 sentence-transformers；失败则永久回退轻量向量。
+    """惰性加载 sentence-transformers；失败则永久回退轻量向量。
 
-    开关优先级：
-      RAG_USE_ST=0  强制关闭（用轻量向量 + 本地检索）
-      RAG_USE_ST=1  强制开启（真实语义 embedding）
-      都不设          默认关闭，用轻量关键词检索（启动快、引用召回更优、无联网风险）
+    开关优先级（诚实标注）：
+      RAG_USE_ST=0  强制关闭（轻量哈希向量 + 关键词检索）
+      RAG_USE_ST=1  强制开启（真实语义 embedding，缺失模型会报错并降级）
+      （不设）        自动：本地已缓存 all-MiniLM-L6-v2 即默认开启真·语义检索；
+                    否则优雅降级到轻量向量 + 关键词，保证服务零外部依赖可启动。
 
-    启用真实语义 embedding 时：若 all-MiniLM-L6-v2 已离线预热到本地缓存，
-    则强制 HF_HUB_OFFLINE=1 从缓存加载，避免受限网络下连 huggingface.co 超时卡死
-    （本沙箱 huggingface.co 不可达，仅 hf-mirror.com 可下模型）。
+    启用真实语义 embedding 时：若模型已在本地缓存，强制 HF_HUB_OFFLINE=1 从缓存
+    加载，避免受限网络下连 huggingface.co 超时卡死（本沙箱 huggingface.co 不可达）。
     """
     global _ST_MODEL, _ST_TRIED
     if _ST_TRIED:
@@ -67,25 +85,20 @@ def _try_load_st():
     env = os.getenv("RAG_USE_ST")
     if env == "0":
         return None
-    if os.getenv("RAG_DISABLE_ST") == "1" and env != "1":
-        return None
-    # 未显式开启时不自动加载：保持轻量、稳定、可量化的默认体验
-    if env != "1":
+    force = env == "1"
+    cached = _model_cached_locally()
+    # 未显式开启且未强制、且本地无模型、且未被显式禁用 → 走轻量降级
+    if not force and not cached:
         return None
     try:
-        # 模型已离线预热到本地缓存时，强制离线加载，规避联网超时卡死
-        import pathlib
-
-        _hf_cache = (
-            pathlib.Path(os.path.expanduser("~")) / ".cache" / "huggingface" / "hub"
-        )
-        _mini_dir = _hf_cache / "models--sentence-transformers--all-MiniLM-L6-v2"
-        if _mini_dir.exists():
+        if cached:
             os.environ.setdefault("HF_HUB_OFFLINE", "1")
         from sentence_transformers import SentenceTransformer
 
         _ST_MODEL = SentenceTransformer("all-MiniLM-L6-v2")
-    except Exception:
+        print(f"[rag] 已加载真实语义向量模型 all-MiniLM-L6-v2（离线，dim=384）")
+    except Exception as exc:
+        print(f"[rag] 加载 sentence-transformers 失败，降级轻量向量：{exc}")
         _ST_MODEL = None
     return _ST_MODEL
 
@@ -266,6 +279,7 @@ class CompetitionRAG:
         """从数据库读取全部赛事并灌入各自隔离集合。返回 {competition_id: 片段数}。"""
         import db  # 延迟导入，避免循环依赖
 
+        _SEM_CACHE.clear()  # 数据可能变化，清掉旧块向量缓存
         result: dict = {}
         for comp in db.get_all_competitions():
             result[comp.competition_id] = self.ingest_competition(comp)
@@ -420,12 +434,25 @@ class CompetitionRAG:
         scored.sort(key=lambda x: -x[0])
         return [b for _, b in scored[:top_k]]
 
+    def _lexical_score(self, q: str, text: str) -> float:
+        """关键词重叠度（归一化），作为混合检索的 lexical 信号。"""
+        qt = set((q or "").lower())
+        if not qt:
+            return 0.0
+        t = (text or "").lower()
+        hit = sum(1 for ch in qt if ch in t)
+        return hit / len(qt)
+
     def _semantic_local_query(self, comp: Competition, question: str, top_k: int) -> list[Citation]:
-        """具备真实 embedding 时，用 sentence-transformers 做余弦相似度本地检索。
+        """具备真实 embedding 时，用 sentence-transformers 做「语义 + 关键词」混合检索。
 
         绕开本环境不稳定的 Chroma 持久化查询，仍能获得真正的「语义」召回：
-        「团队几个人」「组队人数」等 paraphrase 都能命中 team_max 块。
+        「团队几个人」「组队人数」等 paraphrase 都能命中 team_max 块；同时用关键词
+        重叠（0.2 权重）兜底精确术语。最终 0.8*语义余弦 + 0.2*关键词 混合重排。
         不依赖任何外部服务，引用仍 100% 来自官方标注。
+
+        块向量按 competition_id 缓存到内存（数据静态），仅 query 向量逐次编码，
+        大幅提升重复查询吞吐。
         """
         blocks = self._build_blocks(comp)
         if not blocks:
@@ -433,12 +460,21 @@ class CompetitionRAG:
         model = _try_load_st()
         if model is None:
             return self._local_query(comp, question, top_k)
+        # 块向量缓存（按赛事隔离）
+        if comp.competition_id not in _SEM_CACHE:
+            texts = [b.source_text for b in blocks]
+            _SEM_CACHE[comp.competition_id] = (
+                blocks,
+                model.encode(texts, normalize_embeddings=True),
+            )
+        cached_blocks, b_vecs = _SEM_CACHE[comp.competition_id]
         q_vec = model.encode([question or ""], normalize_embeddings=True)[0]
-        b_vecs = model.encode([b.source_text for b in blocks], normalize_embeddings=True)
         scored = []
-        for b, v in zip(blocks, b_vecs):
+        for b, v in zip(cached_blocks, b_vecs):
             sim = float(sum(a * c for a, c in zip(q_vec, v)))  # 已归一化 -> 余弦
-            scored.append((sim, b))
+            lex = self._lexical_score(question or "", b.source_text)
+            hybrid = 0.8 * sim + 0.2 * lex
+            scored.append((hybrid, b))
         scored.sort(key=lambda x: -x[0])
         return [b for _, b in scored[:top_k]]
 

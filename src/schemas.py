@@ -23,12 +23,23 @@ from pydantic import BaseModel, Field
 
 
 class CompetitionCategory(str, Enum):
-    """赛事四大类别，对应 data/raw 下的子目录。"""
+    """赛事类别，覆盖高校主流学科竞赛方向。"""
 
-    PROGRAMMING = "programming"   # 程序设计类
-    MODELING = "modeling"         # 数学建模类
-    INNOVATION = "innovation"     # 创新创业类
-    SOFTWARE = "software"         # 软件作品类
+    PROGRAMMING = "programming"       # 程序设计类
+    MODELING = "modeling"             # 数学建模类
+    INNOVATION = "innovation"         # 创新创业类
+    SOFTWARE = "software"             # 软件作品类
+    ENGLISH = "english"               # 外语/英语类
+    MATH = "math"                     # 数学竞技类（非建模）
+    ELECTRONICS = "electronics"       # 电子设计类
+    ROBOTICS_AI = "robotics_ai"       # 机器人与人工智能类
+    DATA = "data"                     # 数据科学类
+    DESIGN = "design"                 # 艺术与设计类
+    BUSINESS = "business"             # 财经商科类
+    ENGINEERING = "engineering"       # 机械与工程类
+    LIFE_SCIENCE = "life_science"     # 生命科学/医药类
+    PHYSICS = "physics"               # 物理类
+    CHEM_ENV = "chem_env"             # 化工/环境/能源类
 
 
 class EducationLevel(str, Enum):
@@ -196,6 +207,10 @@ class Competition(BaseModel):
     trusted_level: TrustedLevel = TrustedLevel.C
     data_status: DataStatus = DataStatus.UNVERIFIED
     last_verified_at: Optional[str] = None
+
+    # —— 官方来源核实结论 ——
+    official_source_status: Optional[str] = None  # "found" | "not_found" | None
+    notes: Optional[str] = None
 
     # —— 证据 ——
     evidence: list[Citation] = Field(default_factory=list)

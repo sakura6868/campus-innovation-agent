@@ -72,11 +72,18 @@ const state = {
   profile: null,
   competitions: [],
   evidenceCache: {}, // competition_id -> [evidence]
+  currentEvidence: [], // 引用证据索引（供弹窗 / 角标定位）
 };
 
 const CAT_LABEL = {
   programming: "程序设计", modeling: "数学建模",
   innovation: "创新创业", software: "软件作品",
+  english: "外语竞赛", math: "数学竞技",
+  electronics: "电子设计", robotics_ai: "机器人与AI",
+  data: "数据科学", design: "艺术设计",
+  business: "财经商科", engineering: "机械工程",
+  life_science: "生科医药", physics: "物理",
+  chem_env: "化工环境",
 };
 const STATUS_LABEL = {
   highly_suitable: "高度适合", suitable: "比较适合",
@@ -88,10 +95,10 @@ const STATUS_LABEL = {
 // ---------------------------------------------------------------------------
 // 引用证据弹窗
 // ---------------------------------------------------------------------------
-let currentEvidence = [];
+// 引用证据索引已并入 state（见上方 state 容器）
 
 function openCiteModal(i) {
-  const e = currentEvidence[i];
+  const e = state.currentEvidence[i];
   if (!e) return;
   const page = e.page === null || e.page === undefined ? "未定位" : `第 ${e.page} 页`;
   $("#cite-body").innerHTML = `
@@ -109,9 +116,9 @@ function openCiteModal(i) {
 }
 
 function citeChips(evidence) {
-  currentEvidence = evidence || [];
-  if (!currentEvidence.length) return `<span class="muted">（暂无引用证据）</span>`;
-  return currentEvidence.map((e, i) =>
+  state.currentEvidence = evidence || [];
+  if (!state.currentEvidence.length) return `<span class="muted">（暂无引用证据）</span>`;
+  return state.currentEvidence.map((e, i) =>
     `<span class="cite-chip" data-cite="${i}" title="点击查看原文证据">引用 ${i + 1}</span>`
   ).join("");
 }
@@ -121,7 +128,7 @@ function chipsForField(evidence, field) {
   const list = (evidence || []).filter((e) => e.field === field);
   if (!list.length) return "";
   return " " + list.map((e, i) => {
-    const idx = currentEvidence.indexOf(e);
+    const idx = state.currentEvidence.indexOf(e);
     return `<span class="cite-chip" data-cite="${idx}" title="点击查看原文证据">${escapeHtml(e.field)}</span>`;
   }).join("");
 }
@@ -290,49 +297,118 @@ function monogram(name) {
 // ---------------------------------------------------------------------------
 // 赛事大厅
 // ---------------------------------------------------------------------------
-async function renderHall() {
-  const cat = $("#filter-cat").value;
-  const year = $("#filter-year").value;
-  let url = "/api/competitions";
-  const qs = [];
-  if (cat) qs.push("category=" + encodeURIComponent(cat));
-  if (year) qs.push("year=" + encodeURIComponent(year));
-  if (qs.length) url += "?" + qs.join("&");
+// 专业匹配等级：2=明确包含该专业，1=不限专业(面向所有人)，0=不匹配
+function compMatchLevel(c, major) {
+  if (!major) return 0;
+  if (!c.allowed_majors || c.allowed_majors.length === 0) return 1; // 不限专业
+  return c.allowed_majors.includes(major) ? 2 : 0;
+}
 
-  let list;
-  try {
-    list = await apiGet(url);
-  } catch (err) {
-    $("#hall-list").innerHTML = `<div class="card">加载失败：${escapeHtml(err.message)}</div>`;
-    return;
-  }
-  state.competitions = list;
+// 报名状态标签：基于时间字段判断，给「已截止 / 已开赛 / 已结束」加灰色标识，
+// 与后端 recommend_for_user 的时间门控（只推报名中）前后呼应。
+function competitionStatus(c) {
+  const today = new Date().toISOString().slice(0, 10);
+  const sd = c.competition_start_date, ed = c.competition_end_date;
+  const rd = c.registration_deadline, sub = c.submission_deadline;
+  if (sd && sd <= today) return { label: "已开赛", cls: "status-progress" };
+  if (ed && ed < today) return { label: "已结束", cls: "status-ended" };
+  if (rd && rd < today) return { label: "报名已截止", cls: "status-closed" };
+  if (!rd && sub && sub < today) return { label: "报名已截止", cls: "status-closed" };
+  return { label: "报名中", cls: "status-open" };
+}
+function statusTag(c) {
+  const s = competitionStatus(c);
+  return `<span class="tag ${s.cls}">${s.label}</span>`;
+}
 
-  // 年份下拉
-  const years = Array.from(new Set(list.map((c) => c.document_year))).sort((a, b) => b - a);
-  const yearSel = $("#filter-year");
-  const cur = yearSel.value;
-  yearSel.innerHTML = `<option value="">全部年份</option>` +
-    years.map((y) => `<option value="${y}">${y}</option>`).join("");
-  if (cur) yearSel.value = cur;
-
-  if (!list.length) {
-    $("#hall-list").innerHTML = `<div class="card muted">暂无赛事。</div>`;
-    return;
-  }
-  $("#hall-list").innerHTML = list.map((c) => {
-    return `<article class="card comp-card" data-id="${escapeHtml(c.competition_id)}" tabindex="0">
+function compCardHtml(c, matchLevel) {
+  const majorTag = matchLevel === 2
+    ? `<span class="tag major-match">匹配你的专业</span>`
+    : (matchLevel === 1 ? `<span class="tag major-open">不限专业</span>` : "");
+  return `<article class="card comp-card" data-id="${escapeHtml(c.competition_id)}" tabindex="0">
       <div class="comp-card-main">
         <div class="comp-kicker">${escapeHtml(c.competition_id)}</div>
         <div class="comp-title">${escapeHtml(c.competition_name)}</div>
         <div class="comp-meta">
           <span class="tag cat">${CAT_LABEL[c.category] || c.category}</span>
           <span class="tag year">${c.document_year}</span>
+          ${statusTag(c)}
+          ${majorTag}
         </div>
       </div>
       <div class="comp-card-side"><span>报名截止</span><strong>${escapeHtml(c.registration_deadline || "未明确")}</strong><i aria-hidden="true">→</i></div>
     </article>`;
-  }).join("");
+}
+
+async function renderHall() {
+  // 拉取全部赛事（用于专业匹配与年份下拉）
+  let all;
+  try {
+    all = await apiGet("/api/competitions");
+  } catch (err) {
+    $("#hall-list").innerHTML = `<div class="card">加载失败：${escapeHtml(err.message)}</div>`;
+    return;
+  }
+  state.competitions = all;
+
+  // 年份下拉
+  const years = Array.from(new Set(all.map((c) => c.document_year))).sort((a, b) => b - a);
+  const yearSel = $("#filter-year");
+  const cur = yearSel.value;
+  yearSel.innerHTML = `<option value="">全部年份</option>` +
+    years.map((y) => `<option value="${y}">${y}</option>`).join("");
+  if (cur) yearSel.value = cur;
+
+  // 用户专业画像（已登录且已填写画像时生效）
+  let major = null;
+  if (state.uid) {
+    try {
+      const p = await apiGet(`/api/users/${encodeURIComponent(state.uid)}/profile`);
+      major = p && p.major ? p.major : null;
+    } catch (_) { major = null; }
+  }
+  const levelOf = (c) => compMatchLevel(c, major);
+
+  // 应用类别/年份筛选（客户端，便于专业优先排序）
+  const cat = $("#filter-cat").value;
+  const year = $("#filter-year").value;
+  const list = all.filter((c) =>
+    (!cat || c.category === cat) && (!year || String(c.document_year) === String(year))
+  );
+
+  if (!list.length) {
+    $("#hall-list").innerHTML = `<div class="card muted">暂无符合条件的赛事。</div>`;
+    return;
+  }
+
+  // 按「专业匹配优先 → 报名截止临近优先」排序
+  const byDeadline = (a, b) => {
+    const da = a.registration_deadline || "9999", db = b.registration_deadline || "9999";
+    return da < db ? -1 : da > db ? 1 : 0;
+  };
+  const sorted = list.slice().sort((a, b) => {
+    const la = levelOf(a), lb = levelOf(b);
+    if (la !== lb) return lb - la;
+    return byDeadline(a, b);
+  });
+
+  // 顶部「为你推荐」区块（跨筛选，取专业匹配度最高的若干项）
+  let strip = "";
+  if (major) {
+    const matched = all
+      .map((c) => ({ c, l: levelOf(c) }))
+      .filter((x) => x.l > 0)
+      .sort((a, b) => b.l - a.l || byDeadline(a.c, b.c))
+      .slice(0, 6);
+    if (matched.length) {
+      strip = `<div class="reco-strip">
+        <div class="reco-head">🎯 为你推荐 · 基于你的专业「${escapeHtml(major)}」匹配到 ${matched.length}+ 项赛事</div>
+        <div class="cards reco-cards">${matched.map((x) => compCardHtml(x.c, x.l)).join("")}</div>
+      </div>`;
+    }
+  }
+
+  $("#hall-list").innerHTML = strip + sorted.map((c) => compCardHtml(c, levelOf(c))).join("");
 
   $$("#hall-list .comp-card").forEach((el) => {
     el.addEventListener("click", () => {
@@ -361,7 +437,7 @@ async function renderDetail(id) {
   const c = detail.competition;
   const ev = c.evidence || [];
   // 重新构建全局 evidence 索引（保证 data-cite 指向正确）
-  currentEvidence = ev;
+  state.currentEvidence = ev;
 
   const kv = (k, v) =>
     `<div class="kv"><span class="k">${escapeHtml(k)}</span><span class="v">${v}</span></div>`;
@@ -416,6 +492,8 @@ async function renderDetail(id) {
       <div class="comp-meta">
         <span class="tag cat">${CAT_LABEL[c.category] || c.category}</span>
         <span class="tag year">${c.document_year}</span>
+        ${statusTag(c)}
+        ${(c.official_source_status === "not_found") ? `<span class="tag src-unverified">来源待确认</span>` : (c.official_source_status === "found" ? `<span class="tag src-verified">官方已核验</span>` : "")}
       </div>
       </div>
       <div class="detail-actions">
@@ -423,6 +501,13 @@ async function renderDetail(id) {
         <button id="join-project" class="btn primary">加入我的项目</button>
       </div>
     </div>
+
+    ${c.official_source_status === "not_found" ? `
+    <div class="verify-warn">
+      <strong>⚠ 未找到官方链接</strong>
+      <div>本赛事未能核实到官方来源，以上数据来源待确认，请勿当作定论。</div>
+      ${c.notes ? `<details><summary>查看核实说明</summary><div>${escapeHtml(c.notes)}</div></details>` : ""}
+    </div>` : ""}
 
     ${c.brief_description ? `<div class="section"><h3>比赛简介</h3><div class="card"><p class="brief-desc" style="line-height:1.7;color:#30343a;margin:0;white-space:pre-wrap;">${escapeHtml(c.brief_description)}</p></div></div>` : ""}
 
@@ -446,6 +531,24 @@ async function renderDetail(id) {
       ${(c.evaluation_dimensions && c.evaluation_dimensions.length) ? kv("评价维度", c.evaluation_dimensions.join("、")) : ""}
     </div></div>
 
+    ${ev.length ? `<div class="section"><h3>官方依据</h3><div class="card">
+      <details open>
+        <summary>共 ${ev.length} 条来源证据<span>点击收起</span></summary>
+        <div class="refs-list" style="padding-top:8px;">
+          ${ev.map((e) => {
+            const lvl = e.trust_level || e.trusted_level || "A";
+            const lvlLabel = ({ A: "可信 A", B: "待核 B", C: "存疑 C" })[lvl] || lvl;
+            const src = (e.document_name || "") + (e.page ? " 第" + e.page + "页" : "");
+            return `<div class="ref">
+              <span class="lvl ${lvl}">${lvlLabel}</span>
+              <strong>${escapeHtml(e.field || "官方规则")}</strong>
+              <div>${escapeHtml((e.source_text || "").slice(0, 180))}</div>
+              <div class="muted">${escapeHtml(src)}${e.source_url ? ` · <a href="${escapeHtml(e.source_url)}" target="_blank" rel="noopener">官方链接 ↗</a>` : ""}</div>
+            </div>`;
+          }).join("")}
+        </div>
+      </details>
+    </div></div>` : ""}
     <div class="section source-note"><p class="muted">以上信息来自赛事官方通知，请以学校官网或赛事官网最新发布为准。</p></div>
   `;
 
@@ -473,8 +576,8 @@ async function ragSearch(compId, year) {
     return;
   }
   // 追加到全局证据数组，复用弹窗
-  const base = currentEvidence.length;
-  hits.forEach((h) => currentEvidence.push(h));
+  const base = state.currentEvidence.length;
+  hits.forEach((h) => state.currentEvidence.push(h));
   box.innerHTML = hits.map((h) => {
     const page = (h.page === null || h.page === undefined) ? "未定位" : `第 ${h.page} 页`;
     return `<div class="card" style="margin-bottom:8px;">
@@ -535,9 +638,9 @@ async function renderRecommend() {
       </div>
       <div class="comp-meta">${tags}</div>
       ${gate}
-      ${explain ? `<ul class="explain">${explain}</ul>` : ""}
+      ${explain ? `<details class="rec-why"><summary>为何推荐 · ${Object.keys(r.explanation || {}).length} 项匹配<span>点击展开</span></summary><ul class="explain">${explain}</ul></details>` : ""}
       ${r.recommendation_status === "candidate_only" ? `<div class="muted" style="font-size:12px;margin-top:6px;">该赛事仅作为候选信息展示，暂未纳入匹配评分。</div>` : ""}
-      ${r.eligible && !r.pending_review ? `<div class="row"><button class="btn primary join-btn" data-id="${escapeHtml(r.competition_id)}">加入我的项目</button></div>` : ""}
+      ${r.eligible ? `<div class="row"><button class="btn primary join-btn" data-id="${escapeHtml(r.competition_id)}">加入我的项目</button></div>` : ""}
     </article>`;
   }).join("");
 
@@ -672,8 +775,8 @@ async function loadCitations(compId, target) {
 function renderEvidenceList(ev) {
   if (!ev.length) return `<div class="muted">暂无引用证据</div>`;
   // 临时加入全局索引以便点击
-  const base = currentEvidence.length;
-  ev.forEach((e) => currentEvidence.push(e));
+  const base = state.currentEvidence.length;
+  ev.forEach((e) => state.currentEvidence.push(e));
   return ev.map((e, i) => {
     const idx = base + i;
     return `<div class="kv"><span class="k">${escapeHtml(e.field)}</span><span class="v">
@@ -720,9 +823,12 @@ async function renderAgentView() {
   }
 }
 
-// 将答案文本原样渲染（不再显示可点击引用角标，引用信息仅保留在底层数据与比赛文档中）
+// 将答案渲染为带 [n] 角标 + 轻量 Markdown（**加粗**）的结构化文本
 function renderAnswerWithCites(text) {
-  return escapeHtml(text);
+  let html = escapeHtml(text || "");
+  html = html.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  html = html.replace(/\[(\d+)\]/g, (m, n) => `<sup class="cite" data-cite="${Number(n) - 1}">[${n}]</sup>`);
+  return html;
 }
 
 function cleanAgentAnswer(text) {
@@ -784,12 +890,31 @@ async function agentAsk() {
   }
 
   // 引用：追加到全局证据数组，供弹窗复用
-  const base = currentEvidence.length;
-  (data.citations || []).forEach((c) => currentEvidence.push(c));
+  const base = state.currentEvidence.length;
+  (data.citations || []).forEach((c) => state.currentEvidence.push(c));
 
   const intentTag = `<span class="intent-tag">${INTENT_LABEL[data.intent] || data.intent} · ${escapeHtml(data.resolved_name || "自动识别赛事")}</span>`;
 
-  const refsHtml = "";
+  const citeList = data.citations || [];
+  const refsHtml = citeList.length
+    ? `<div class="refs"><details open>
+        <summary>官方依据 · ${citeList.length} 条<span>点击收起</span></summary>
+        <div class="refs-list">
+          ${citeList.map((c, i) => {
+            const lvl = c.trust_level || c.trusted_level || "A";
+            const lvlLabel = ({ A: "可信 A", B: "待核 B", C: "存疑 C" })[lvl] || lvl;
+            const src = (c.document_name || "") + (c.page ? " 第" + c.page + "页" : "");
+            const excerpt = (c.source_text || c.snippet || "").slice(0, 180);
+            return `<div class="ref" id="ref-${i}">
+              <span class="lvl ${lvl}">${lvlLabel}</span>
+              <strong>${escapeHtml(c.field || "官方规则")}</strong>
+              <div>${escapeHtml(excerpt)}</div>
+              <div class="muted">${escapeHtml(src)}${c.source_url ? ` · <a href="${escapeHtml(c.source_url)}" target="_blank" rel="noopener">官方链接 ↗</a>` : ""}</div>
+            </div>`;
+          }).join("")}
+        </div>
+      </details></div>`
+    : "";
   const traceHtml = "";
 
   aRow.innerHTML = `<div class="msg-a">
@@ -799,8 +924,20 @@ async function agentAsk() {
     ${traceHtml}
   </div>`;
 
-  // 绑定角标点击（已隐藏证据展示，暂不绑定）
-  // $$(".cite", aRow).forEach((el) => { ... });
+  // 角标点击：定位并高亮对应官方依据
+  $$(".cite", aRow).forEach((el) => {
+    el.addEventListener("click", () => {
+      const det = aRow.querySelector(".refs details");
+      if (det && !det.open) det.open = true;
+      const ref = aRow.querySelector("#ref-" + el.dataset.cite);
+      if (ref) {
+        ref.scrollIntoView({ behavior: "smooth", block: "center" });
+        const old = ref.style.background;
+        ref.style.background = "#fff6da";
+        setTimeout(() => { ref.style.background = old; }, 900);
+      }
+    });
+  });
   log.scrollTop = log.scrollHeight;
   sendBtn.disabled = false;
   sendBtn.classList.remove("is-loading");

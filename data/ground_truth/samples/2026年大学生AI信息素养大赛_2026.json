@@ -1,0 +1,46 @@
+{
+  "competition_id": "2026年大学生AI信息素养大赛_2026",
+  "competition_name": "2026年大学生“AI+信息素养”大赛",
+  "document_year": 2026,
+  "category": "data",
+  "organizer": "大学生“AI+信息素养”大赛组织委员会（指导单位：教育部高等学校图书情报工作指导委员会、重庆市教育委员会、四川省教育厅）",
+  "eligible_students": [
+    "本科生",
+    "研究生"
+  ],
+  "allowed_grades": null,
+  "allowed_majors": null,
+  "team_required": true,
+  "team_min": 1,
+  "team_max": 3,
+  "registration_deadline": "2026-09-17",
+  "submission_deadline": null,
+  "result_announcement_date": null,
+  "competition_start_date": "2026-09-19",
+  "competition_end_date": null,
+  "award_settings": "校赛设校级一、二、三等奖；市赛/省赛设特等奖、一、二、三等奖及优秀组织奖；晋级全国联赛者获联赛奖项。",
+  "award_distribution": [],
+  "brief_description": "面向高校在校生的AI与信息素养赛事，分本科生、研究生赛道（部分赛区含高职高专）。赛段含校赛（线上限时答题）、市/省赛（团队淘汰赛+作品提交）、全国联赛。报名平台 https://csc.xxsuyang.com/ 。",
+  "required_materials": [
+    "在线答题",
+    "团队作品（省赛阶段）"
+  ],
+  "evaluation_dimensions": [
+    "信息检索",
+    "AI应用能力",
+    "数据素养"
+  ],
+  "required_skills": [
+    "信息素养",
+    "AI工具应用"
+  ],
+  "official_source_url": "https://csc.xxsuyang.com/",
+  "source_acquired_date": "2026-07-19",
+  "trusted_level": "C",
+  "data_status": "unverified",
+  "last_verified_at": null,
+  "official_source_status": "found",
+  "notes": "自动发现于 2026-07-19，来源大赛官方平台 csc.xxsuyang.com 及多所高校（同济、天津职业技术师范大学等）报名通知。报名 2026-07-03 至 09-17；校赛 09-19~21；省赛淘汰赛 10-17~18、作品提交至 11-02。精确决赛/联赛日期略，按已知信息填写；数据待人工核验，请勿当作定论。",
+  "evidence": [],
+  "doc_version": "2026_v1"
+}

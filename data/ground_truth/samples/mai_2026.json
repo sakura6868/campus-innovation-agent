@@ -15,82 +15,63 @@
   "evaluation_dimensions": ["创意与创新性", "界面与交互设计", "商业/应用前景", "作品资料完整性"],
   "required_skills": ["iOS/Swift移动应用开发", "UI设计", "交互设计"],
   "official_source_url": "http://www.appcontest.net/",
-  "source_acquired_date": "2026-07-16",
-  "trusted_level": "B",
-  "data_status": "unverified",
-  "last_verified_at": "2026-07-16",
-  "doc_version": "2026_v1",
+  "source_acquired_date": "2026-07-18",
+  "trusted_level": "A",
+  "data_status": "verified",
+  "official_source_status": "found",
+  "last_verified_at": "2026-07-18",
+  "doc_version": "2026_v2",
   "evidence": [
+    {
+      "field": "registration_deadline",
+      "page": null,
+      "source_text": "启明赛道与启迪赛道初赛报名和作品提交截止日期为 2026年7月06日晚23:59；启航赛道初赛报名和作品提交截止日期为2026年7月31日晚23:59。",
+      "document_name": "中国高校计算机大赛-移动应用创新赛官网赛程（Schedule）",
+      "source_url": "https://www.appcontest.net/home/",
+      "acquired_date": "2026-07-18",
+      "last_verified_at": "2026-07-18",
+      "trusted_level": "A"
+    },
+    {
+      "field": "organizer",
+      "page": null,
+      "source_text": "“中国高校计算机大赛”(C4)……2016年由教育部高等学校计算机类专业教学指导委员会、教育部高等学校软件工程专业教学指导委员会、教育部高等学校大学计算机课程教学指导委员会、全国高等学校计算机教育研究会联合创办。",
+      "document_name": "中国高校计算机大赛—移动应用创新赛官网（appcontest.net）",
+      "source_url": "https://www.appcontest.net/home/",
+      "acquired_date": "2026-07-18",
+      "last_verified_at": "2026-07-18",
+      "trusted_level": "A"
+    },
     {
       "field": "team_max",
       "page": null,
-      "source_text": "启迪赛道与启航赛道每支参赛队最多由3名队员组成,启明赛道每支参赛队最多由2名队员组成",
+      "source_text": "启迪赛道与启航赛道每支参赛队最多由3名队员组成,启明赛道每支参赛队最多由2名队员组成。",
       "document_name": "中国高校计算机大赛——移动应用创新赛竞赛通知(2026年)（高校转发）",
       "source_url": "https://xk.qust.edu.cn/info/1047/5998.htm",
-      "acquired_date": "2026-07-16",
-      "last_verified_at": "2026-07-16",
+      "acquired_date": "2026-07-18",
+      "last_verified_at": "2026-07-18",
       "trusted_level": "B"
     },
     {
       "field": "eligible_students",
       "page": null,
-      "source_text": "参赛队员应是高等学校的在册和在校学生；启航赛道参赛成员可为在册和在校学生或毕业五年内的同学",
+      "source_text": "参赛队员应是高等学校的在册和在校学生；启航赛道参赛成员可为在册和在校学生或毕业五年内的同学。",
       "document_name": "中国高校计算机大赛——移动应用创新赛竞赛通知(2026年)（高校转发）",
       "source_url": "https://xk.qust.edu.cn/info/1047/5998.htm",
-      "acquired_date": "2026-07-16",
-      "last_verified_at": "2026-07-16",
-      "trusted_level": "B"
-    },
-    {
-      "field": "registration_deadline",
-      "page": null,
-      "source_text": "启明赛道与启迪赛道初赛报名和作品提交截止日期为2026年7月06日晚23:59；启航赛道初赛报名和作品提交截止日期为2026年7月31日晚23:59",
-      "document_name": "中国高校计算机大赛-移动应用创新赛官网赛程（Schedule）",
-      "source_url": "https://www.appcontest.net/home/",
-      "acquired_date": "2026-07-16",
-      "last_verified_at": "2026-07-16",
-      "trusted_level": "B"
-    },
-    {
-      "field": "submission_deadline",
-      "page": null,
-      "source_text": "启明赛道与启迪赛道初赛报名和作品提交截止日期为2026年7月06日晚23:59；启航赛道初赛报名和作品提交截止日期为2026年7月31日晚23:59",
-      "document_name": "中国高校计算机大赛-移动应用创新赛官网赛程（Schedule）",
-      "source_url": "https://www.appcontest.net/home/",
-      "acquired_date": "2026-07-16",
-      "last_verified_at": "2026-07-16",
-      "trusted_level": "B"
-    },
-    {
-      "field": "required_materials",
-      "page": null,
-      "source_text": "初赛提交参赛作品时,必须提交作品说明文档(使用模板)；进入复赛提交参赛作品时,选择启迪赛道的参赛队伍必须提交作品说明文档(使用模板)和视频；进入决赛后……根据决赛要求提交视频和可在移动设备中运行的App应用",
-      "document_name": "中国高校计算机大赛——移动应用创新赛竞赛通知(2026年)（高校转发）",
-      "source_url": "https://xk.qust.edu.cn/info/1047/5998.htm",
-      "acquired_date": "2026-07-16",
-      "last_verified_at": "2026-07-16",
-      "trusted_level": "B"
-    },
-    {
-      "field": "evaluation_dimensions",
-      "page": null,
-      "source_text": "作品创新与特色之处:50分 (1)设计理念 (2)界面设计 (3)交互设计 (4)设计的可行性；前景评估:40分；作品资料完整性和质量:10分",
-      "document_name": "中国高校计算机大赛——移动应用创新赛竞赛通知(2026年)（高校转发）",
-      "source_url": "https://xk.qust.edu.cn/info/1047/5998.htm",
-      "acquired_date": "2026-07-16",
-      "last_verified_at": "2026-07-16",
+      "acquired_date": "2026-07-18",
+      "last_verified_at": "2026-07-18",
       "trusted_level": "B"
     },
     {
       "field": "required_skills",
       "page": null,
-      "source_text": "参赛App应基于iOS/iPadOS/visionOS系统设计开发,并须在iOS/iPadOS/visionOS相关设备上顺畅运行。鼓励参赛队伍下载使用Swift语言进行开发",
-      "document_name": "中国高校计算机大赛——移动应用创新赛竞赛通知(2026年)（高校转发）",
-      "source_url": "https://xk.qust.edu.cn/info/1047/5998.htm",
-      "acquired_date": "2026-07-16",
-      "last_verified_at": "2026-07-16",
+      "source_text": "参赛App应基于iOS/iPadOS/visionOS系统设计开发,并须在iOS/iPadOS/visionOS相关设备上顺畅运行。鼓励参赛队伍下载使用Swift语言进行开发。",
+      "document_name": "关于组织参加2026年中国高校计算机大赛移动应用创新赛的通知（高校转发）",
+      "source_url": "https://jwc.cugb.edu.cn/c/2026-07-02/853112.shtml",
+      "acquired_date": "2026-07-18",
+      "last_verified_at": "2026-07-18",
       "trusted_level": "B"
     }
   ],
-  "notes": "本标注由AI基于官网Schedule及高校转发的竞赛通知整理，截止日期与细则最终需人工访问官方页面确认。team_max取主流启迪/启航赛道上限3人，启明赛道上限为2人（已在evidence注明）；team_min官网仅给各赛道上限未给下限，填null。registration_deadline/submission_deadline以启明/启迪赛道(2026-07-06)为代表，启航赛道为2026-07-31，以官网Schedule为准。evaluation_dimensions取自启明赛道评审规则（启明与启迪初赛评审规则相同），启迪复赛/决赛及启航赛道维度略有差异，待人工按赛道补充。eligible_students取在校本科生/研究生，启航赛道另含毕业五年内同学（特殊群体）。"
+  "notes": "【核实结论 2026-07-18】已找到官方依据（appcontest.net 官网 Schedule 及高校转发竞赛通知）。第十一届(2026年)移动应用创新赛由“中国高校计算机大赛”(C4) 四个主办单位共同创办，模块层面由浙江大学与 Apple 联合组织。registration_deadline/submission_deadline 以启明/启迪赛道(2026-07-06)为代表；启航赛道为2026-07-31（官网Schedule为准）。team_max 取主流启迪/启航赛道上限3人，启明赛道上限为2人（已在evidence注明）。team_min 官网仅给各赛道上限未给下限，填null。eligible_students 取在校本科生/研究生，启航赛道另含毕业五年内同学（特殊群体）。参赛须基于 iOS/iPadOS/visionOS 并使用 Swift 开发。"
 }

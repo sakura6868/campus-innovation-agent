@@ -3,7 +3,13 @@
   "document_year": 2026,
   "organizer": "中国高校计算机大赛—移动应用创新赛组织委员会",
   "category": "software",
-  "eligible_students": ["本科生", "研究生", "专科生", "高职高专生", "毕业生（毕业5年内）"],
+  "eligible_students": [
+    "本科生",
+    "研究生",
+    "专科生",
+    "高职高专生",
+    "毕业生（毕业5年内）"
+  ],
   "allowed_grades": null,
   "allowed_majors": null,
   "team_required": true,
@@ -11,14 +17,28 @@
   "team_max": 3,
   "registration_deadline": "2026-07-31",
   "submission_deadline": "2026-07-31",
-  "required_materials": ["全体队员签名的报名表", "作品说明文档", "已上架或TestFlight可用的App"],
-  "evaluation_dimensions": ["作品创新性", "商业前景", "社会价值", "团队展示与表达"],
-  "required_skills": ["iOS/iPadOS/visionOS开发", "产品设计", "商业分析", "路演表达"],
+  "required_materials": [
+    "全体队员签名的报名表",
+    "作品说明文档",
+    "已上架或TestFlight可用的App"
+  ],
+  "evaluation_dimensions": [
+    "作品创新性",
+    "商业前景",
+    "社会价值",
+    "团队展示与表达"
+  ],
+  "required_skills": [
+    "iOS/iPadOS/visionOS开发",
+    "产品设计",
+    "商业分析",
+    "路演表达"
+  ],
   "official_source_url": "https://xk.qust.edu.cn/system/_content/download.jsp?urltype=news.DownloadAttachUrl&owner=1999506397&wbfileid=17743430",
-  "source_acquired_date": "2026-07-16",
+  "source_acquired_date": "2026-07-18",
   "trusted_level": "A",
   "data_status": "verified",
-  "last_verified_at": "2026-07-16",
+  "last_verified_at": "2026-07-18",
   "doc_version": "2026_official_rules_v1",
   "evidence": [
     {
@@ -112,5 +132,6 @@
       "trusted_level": "A"
     }
   ],
-  "notes": "按启航赛道单独建档，避免与启明/启迪赛道的6月30日截止混用。规程仅明确队员上限3人，未明确下限，因此team_min保持null。报名系统在截止日前允许完善信息，故报名截止与初赛作品截止统一记录为2026-07-31。"
+  "notes": "按启航赛道单独建档，避免与启明/启迪赛道的6月30日截止混用。规程仅明确队员上限3人，未明确下限，因此team_min保持null。报名系统在截止日前允许完善信息，故报名截止与初赛作品截止统一记录为2026-07-31。",
+  "official_source_status": "found"
 }

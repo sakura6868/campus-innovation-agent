@@ -1,9 +1,14 @@
 {
+  "competition_id": "fwb_2026",
   "competition_name": "中国大学生服务外包创新创业大赛",
   "document_year": 2026,
   "organizer": "中国大学生服务外包创新创业大赛组织委员会",
   "category": "software",
-  "eligible_students": ["本科生", "高职高专生", "毕业生（毕业5年内）"],
+  "eligible_students": [
+    "本科生",
+    "高职高专生",
+    "毕业生（毕业5年内）"
+  ],
   "allowed_grades": null,
   "allowed_majors": null,
   "team_required": true,
@@ -18,7 +23,7 @@
   "source_acquired_date": "2026-07-16",
   "trusted_level": "A",
   "data_status": "verified",
-  "last_verified_at": "2026-07-16",
+  "last_verified_at": "2026-07-18",
   "doc_version": "2026_official_pdf_v1",
   "evidence": [
     {
@@ -72,5 +77,6 @@
       "trusted_level": "A"
     }
   ],
-  "notes": "人工逐页核验组委会正式通知。通知只明确队员上限5人，未明确下限；材料清单被下放到参赛手册，因此required_materials保持空数组，不据此推测。报名截止的16:00时刻保留在证据原文中。"
+  "notes": "人工逐页核验组委会正式通知。通知只明确队员上限5人，未明确下限；材料清单被下放到参赛手册，因此required_materials保持空数组，不据此推测。报名截止的16:00时刻保留在证据原文中。",
+  "official_source_status": "found"
 }

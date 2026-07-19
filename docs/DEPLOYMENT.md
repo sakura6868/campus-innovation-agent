@@ -42,7 +42,7 @@ python -m venv venv
 | 变量 | 默认值 | 说明 |
 | --- | --- | --- |
 | `DATABASE_URL` | SQLite | 数据库连接串 |
-| `RAG_USE_ST` | `0` | 是否启用 sentence-transformers |
+| `RAG_USE_ST` | `自动` | 语义检索开关：`0` 强制关、`1` 强制开、不设则本地有 all-MiniLM-L6-v2 即默认开启真·语义检索（详见 `docs/RAG_ARCHITECTURE.md`） |
 | `CHROMA_HOST` | 空 | 远程 Chroma 地址 |
 | `CHROMA_PORT` | `8000` | 远程 Chroma 端口 |
 | `AGENT_LLM_API_KEY` | 空 | 可选模型润色密钥 |
