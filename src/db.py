@@ -247,53 +247,56 @@ def init_db() -> None:
     seed_all()
 
 
-def _migrate_competition_columns() -> None:
-    """幂等增量迁移：为已存在的 competitions 表补齐新增时间/奖项列。
+def _add_missing_columns(table, url: str) -> None:
+    """幂等增量迁移：为已存在的表补齐 ORM 模型声明但库表缺失的列（跨 SQLite / PostgreSQL）。
 
-    SQLAlchemy 的 create_all 不会向已存在的表添加新列，因此这里检查缺失列
-    并 ALTER TABLE 补齐（SQLite 用 PRAGMA；PostgreSQL 用 information_schema）。
+    SQLAlchemy 的 create_all 不会向已存在的表添加新列，因此这里根据模型元数据
+    检查缺失列并 ALTER TABLE 补齐。列集合直接从 ORM 模型派生，**新增字段时无需
+    再手工维护白名单**，从根本上避免「本地有、线上缺列」的 schema 漂移问题。
     """
     from sqlalchemy import text
 
-    wanted = {
-        "result_announcement_date", "award_settings", "award_distribution",
-        "competition_start_date", "competition_end_date", "brief_description",
-    }
-    date_cols = {"result_announcement_date", "competition_start_date", "competition_end_date"}
-    if DATABASE_URL.startswith("sqlite"):
-        with _engine.begin() as conn:
-            rows = conn.execute(text("PRAGMA table_info(competitions)")).fetchall()
+    dialect = _engine.dialect
+    wanted = {c.name: c for c in table.columns}
+    with _engine.begin() as conn:
+        if url.startswith("sqlite"):
+            rows = conn.execute(text(f"PRAGMA table_info({table.name})")).fetchall()
             existing = {r[1] for r in rows}
-            for col in wanted - existing:
-                col_type = "DATE" if col in date_cols else "VARCHAR"
-                conn.execute(text(f"ALTER TABLE competitions ADD COLUMN {col} {col_type}"))
-    else:
-        with _engine.begin() as conn:
+        else:
             rows = conn.execute(
-                text("SELECT column_name FROM information_schema.columns WHERE table_name = 'competitions'")
+                text(
+                    "SELECT column_name FROM information_schema.columns "
+                    f"WHERE table_name = '{table.name}'"
+                )
             ).fetchall()
             existing = {r[0] for r in rows}
-            for col in wanted - existing:
-                col_type = "DATE" if col in date_cols else "VARCHAR"
-                conn.execute(text(f"ALTER TABLE competitions ADD COLUMN {col} {col_type}"))
+        for name, col in wanted.items():
+            if name in existing:
+                continue
+            col_type = col.type.compile(dialect=dialect)
+            ddl = f"ALTER TABLE {table.name} ADD COLUMN {name} {col_type}"
+            # 已有数据表上不能直接添加 NOT NULL 列；若存在标量默认值则补 DEFAULT 过渡。
+            if (
+                (not col.nullable)
+                and col.default is not None
+                and not callable(getattr(col.default, "arg", None))
+            ):
+                lit = col.default.arg
+                if isinstance(lit, str):
+                    ddl += f" DEFAULT '{lit.replace(chr(39), chr(39) * 2)}'"
+                else:
+                    ddl += f" DEFAULT {lit}"
+            conn.execute(text(ddl))
+
+
+def _migrate_competition_columns() -> None:
+    """为 competitions 表补齐模型声明但库表缺失的列。"""
+    _add_missing_columns(CompetitionModel.__table__, DATABASE_URL)
 
 
 def _migrate_user_profile_columns() -> None:
-    """幂等增量迁移：为已存在的 user_profiles 表补齐新增展示列。
-
-    SQLAlchemy 的 create_all 不会向已存在的表添加新列，因此这里用
-    PRAGMA 检查缺失列并 ALTER TABLE 补齐（仅 SQLite；PostgreSQL 走正常建表）。
-    """
-    if not DATABASE_URL.startswith("sqlite"):
-        return
-    from sqlalchemy import text
-
-    wanted = {"display_name", "persona", "avatar"}
-    with _engine.begin() as conn:
-        rows = conn.execute(text("PRAGMA table_info(user_profiles)")).fetchall()
-        existing = {r[1] for r in rows}
-        for col in wanted - existing:
-            conn.execute(text(f"ALTER TABLE user_profiles ADD COLUMN {col} VARCHAR"))
+    """为 user_profiles 表补齐模型声明但库表缺失的列（跨 dialect）。"""
+    _add_missing_columns(UserProfileModel.__table__, DATABASE_URL)
 
 
 @contextmanager
