@@ -172,6 +172,11 @@ def _resolve_competition_versioned(
         return best, None, None
 
     verified = [c for c in same_name if assess_source_readiness(c).ready]
+    if not verified:
+        # 兜底：即便评估未达「ready」（如 evidence 字段待补），只要已锚定官方来源
+        # （found），就默认按最新届作答，避免常见赛事因多版本直接掉进「请明确年份」
+        # 的澄清分支、从而完全不触发润色与引用。
+        verified = [c for c in same_name if c.official_source_status == "found"]
     years = "、".join(str(c.document_year) for c in sorted(same_name, key=lambda item: item.document_year, reverse=True))
     if verified:
         selected = max(verified, key=lambda item: item.document_year)
@@ -686,7 +691,11 @@ def node_compose(state: AgentState) -> AgentState:
     if state.get("version_resolution_note"):
         answer = state["version_resolution_note"] + "\n\n" + answer
     if state.get("pending_review") and intent in ("qa", "detail"):
-        answer += "\n\n该赛事目前仅作为候选信息展示，关键字段证据尚不完整；以上内容不构成资格判断或匹配评分，请以官网最新通知为准。"
+        comp = db.get_competition(state.get("resolved_competition")) if state.get("resolved_competition") else None
+        # 仅对「无官方来源 / 待核验」赛事显示候选免责；已锚定官方来源（found）的
+        # A/B 级赛事不再套用，避免对已核验信息给出误导性的「候选」措辞。
+        if comp is None or comp.official_source_status != "found":
+            answer += "\n\n该赛事目前仅作为候选信息展示，关键字段证据尚不完整；以上内容不构成资格判断或匹配评分，请以官网最新通知为准。"
 
     trace.append("组装答案：完成")
     return {**state, "answer": answer, "trace": trace}

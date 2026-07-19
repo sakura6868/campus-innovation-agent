@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>校园科创导航智能体</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='10' fill='%2316181d'/%3E%3Ctext x='32' y='40' text-anchor='middle' font-family='Arial' font-size='25' font-weight='700' fill='white'%3ECI%3C/text%3E%3C/svg%3E" />
-  <link rel="stylesheet" href="/static/styles.css?v=20260719.4" />
+  <link rel="stylesheet" href="/static/styles.css?v=20260719.5" />
 </head>
 <body>
   <header class="topnav">
@@ -208,9 +208,7 @@
 
         <div class="agent-composer-wrap">
           <div class="agent-input">
-            <textarea id="agent-q" rows="1" placeholder="向校园科创智能体提问"></textarea>
-            <div class="agent-composer-footer">
-              <span>Enter 发送 · Shift + Enter 换行</span>
+            <div class="agent-input-toolbar">
               <label class="model-select" title="切换润色模型（需后端已配置对应 LLM key）">
                 <span>模型</span>
                 <select id="agent-model">
@@ -219,6 +217,13 @@
                   <option value="qwen-turbo">qwen-turbo</option>
                 </select>
               </label>
+              <span id="agent-llm-status" class="agent-llm-status" data-on="0">
+                <span class="agent-llm-dot"></span><span class="agent-llm-text">检测中…</span>
+              </span>
+            </div>
+            <textarea id="agent-q" rows="1" placeholder="向校园科创智能体提问"></textarea>
+            <div class="agent-composer-footer">
+              <span>Enter 发送 · Shift + Enter 换行</span>
               <button id="agent-send" class="agent-send" type="button" title="发送问题" aria-label="发送问题">↑</button>
             </div>
           </div>
@@ -411,6 +416,6 @@
 
   <div id="toast" class="toast hidden"></div>
 
-  <script src="/static/app.js?v=20260719.4"></script>
+  <script src="/static/app.js?v=20260719.5"></script>
 </body>
 </html>

@@ -412,6 +412,18 @@ def agent_ask(
         raise HTTPException(status_code=500, detail=f"Agent 执行异常：{exc}")
 
 
+@app.get("/api/agent/llm-status", tags=["Agent"])
+def agent_llm_status() -> dict:
+    """返回 LLM 润色层启用状态，供前端展示『智能润色是否已连接』。"""
+    from agent.llm import is_llm_enabled
+
+    return {
+        "enabled": is_llm_enabled(),
+        "model": os.getenv("AGENT_LLM_MODEL") or "gpt-4o-mini",
+        "provider": os.getenv("AGENT_LLM_PROVIDER") or "",
+    }
+
+
 # ---------------------------------------------------------------------------
 # 数据维护闭环（上传 → 解析 → 来源确认 → 入库）
 # ---------------------------------------------------------------------------

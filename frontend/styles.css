@@ -1297,6 +1297,32 @@ label input, label select, .agent-input textarea, .login-custom input,
   color: #a0a5ad;
   font-size: 9px;
 }
+.agent-input-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 1px 6px;
+  margin-bottom: 2px;
+  border-bottom: 1px solid #eef0f2;
+}
+.agent-llm-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #8a8f98;
+  white-space: nowrap;
+}
+.agent-llm-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #c2c6cc;
+  flex: none;
+}
+.agent-llm-status[data-on="1"] .agent-llm-dot { background: #2faa5b; }
+.agent-llm-status[data-on="1"] .agent-llm-text { color: #4a8f63; }
 .model-select {
   display: inline-flex;
   align-items: center;

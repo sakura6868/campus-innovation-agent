@@ -993,8 +993,31 @@ $("#agent-q").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.s
   if (!mdl) return;
   const saved = localStorage.getItem("agent_model");
   if (saved) mdl.value = saved;
-  mdl.addEventListener("change", () => localStorage.setItem("agent_model", mdl.value));
+  mdl.addEventListener("change", () => {
+    localStorage.setItem("agent_model", mdl.value);
+    refreshLlmStatus();
+  });
+  refreshLlmStatus();
 })();
+
+// 读取后端 LLM 启用状态，更新输入框顶部状态点（解决"看不出是否接入模型"）
+async function refreshLlmStatus() {
+  const el = document.getElementById("agent-llm-status");
+  if (!el) return;
+  const txt = el.querySelector(".agent-llm-text");
+  try {
+    const r = await apiGet("/api/agent/llm-status");
+    const on = !!r.enabled;
+    el.dataset.on = on ? "1" : "0";
+    const mdl = (document.getElementById("agent-model") || {}).value || "";
+    txt.textContent = on
+      ? `智能润色已连接 · ${mdl || r.model || "LLM"}`
+      : "未启用智能润色（标准答复）";
+  } catch (e) {
+    el.dataset.on = "0";
+    txt.textContent = "智能润色状态未知";
+  }
+}
 $("#agent-q").addEventListener("input", (e) => {
   e.currentTarget.style.height = "auto";
   e.currentTarget.style.height = `${Math.min(e.currentTarget.scrollHeight, 160)}px`;
