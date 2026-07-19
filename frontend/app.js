@@ -1000,6 +1000,23 @@ $("#agent-q").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.s
   refreshLlmStatus();
 })();
 
+// 主题色选择器：启动时从 localStorage 恢复，点击即时切换
+(function initThemePicker() {
+  const view = document.getElementById("view-agent");
+  const picker = document.querySelector(".agent-theme-picker");
+  if (!view || !picker) return;
+  const saved = localStorage.getItem("agent_theme");
+  if (saved) view.dataset.theme = saved;
+  picker.querySelectorAll("button").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.theme === view.dataset.theme);
+    btn.addEventListener("click", () => {
+      view.dataset.theme = btn.dataset.theme;
+      localStorage.setItem("agent_theme", btn.dataset.theme);
+      picker.querySelectorAll("button").forEach((b) => b.classList.toggle("active", b === btn));
+    });
+  });
+})();
+
 // 读取后端 LLM 启用状态，更新输入框顶部状态点（解决"看不出是否接入模型"）
 async function refreshLlmStatus() {
   const el = document.getElementById("agent-llm-status");
