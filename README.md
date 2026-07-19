@@ -1,5 +1,7 @@
 # 校园科创导航智能体
 
+[![CI](https://github.com/sakura6868/campus-innovation-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/sakura6868/campus-innovation-agent/actions/workflows/ci.yml)
+
 面向在校生的可信赛事导航与参赛执行助手。系统把官方通知解析、人工核验、赛事隔离 RAG、资格门控、个性化推荐和项目任务管理串成完整闭环。
 
 ## 核心能力
