@@ -2293,6 +2293,39 @@ label input, label select, .agent-input textarea, .login-custom input,
   overflow: hidden;
 }
 
+/* 全屏沉浸模式：智能问答占满 topnav 下方整个视口 */
+body.agent-fullscreen {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+body.agent-fullscreen .topnav {
+  flex: none;
+}
+body.agent-fullscreen .container {
+  flex: 1;
+  min-height: 0;
+  max-width: none;
+  padding: 0;
+  overflow: hidden;
+}
+body.agent-fullscreen #view-agent.agent-codex {
+  max-width: none;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  height: 100%;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+body.agent-fullscreen #view-agent.agent-codex .agent-workspace {
+  height: 100%;
+  min-height: 0;
+  border-radius: 0;
+}
+
 #view-agent.agent-codex .agent-workspace {
   background: transparent;
   border: 0;

@@ -144,6 +144,8 @@ function showView(name) {
   $$(".topnav nav a").forEach((a) => {
     a.classList.toggle("active", a.dataset.nav === name);
   });
+  // 智能问答页全屏沉浸：移除容器边距，让视图占满 topnav 下方全部空间
+  document.body.classList.toggle("agent-fullscreen", name === "agent");
 }
 
 function router() {
