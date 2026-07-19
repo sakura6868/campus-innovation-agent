@@ -12,10 +12,14 @@
   - 「让问答自动带引用」：任何回答都在 state["citations"] 中携带来源，
     compose 节点把引用编号嵌入答案文本（[1][2]…），前端可渲染角标。
   - 离线可运行：不依赖任何外部 LLM Key。意图路由用规则 + 最长公共子串
-    锁定赛事；答案用确定性模板生成。若配置了 LLM（设 AGENT_LLM_API_KEY，
-    可选 AGENT_LLM_BASE_URL 指向任意 OpenAI 兼容端点），compose / team_copy
-    会调用 LLM 对模板润色，但引用与门控结论始终来自本地可信数据，不被模型改写
-    （润色后做引用标记校验，破坏 [n] 编号则自动回退原稿）。详见 src/agent/llm.py。
+    锁定赛事；答案默认用确定性模板生成（LLM 未启用时的回退）。若配置了 LLM
+    （设 AGENT_LLM_API_KEY，可选 AGENT_LLM_BASE_URL 指向任意 OpenAI 兼容端点）：
+      * qa / detail（指向具体赛事的事实查询）：由 LLM 基于检索证据**自由撰写**
+        答案（可解释、对比、给建议），但所有赛事事实必须带 [n] 引用、且不得
+        超出证据范围（见 src/agent/skills/evidence_speaking.md 铁律 + 引用校验）。
+      * chat（开放/建议/通用问题）：走自由对话，LLM 当参谋，同样受证据铁律约束。
+      * recommend / team：保持确定性逻辑（列表/文案），team 文案做轻量润色。
+    门控结论与引用编号始终来自本地可信数据，模型无法改写；生成失败自动回退模板。
 
 执行轨迹：state["trace"] 记录每个节点，前端可展示「意图→检索→门控→评分→文案」。
 """
@@ -52,6 +56,7 @@ from recommendation.engine import (
 )
 from schemas import Citation, Competition, UserProfile
 from trust import assess_source_readiness
+from agent.llm import generate_answer as _llm_generate
 
 
 # ---------------------------------------------------------------------------
@@ -202,6 +207,12 @@ def _resolve_competition(question: str, comps: list[Competition]) -> Optional[Co
 _KW_RECOMMEND = ["推荐", "适合我", "适合参加", "该参加", "选哪个", "报哪个", "有什么比赛", "参加什么"]
 _KW_TEAM = ["组队", "招募", "招新", "招人", "队友", "文案", "招队友", "找队友", "队员"]
 _KW_DETAIL = ["介绍", "详情", "是什么", "概况", "简介", "了解一下"]
+_KW_CHAT = [
+    "规划", "计划", "建议", "怎么准备", "如何准备", "怎么选", "如何选",
+    "策略", "路线", "方向", "经验", "分享", "攻略", "提升", "怎么学",
+    "如何学", "怎么备", "如何备", "我该怎么", "该不该", "值不值", "怎么样",
+    "帮我", "如何冲", "怎么冲", "怎么安排", "如何安排",
+]
 
 
 def _classify_intent(question: str, has_comp: bool) -> str:
@@ -214,7 +225,8 @@ def _classify_intent(question: str, has_comp: bool) -> str:
         return "detail"
     if has_comp:
         return "qa"          # 指向具体赛事的问题，默认走规则问答（检索带引用）
-    return "unknown"
+    # 无明确赛事：开放/建议/通用类问题走自由对话（chat），由 LLM 当参谋
+    return "chat"
 
 
 # ---------------------------------------------------------------------------
@@ -344,10 +356,45 @@ def _detail_fallback_citations(comp: Optional[Competition]) -> list[Citation]:
     return out
 
 
+def _broad_retrieve(question: str, top_k: int = 5) -> tuple[list, list]:
+    """开放对话（chat）用：跨全部赛事做轻量召回，作为 LLM 自由作答的接地证据。
+
+    不依赖 RAG 语义检索（本环境 RAG 为本地隔离实现），改用「赛事名模糊匹配 +
+    关键字段（技能/对象/类别）关键词重叠」打分，取 top-k 赛事，再把每个赛事的
+    关键结构化字段转成 Citation 作为证据。返回 (相关赛事列表, 证据列表)。
+    """
+    comps = db.get_all_competitions()
+    scored = []
+    for c in comps:
+        score = _competition_match_score(question, c)
+        hay_parts = [c.competition_name or ""]
+        hay_parts += list(getattr(c, "required_skills", []) or [])
+        hay_parts += [getattr(s, "value", str(s)) for s in (getattr(c, "eligible_students", []) or [])]
+        cat = getattr(c, "category", None)
+        if cat:
+            hay_parts.append(str(cat))
+        hay = " ".join(hay_parts)
+        if any(tok in _norm(question) for tok in hay.split() if len(tok) >= 2):
+            score += 2
+        if score >= 4:
+            scored.append((c, score))
+    scored.sort(key=lambda x: x[1], reverse=True)
+    top = [c for c, _ in scored[:top_k]]
+    cites: list = []
+    for c in top:
+        for cit in _detail_fallback_citations(c)[:3]:
+            cites.append(cit)
+    return top, cites
+
+
 def node_retrieve(state: AgentState) -> AgentState:
     trace = list(state.get("trace") or [])
     cid = state.get("resolved_competition")
     if not cid:
+        if (state.get("intent") or "") == "chat":
+            top, cites = _broad_retrieve(state.get("question") or "", top_k=int(state.get("top_k") or 5))
+            trace.append(f"开放检索：跨赛事召回 {len(top)} 个相关赛事、{len(cites)} 条证据")
+            return {**state, "citations": [_cite_dict(h) for h in cites], "trace": trace}
         trace.append("隔离检索：跳过（无目标赛事）")
         return {**state, "citations": [], "trace": trace}
 
@@ -611,11 +658,137 @@ def _citations_appendix(citations: list[dict]) -> str:
     return "\n".join(lines)
 
 
+# ---------------------------------------------------------------------------
+# 工具：混合模式 —— LLM 基于证据自由撰写（仍强约束 [n] 引用）
+# ---------------------------------------------------------------------------
+
+_CIT_RE = re.compile(r"\[(\d+)\]")
+
+
+def _build_evidence_brief(citations: list[dict]) -> str:
+    """把 citations 序列化成 LLM 能读懂的「编号证据清单」。
+
+    每条形如：[n] （文档名｜字段｜可信等级）原文片段 官方链接
+    LLM 撰写时须用 [n] 回指，从而保证所有事实可溯源。
+    """
+    if not citations:
+        return "（无具体赛事证据，请基于通用方法论回答，不要编造任何具体赛事的事实、日期或数字）"
+    lines = []
+    for i, c in enumerate(citations):
+        doc = c.get("document_name") or "官方通知"
+        url = c.get("source_url") or ""
+        field = c.get("field") or ""
+        txt = (c.get("source_text") or "").strip().replace("\n", " ")
+        lvl = c.get("trusted_level") or "C"
+        line = f"[{i + 1}] （{doc}｜字段:{field}｜可信等级:{lvl}）{txt}"
+        if url:
+            line += f" 官方链接:{url}"
+        lines.append(line)
+    return "\n".join(lines)
+
+
+def _profile_summary(profile) -> str:
+    if not profile:
+        return ""
+    parts = []
+    edu = getattr(profile, "education_level", None)
+    if edu:
+        parts.append(f"学历：{edu}")
+    if getattr(profile, "major", None):
+        parts.append(f"专业：{profile.major}")
+    if getattr(profile, "skills", None):
+        parts.append("技能：" + "、".join(profile.skills))
+    if getattr(profile, "interests", None):
+        parts.append("兴趣：" + "、".join(profile.interests))
+    return "；".join(parts)
+
+
+def _sanitize_citations(answer: str, n_citations: int) -> str:
+    """去掉超出证据范围的 [n] 引用，防止模型编造不存在的编号。
+
+    若模型写了 [7] 但只有 3 条证据，则该标记被剥离，避免前端渲染幽灵引用。
+    """
+    def _repl(m: "re.Match") -> str:
+        idx = int(m.group(1))
+        return "" if idx < 1 or idx > n_citations else m.group(0)
+    return _CIT_RE.sub(_repl, answer)
+
+
+def _generate_grounded(state: AgentState, intent: str, citations: list, name: str,
+                       allow_empty_evidence: bool = False) -> Optional[str]:
+    """调用 LLM 基于证据自由撰写；LLM 未启用/生成失败返回 None（回退确定性）。"""
+    if not citations and not allow_empty_evidence:
+        return None
+    brief = _build_evidence_brief(citations)
+    profile = _load_profile(state)
+    profile_summary = _profile_summary(profile) if profile else ""
+    question = state.get("question") or ""
+    out = _llm_generate(
+        question, brief,
+        intent=intent,
+        profile_summary=profile_summary,
+        model=state.get("model"),
+    )
+    if not out:
+        return None
+    return _sanitize_citations(out, len(citations))
+
+
+def _finalize_grounded(generated: str, state: AgentState, citations: list,
+                       intent: str, trace: list) -> str:
+    """把 LLM 生成结果 + 确定性门控/评分结论 + 引用附录拼成最终答案。"""
+    answer = generated
+    gate = state.get("gate") or {}
+    if gate.get("eligible") is False:
+        answer += f"\n\n结合你的画像，该赛事门控未通过：{'；'.join(gate.get('reasons') or [])}"
+    elif gate.get("eligible") is True and not (state.get("score") or {}).get("skipped"):
+        answer += f"\n\n你符合报名硬性条件，综合匹配度约 {(state.get('score') or {}).get('total')} 分。"
+    answer += _citations_appendix(citations)
+    if state.get("version_resolution_note"):
+        answer = state["version_resolution_note"] + "\n\n" + answer
+    if state.get("pending_review") and intent in ("qa", "detail"):
+        comp = db.get_competition(state.get("resolved_competition")) if state.get("resolved_competition") else None
+        if comp is None or comp.official_source_status != "found":
+            answer += "\n\n该赛事目前仅作为候选信息展示，关键字段证据尚不完整；以上内容不构成资格判断或匹配评分，请以官网最新通知为准。"
+    trace.append("组装答案：LLM 基于证据自由撰写（带 [n] 引用）")
+    return answer
+
+
 def node_compose(state: AgentState) -> AgentState:
     trace = list(state.get("trace") or [])
     intent = state.get("intent") or "unknown"
     citations = state.get("citations") or []
     name = state.get("resolved_name")
+
+    # 歧义澄清优先：多版本未定 / 需明确年份时，直接给出澄清，不进入自由生成，
+    # 避免 LLM 在信息不足时自行猜测赛事版本。
+    if state.get("clarification"):
+        answer = state["clarification"]
+        answer += _citations_appendix(citations)
+        trace.append("组装答案：歧义澄清（需用户明确年份/版本）")
+        return {**state, "answer": answer, "trace": trace}
+
+    # ---- 混合模式核心：qa/detail 事实查询、chat 开放对话，均由 LLM 基于证据自由撰写 ----
+    if intent in ("qa", "detail") and citations:
+        generated = _generate_grounded(state, intent, citations, name)
+        if generated:
+            answer = _finalize_grounded(generated, state, citations, intent, trace)
+            return {**state, "answer": answer, "trace": trace}
+    if intent == "chat":
+        generated = _generate_grounded(state, "chat", citations, name, allow_empty_evidence=True)
+        if generated:
+            answer = _finalize_grounded(generated, state, citations, "chat", trace)
+            return {**state, "answer": answer, "trace": trace}
+        # LLM 未启用或生成失败：友好回退
+        answer = (
+            "（当前未启用智能模型，开放对话暂不可用。我可以回答具体赛事的事实查询，"
+            "例如「蓝桥杯报名截止日期」；启用模型后这里会由助手基于证据自由作答。）"
+        )
+        answer += _citations_appendix(citations)
+        if state.get("version_resolution_note"):
+            answer = state["version_resolution_note"] + "\n\n" + answer
+        trace.append("组装答案：chat 回退提示")
+        return {**state, "answer": answer, "trace": trace}
 
     if intent == "team":
         body = state.get("team_copy") or "未能生成组队文案。"
@@ -733,6 +906,7 @@ def build_graph():
             "qa": "retrieve",
             "detail": "retrieve",
             "team": "retrieve",
+            "chat": "retrieve",
             "recommend": "recommend_all",
             "unknown": "compose",
         },

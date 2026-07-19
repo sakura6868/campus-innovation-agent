@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import os
 import re
+from pathlib import Path
 from typing import Optional
 
 try:  # pragma: no cover - requests 为本项目运行依赖，缺失则 LLM 自动关闭
@@ -125,6 +126,53 @@ def polish(draft: str, context: str, model: Optional[str] = None) -> Optional[st
 def complete(system: str, user: str, model: Optional[str] = None) -> Optional[str]:
     """通用问答接口（供未来自由对话 / 复杂意图使用）。"""
     return _post_chat(system, user, model=model)
+
+
+# ---------------------------------------------------------------------------
+# 证据说话 skill（让 LLM 完全依据检索证据作答，防幻觉）
+# ---------------------------------------------------------------------------
+
+_SKILL_FILE = Path(__file__).resolve().parent / "skills" / "evidence_speaking.md"
+_GROUNDING_SKILL = _SKILL_FILE.read_text(encoding="utf-8") if _SKILL_FILE.exists() else ""
+
+
+_GENERATE_SYSTEM = (
+    "你是「校园科创导航助手」里负责最终作答的学长学姐型参谋，说话自然、口语化、有交流感，"
+    "像一个真人辅导员在聊天，而不是生硬罗列条款。\n\n"
+    "【证据说话铁律（必须严格遵守）】\n" + _GROUNDING_SKILL + "\n\n"
+    "【作答要求】\n"
+    "1. 可以解释、对比、给备赛建议、做规划，让回答有「人感」；\n"
+    "2. 只要出现关于具体赛事的任一事实（日期、截止、人数、奖项比例、参赛对象、流程、材料、技能等），"
+    "必须来自下方【证据】并用 [n] 标注来源编号，一个事实一处引用；\n"
+    "3. 若某事实【证据】里没有，绝对不要编造——改为写『这方面建议你直接看官网确认』之类；\n"
+    "4. 通用方法论/心态/时间管理类建议（怎么练、怎么组队）不需要引用，可自然展开；\n"
+    "5. 只输出回答正文，不要加『以下是回答』之类多余说明。"
+)
+
+
+def generate_answer(
+    question: str,
+    evidence_brief: str,
+    intent: str = "qa",
+    profile_summary: str = "",
+    model: Optional[str] = None,
+) -> Optional[str]:
+    """基于检索证据自由撰写回答（混合模式核心）。
+
+    与 ``polish`` 不同，这里不再是对固定模板改措辞，而是让 LLM 当「参谋」，
+    基于【证据】自然组织语言（解释/对比/建议/规划），但所有具体赛事事实必须
+    带 [n] 引用、且不得超出证据范围。未启用 LLM 或调用失败返回 None，
+    调用方回退确定性模板。
+    """
+    if not is_llm_enabled():
+        return None
+    user = f"【用户问题】{question}\n"
+    if profile_summary:
+        user += f"【用户画像】{profile_summary}\n"
+    user += f"【问题类型】{intent}\n"
+    user += f"【可用证据】\n{evidence_brief}\n\n"
+    user += "请基于上述证据，用自然口语化的方式作答（凡是具体赛事事实务必带 [n] 引用）："
+    return _post_chat(_GENERATE_SYSTEM, user, model=model)
 
 
 if __name__ == "__main__":
