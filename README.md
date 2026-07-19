@@ -78,6 +78,10 @@ python -m venv venv
 4. 点 **Deploy Blueprint**，等待 3–8 分钟构建完成，即可访问
    `https://campus-innovation-agent.onrender.com`。
 
+> **健康检查（可选但建议）**：服务启动后默认暴露 `GET /health` 接口（返回
+> `{"status":"ok"}`）。可在 Render 服务设置页把 **Health Check Path** 设为
+> `/health`，让平台自动探活、异常时自动重启，提升稳定性观感与可用性。
+
 ### 部署踩过的坑（已修复，记录备查）
 
 - `requirements.txt` 中 `pdfplumber>=3.0` 版本不存在（最新 `0.11.10`）→ 已改为 `>=0.11`；并补充 `psycopg2-binary>=2.9`（连接 Postgres 必需）。

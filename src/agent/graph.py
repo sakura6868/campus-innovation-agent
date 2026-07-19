@@ -119,6 +119,13 @@ def _lcs_len(a: str, b: str) -> int:
     return best
 
 
+def _strip_year(s: str) -> str:
+    """去掉年份（如「2026年」），避免赛事名里的年份前缀与问题里的年份形成
+    虚假公共子串，导致「2026年蓝桥杯」被错配到「2026年XX大赛」。年份消歧
+    交给 ``_resolve_competition_versioned`` 的 ``mentioned_years`` 处理。"""
+    return re.sub(r"20\d{2}", "", s).replace("年", "")
+
+
 def _competition_match_score(question: str, competition: Competition) -> float:
     q = _norm(question)
     c = competition
@@ -127,13 +134,16 @@ def _competition_match_score(question: str, competition: Competition) -> float:
     for token in _GENERIC_TOKENS:
         core = core.replace(token, "")
     core = "".join(ch for ch in core if not ch.isdigit()).strip()
+    # 完整名 / 核心名 / ID 直接命中仍保留（强信号）
     if name and name in q:
         return 10 + len(name)
     if core and core in q:
         return 8 + len(core)
     if c.competition_id and c.competition_id in q:
         return 6
-    lcs = _lcs_len(q, name)
+    # 模糊匹配时对「完整名」剥离年份再比 LCS，既保留「蓝桥杯」等品牌字，
+    # 又避免赛事名里的「2026年」前缀与问题里的年份形成虚假公共子串。
+    lcs = _lcs_len(_strip_year(q), _strip_year(name)) if name else 0
     return 3 + lcs if lcs >= 3 else 0
 
 

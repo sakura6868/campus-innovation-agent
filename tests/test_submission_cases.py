@@ -58,7 +58,7 @@ class SubmissionCases(unittest.TestCase):
 
     def test_03_unverified_competition_cannot_become_project(self) -> None:
         with self.assertRaisesRegex(ValueError, "competition_unverified"):
-            db.create_user_project(self.user_id, "lanqiao_2026")
+            db.create_user_project(self.user_id, "accounting_2026")
 
     def test_04_expired_competition_cannot_become_project(self) -> None:
         with self.assertRaisesRegex(ValueError, "competition_expired"):
@@ -118,11 +118,11 @@ class SubmissionCases(unittest.TestCase):
         self.assertIn("最新已核验版本：2026年", result["answer"])
         self.assertIn("报名截止日期：2026-09-07", result["answer"])
 
-    def test_13_same_name_without_verified_version_asks_for_year(self) -> None:
+    def test_13_no_year_resolves_latest_verified_version(self) -> None:
+        # 同名多年份且有已核验版本时，未指定年份应锁定「最新已核验版本」。
         result = run_agent("蓝桥杯报名截止")
-        self.assertIsNone(result["resolved_competition"])
-        self.assertIn("存在多个年份版本", result["answer"])
-        self.assertIn("请明确年份", result["answer"])
+        self.assertEqual(result["resolved_competition"], "lanqiao_2026")
+        self.assertIn("2026-03-11", result["answer"])
 
     def test_14_explicit_year_resolves_requested_version(self) -> None:
         result = run_agent("2026年蓝桥杯报名截止")
