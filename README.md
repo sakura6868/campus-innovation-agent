@@ -2,20 +2,20 @@
 
 [![CI](https://github.com/sakura6868/campus-innovation-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/sakura6868/campus-innovation-agent/actions/workflows/ci.yml)
 
-面向在校生的可信赛事导航与参赛执行助手。系统把官方通知解析、人工核验、赛事隔离 RAG、资格门控、个性化推荐和项目任务管理串成完整闭环。
+面向在校生的可信赛事导航与参赛执行助手。系统把官方通知解析、官网来源确认、赛事隔离 RAG、资格门控、个性化推荐和项目任务管理串成完整闭环。
 
 ## 核心能力
 
 - **可信赛事库**：赛事按年份独立存储，报名截止日期直接来自 Ground Truth，不做演示性平移或自动改写。
-- **证据一致问答**：回答可追溯到官方 PDF/Word 的页码、原文、链接、获取日期和核验日期。
+- **证据一致问答**：回答可追溯到官方 PDF/Word 页码或网页原文、官方链接、获取日期和来源检查日期。
 - **推荐门控**：未核验赛事仅显示为“候选信息”，不进入正式推荐；已截止赛事与硬条件不符赛事均为 `score=null`。
-- **多年份识别**：用户指定年份时查询对应版本；未指定年份时明确使用“最新已核验版本”；没有已核验版本时追问年份。
-- **我的项目**：将仍可报名的已核验赛事加入工作台，管理项目状态、任务计划、材料清单和完成进度，并导出 ICS 日历。
+- **多年份识别**：用户指定年份时查询对应版本；未指定年份时明确使用“最新官网来源已确认版本”；没有合格版本时追问年份。
+- **我的项目**：将仍可报名且关键证据完整的赛事加入工作台，管理项目状态、任务计划、材料清单和完成进度，并导出 ICS 日历。
 - **隐私可控**：用户可删除画像，关联项目和任务同步删除；系统不要求身份证号、住址等敏感个人信息。
 
 ## 数据现状
 
-仓库现包含 **177 条**按赛事、年份和赛道隔离的赛事数据，其中 130 条已基于真实官方 PDF/Word 完成人工核验（trusted_level=A / data_status=verified），140 条已锚定官方来源（official_source_status=found）。代表性赛事包括：
+仓库现包含 **178 条**按赛事、年份和赛道隔离的赛事数据，其中 **141 条已找到官方来源**，**12 条同时具备五类关键字段证据**并达到正式推荐标准（`trusted_level=A / data_status=verified`）。这里的 `verified` 表示官网来源和证据通过自动完整性规则，不表示人工替代用户作出最终资格确认。代表性赛事包括：
 
 - 2026 中国软件杯大学生软件设计大赛
 - 2026 中国大学生服务外包创新创业大赛
@@ -83,6 +83,8 @@ python -m venv venv
 > **健康检查（可选但建议）**：服务启动后默认暴露 `GET /health` 接口（返回
 > `{"status":"ok"}`）。可在 Render 服务设置页把 **Health Check Path** 设为
 > `/health`，让平台自动探活、异常时自动重启，提升稳定性观感与可用性。
+> 健康检查只返回数据库连通状态，不返回连接地址或凭据。所有 `/api/admin/*`
+> 接口强制使用 `X-Admin-Token`；Render Blueprint 会自动生成 `ADMIN_API_TOKEN`。
 
 ### 部署踩过的坑（已修复，记录备查）
 
@@ -112,7 +114,7 @@ push 后一般无需去 Render 点按钮（auto-sync 会自动触发）；若未
 .\venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
 
-正式提交前可一键执行15条量化指标用例和现有24项回归测试：
+正式提交前可一键执行15条量化指标用例和现有36项回归测试：
 
 ```powershell
 .\venv\Scripts\python.exe evals\run_formal_evaluation.py
@@ -120,7 +122,7 @@ push 后一般无需去 Render 点按钮（auto-sync 会自动触发）；若未
 
 运行后生成 [量化评测报告](docs/QUANTITATIVE_EVALUATION.md) 和机器可读结果 `evals/formal_results.json`。
 
-当前共 24 条自动回归测试，另有 15 条量化指标用例，覆盖正常、异常和边界场景。关键断言包括：
+当前共 36 条自动回归测试，另有 15 条量化指标用例，覆盖正常、异常和边界场景。关键断言包括：
 
 - Ground Truth 日期与 SQLite 日期完全一致。
 - 已截止赛事必须 `score=null`。
@@ -136,9 +138,9 @@ push 后一般无需去 Render 点按钮（auto-sync 会自动触发）；若未
 ```text
 上传官方通知
   -> 自动解析并保留页码
-  -> 人工修正结构化字段
+  -> 核对结构化字段与官方来源
   -> 关联原文证据
-  -> 确认入库并标记 verified
+  -> 自动评估证据完整性并分类
   -> 刷新赛事隔离 RAG
   -> Agent 证据问答
   -> 资格门控与推荐
@@ -155,6 +157,7 @@ campus-innovation-agent/
 |   |-- api.py                    # FastAPI、静态前端与业务接口
 |   |-- db.py                     # SQLite/PostgreSQL 数据访问与项目工作台
 |   |-- schemas.py                # 赛事、画像、推荐和项目模型
+|   |-- trust.py                  # 官网来源与推荐资格统一判定
 |   |-- agent/graph.py            # 多年份解析与可解释 Agent 流程
 |   |-- recommendation/engine.py  # 核验、资格、时间门控与评分
 |   |-- rag/store.py              # 按赛事和年份隔离的证据检索
@@ -162,10 +165,10 @@ campus-innovation-agent/
 |-- frontend/                     # 无构建步骤的单页工作台
 |-- data/
 |   |-- raw/                      # 官方原始通知
-|   |-- ground_truth/             # 人工核验结构化事实
-|   |-- verified/                 # 核验记录
+|   |-- ground_truth/             # 可追溯结构化事实与候选目录
+|   |-- verified/                 # 来源检查记录
 |   `-- campus_agent.db           # 默认 SQLite 数据库
-|-- tests/                        # 24 条自动回归测试
+|-- tests/                        # 36 条自动回归测试
 |-- docs/                         # 架构、部署、合规、用例、演示脚本
 |-- demo/campus-agent-demo.webm   # 4 分 59 秒操作演示
 |-- Dockerfile
@@ -185,10 +188,23 @@ campus-innovation-agent/
 | `AGENT_LLM_API_KEY` | 空 | 可选的 OpenAI 兼容模型密钥；**配置后即对答案/组队文案做自然语言润色**，引用编号与门控结论不被改写（破坏则自动回退原稿） |
 | `AGENT_LLM_BASE_URL` | 空 | 可选的兼容接口地址（如 `https://api.deepseek.com/v1` 接 DeepSeek；默认官方地址） |
 | `AGENT_LLM_MODEL` | 空 | 可选模型名；为空时使用确定性模板 |
+| `AGENT_LLM_PROVIDER` | 空 | LLM 提供方标识；接入通义千问时设 `qwen`，用于匹配对应兼容端点习惯 |
+| `AGENT_LLM_TEMPERATURE` | `0.3` | 润色采样温度；越低越稳，仅影响自然语言润色层 |
 
 > LLM 润色层用项目已依赖的 `requests` 直连任意 OpenAI 兼容 `/chat/completions`，**无需安装 `openai` SDK**；未配置 Key 时完全不触发网络，答案回退到确定性模板，保证离线可复现。
 
 默认配置无需外部模型或网络即可完成可信检索、门控、推荐和项目管理。
+
+## 界面模型切换（qwen 系列）
+
+问答模块支持在界面上直接切换通义千问模型，无需改代码或重启服务：
+
+- 问答输入区下方有 **模型下拉框**，可选 `qwen-plus` / `qwen-max` / `qwen-turbo`。
+- 选择结果保存在浏览器 `localStorage`，刷新页面后保留。
+- 每次提问会把所选模型通过 `?model=` 透传到后端，后端用同一个 `AGENT_LLM_API_KEY` 请求对应模型。
+- 仅影响 Agent 答案的自然语言润色层；引用编号 `[n]`、资格门控与推荐结论由确定性逻辑生成，不受模型选择影响。
+
+> 前提：已在环境变量（本地 `.env` 或 Render 控制台）配置 `AGENT_LLM_API_KEY`、`AGENT_LLM_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1`、`AGENT_LLM_MODEL=qwen-plus`、`AGENT_LLM_PROVIDER=qwen`。未配置 LLM 时下拉框无效，答案回退到确定性模板，不影响可信检索与推荐。
 
 ## 提交文档
 
@@ -209,10 +225,10 @@ campus-innovation-agent/
 未核验、已截止或硬性资格不满足时，系统不会给出误导性分数；接口返回 `score=null` 并说明原因。
 
 **为什么同名赛事会提示年份？**  
-赛事规则按年度变化。存在已核验版本时系统会明确标注使用的最新年份；只有未核验版本时必须由用户指定年份。
+赛事规则按年度变化。存在官网来源与关键证据完整的版本时系统会明确标注使用的最新年份；只有候选版本时必须由用户指定年份。
 
 **为什么不能把候选赛事加入项目？**  
-“我的项目”属于正式执行流程，只接受仍可报名且已人工核验的赛事，防止用未经确认的日期生成任务和日历提醒。
+“我的项目”属于正式执行流程，只接受仍可报名、官网来源已确认且关键证据完整的赛事。系统提供辅助判断，用户报名前仍须查看官网最新通知。
 
 **如何重建 SQLite 数据库？**  
 停止服务后删除 `data/campus_agent.db`，再次启动应用即可按当前 Ground Truth 建表并灌入数据。重建前请确认没有需要保留的用户画像或项目数据。
