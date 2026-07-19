@@ -73,6 +73,7 @@ const state = {
   competitions: [],
   evidenceCache: {}, // competition_id -> [evidence]
   currentEvidence: [], // 引用证据索引（供弹窗 / 角标定位）
+  detailReturn: "#/hall", // 详情页返回目标视图（默认大厅；从推荐进入时为 #/recommend）
 };
 
 const CAT_LABEL = {
@@ -412,6 +413,7 @@ async function renderHall() {
 
   $$("#hall-list .comp-card").forEach((el) => {
     el.addEventListener("click", () => {
+      state.detailReturn = "#/hall";
       location.hash = "#/detail/" + el.dataset.id;
     });
     el.addEventListener("keydown", (event) => {
@@ -427,6 +429,13 @@ $("#filter-year").addEventListener("change", renderHall);
 // 赛事详情
 // ---------------------------------------------------------------------------
 async function renderDetail(id) {
+  // 根据来源更新「返回」链接（从推荐进入 → 返回推荐；其余 → 返回大厅）
+  const backEl = document.querySelector("#view-detail .back");
+  if (backEl) {
+    const ret = state.detailReturn || "#/hall";
+    backEl.setAttribute("href", ret);
+    backEl.textContent = ret === "#/recommend" ? "← 返回推荐" : "← 返回大厅";
+  }
   let detail;
   try {
     detail = await apiGet("/api/competitions/" + encodeURIComponent(id));
@@ -640,12 +649,21 @@ async function renderRecommend() {
       ${gate}
       ${explain ? `<details class="rec-why"><summary>为何推荐 · ${Object.keys(r.explanation || {}).length} 项匹配<span>点击展开</span></summary><ul class="explain">${explain}</ul></details>` : ""}
       ${r.recommendation_status === "candidate_only" ? `<div class="muted" style="font-size:12px;margin-top:6px;">该赛事仅作为候选信息展示，暂未纳入匹配评分。</div>` : ""}
-      ${r.eligible ? `<div class="row"><button class="btn primary join-btn" data-id="${escapeHtml(r.competition_id)}">加入我的项目</button></div>` : ""}
+      <div class="row">
+        <button class="btn ghost detail-btn" data-id="${escapeHtml(r.competition_id)}">查看详情</button>
+        ${r.eligible ? `<button class="btn primary join-btn" data-id="${escapeHtml(r.competition_id)}">加入我的项目</button>` : ""}
+      </div>
     </article>`;
   }).join("");
 
   $$("#recommend-list .join-btn").forEach((btn) => {
     btn.addEventListener("click", () => joinProject(btn.dataset.id));
+  });
+  $$("#recommend-list .detail-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      state.detailReturn = "#/recommend";
+      location.hash = "#/detail/" + btn.dataset.id;
+    });
   });
 }
 
