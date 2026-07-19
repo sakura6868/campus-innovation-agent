@@ -754,6 +754,39 @@ def _finalize_grounded(generated: str, state: AgentState, citations: list,
     return answer
 
 
+# ---------------------------------------------------------------------------
+# 竞赛方向话题边界（chat 意图专用，避免自由对话随意发挥）
+# ---------------------------------------------------------------------------
+
+_COMPETITION_KEYWORDS = (
+    "竞赛", "比赛", "赛事", "蓝桥", "建模", "电赛", "软创", "软件", "互联网+", "互联网＋",
+    "挑战杯", "大创", "创青春", "保研", "推免", "综测", "组队", "备赛", "参赛", "项目",
+    "简历", "升学", "奖项", "获奖", "证书", "科创", "创新创业", "acm", "icpc", "程序设计",
+    "数学建模", "电子设计", "英语", "说课", "会计", "统计", "市场", "营销", "财务", "护理",
+    "医学", "计算机", "智能车", "机器人", "物联网", "大数据", "人工智能", "机器学习",
+    "算法", "编程", "论文", "国赛", "省赛", "校赛", "选拔", "作品", "路演", "答辩",
+    "课程设计", "毕业设计", "实习", "就业", "规划",
+)
+
+
+def _is_competition_related(question: str) -> bool:
+    """粗粒度话题边界：问题是否落在竞赛/科创/备赛/升学就业方向。
+
+    命中关键词即视为相关；用于在 chat 意图下拦截明显无关的话题，
+    避免 LLM 自由发挥闲聊。与「证据召回」互补——即便无关键词但召回到了
+    相关赛事证据，也视为相关。
+    """
+    q = (question or "").lower()
+    return any(k in q for k in _COMPETITION_KEYWORDS)
+
+
+_CHAT_SCOPE_REDIRECT = (
+    "这个我可能帮不上～我主要围绕 **大学生学科竞赛 / 科创备赛 / 竞赛规划** "
+    "这类方向给你建议。你要是想聊比赛、组队、备赛，或者竞赛和升学就业的关系，"
+    "尽管问我就好！"
+)
+
+
 def node_compose(state: AgentState) -> AgentState:
     trace = list(state.get("trace") or [])
     intent = state.get("intent") or "unknown"
@@ -775,6 +808,15 @@ def node_compose(state: AgentState) -> AgentState:
             answer = _finalize_grounded(generated, state, citations, intent, trace)
             return {**state, "answer": answer, "trace": trace}
     if intent == "chat":
+        # 话题边界：明显非竞赛方向、且无任何相关赛事证据时，直接拦截，不进 LLM，
+        # 避免自由对话随意发挥闲聊。
+        if not _is_competition_related(state.get("question") or "") and not citations:
+            answer = _CHAT_SCOPE_REDIRECT
+            answer += _citations_appendix(citations)
+            if state.get("version_resolution_note"):
+                answer = state["version_resolution_note"] + "\n\n" + answer
+            trace.append("组装答案：chat 话题边界拦截（非竞赛方向）")
+            return {**state, "answer": answer, "trace": trace}
         generated = _generate_grounded(state, "chat", citations, name, allow_empty_evidence=True)
         if generated:
             answer = _finalize_grounded(generated, state, citations, "chat", trace)

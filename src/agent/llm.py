@@ -149,6 +149,24 @@ _GENERATE_SYSTEM = (
     "5. 只输出回答正文，不要加『以下是回答』之类多余说明。"
 )
 
+# chat 意图专用的「话题边界」约束：只聊竞赛方向，不随意发挥
+_CHAT_SCOPE = (
+    "【话题边界（仅限竞赛方向，不得随意发挥）】\n"
+    "你只围绕「大学生学科竞赛 / 科创活动 / 备赛规划 / 竞赛与升学·就业·综测的关系」作答。\n"
+    "遇到与竞赛无关的话题（日常闲聊、情感、娱乐、时政、其他课程的纯知识答疑、"
+    "非竞赛类通用问题等），不要展开、不要硬聊、不要自由发挥，应礼貌说明自己只负责"
+    "竞赛方向并把话题引回，例如：『这个我不太擅长哦～我主要帮你解答学科竞赛、备赛规划"
+    "这类问题，要不聊聊你最近在关注的比赛？』\n"
+    "即使对方追问无关内容，也始终守住边界，不得为了凑话题而编造任何竞赛信息。"
+)
+
+
+def _build_generate_system(intent: str) -> str:
+    """按意图组装 system 提示：chat 额外加「只聊竞赛」话题边界。"""
+    if intent == "chat":
+        return _GENERATE_SYSTEM + "\n\n" + _CHAT_SCOPE
+    return _GENERATE_SYSTEM
+
 
 def generate_answer(
     question: str,
@@ -172,7 +190,7 @@ def generate_answer(
     user += f"【问题类型】{intent}\n"
     user += f"【可用证据】\n{evidence_brief}\n\n"
     user += "请基于上述证据，用自然口语化的方式作答（凡是具体赛事事实务必带 [n] 引用）："
-    return _post_chat(_GENERATE_SYSTEM, user, model=model)
+    return _post_chat(_build_generate_system(intent), user, model=model)
 
 
 if __name__ == "__main__":

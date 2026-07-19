@@ -233,5 +233,24 @@ class TrustRulesTests(unittest.TestCase):
         self.assertIn("最多 3 人", detail.requirements[0].text)
 
 
+class ChatScopeTests(unittest.TestCase):
+    """chat 意图的话题边界：只聊竞赛方向，无关话题须被拦截。"""
+
+    def test_off_topic_chat_is_redirected_not_answered(self) -> None:
+        # 明显无关话题：不应进入 LLM 自由生成，应返回话题边界引导语
+        result = run_agent("今天天气怎么样，心情不太好")
+        self.assertEqual(result["intent"], "chat")
+        self.assertIn("学科竞赛", result["answer"])
+        self.assertIn("竞赛规划", result["answer"])
+        # 无关话题不会产生任何赛事引用
+        self.assertFalse(result["citations"])
+
+    def test_competition_related_chat_passes_through(self) -> None:
+        # 含竞赛关键词的话题应正常进入 chat 流程（即便无证据也不被拦截）
+        result = run_agent("帮我规划一下这学期的科创比赛安排")
+        self.assertEqual(result["intent"], "chat")
+        self.assertNotIn("这个我可能帮不上", result["answer"])
+
+
 if __name__ == "__main__":
     unittest.main()
