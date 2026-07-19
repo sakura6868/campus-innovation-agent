@@ -559,6 +559,10 @@ label input, label select, .agent-input textarea, .login-custom input,
 .comp-card-side span { color: #7b828d; font-size: 11px; }
 .comp-card-side strong { margin-top: 3px; color: #25292f; font-size: 14px; font-weight: 650; }
 .comp-card-side i { position: absolute; right: 4px; color: #969da7; font-style: normal; font-size: 17px; }
+.card-open-hint { margin-top: 11px; font-size: 12px; color: var(--primary); opacity: .8; font-weight: 600; }
+.comp-card:hover .card-open-hint { opacity: 1; text-decoration: underline; }
+.recommend-view .rec-card { transition: box-shadow .15s, border-color .15s, transform .15s; }
+.recommend-view .rec-card:hover { border-color: #b9c0c9; box-shadow: 0 6px 20px rgba(20, 24, 32, .07); transform: translateY(-2px); }
 
 /* Recommendations */
 #recommend-list.cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }

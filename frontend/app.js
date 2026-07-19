@@ -336,6 +336,7 @@ function compCardHtml(c, matchLevel) {
           ${statusTag(c)}
           ${majorTag}
         </div>
+        <div class="card-open-hint">点击查看详情 ›</div>
       </div>
       <div class="comp-card-side"><span>报名截止</span><strong>${escapeHtml(c.registration_deadline || "未明确")}</strong><i aria-hidden="true">→</i></div>
     </article>`;
