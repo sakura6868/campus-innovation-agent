@@ -400,13 +400,14 @@ def agent_ask(
     user_id: str | None = Query(None, description="用户ID，用于画像驱动的推荐/门控/文案"),
     competition_id: str | None = Query(None, description="可选：前端直接指定目标赛事，否则由路由自动锁定"),
     top_k: int = Query(4, ge=1, le=10, description="隔离检索返回条数"),
+    model: str | None = Query(None, description="可选：请求级覆盖默认 LLM 模型（如 qwen-plus/qwen-max/qwen-turbo），仅同源 key 可用"),
 ) -> dict:
     """走完整 Agent 闭环，返回意图、答案、引用证据、门控/评分/推荐结果、执行轨迹。
 
     问答自动带引用：答案文本内嵌 [1][2]… 角标，citations 提供可点击来源。
     """
     try:
-        return run_agent(question, user_id=user_id, competition_id=competition_id, top_k=top_k)
+        return run_agent(question, user_id=user_id, competition_id=competition_id, top_k=top_k, model=model)
     except Exception as exc:  # 闭环异常不应崩服务
         raise HTTPException(status_code=500, detail=f"Agent 执行异常：{exc}")
 

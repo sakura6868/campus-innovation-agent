@@ -26,10 +26,10 @@ async function apiGet(path) {
   if (!r.ok) throw new Error(`${path} -> ${r.status}`);
   return r.json();
 }
-async function apiPost(path, body) {
+async function apiPost(path, body, extraHeaders = {}) {
   const r = await fetch(path, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...extraHeaders },
     body: JSON.stringify(body),
   });
   let data = null;
@@ -74,6 +74,7 @@ const state = {
   evidenceCache: {}, // competition_id -> [evidence]
   currentEvidence: [], // 引用证据索引（供弹窗 / 角标定位）
   detailReturn: "#/hall", // 详情页返回目标视图（默认大厅；从推荐进入时为 #/recommend）
+  hallReadiness: "all",
 };
 
 const CAT_LABEL = {
@@ -334,6 +335,7 @@ function compCardHtml(c, matchLevel) {
           <span class="tag cat">${CAT_LABEL[c.category] || c.category}</span>
           <span class="tag year">${c.document_year}</span>
           ${statusTag(c)}
+          <span class="tag ${c.recommendation_ready ? "status-verified" : "status-unverified"}">${c.recommendation_ready ? "可正式推荐" : "待核验候选"}</span>
           ${majorTag}
         </div>
         <div class="card-open-hint">点击查看详情 ›</div>
@@ -375,7 +377,11 @@ async function renderHall() {
   const cat = $("#filter-cat").value;
   const year = $("#filter-year").value;
   const list = all.filter((c) =>
-    (!cat || c.category === cat) && (!year || String(c.document_year) === String(year))
+    (!cat || c.category === cat)
+    && (!year || String(c.document_year) === String(year))
+    && (state.hallReadiness === "all"
+      || (state.hallReadiness === "ready" && c.recommendation_ready)
+      || (state.hallReadiness === "candidate" && !c.recommendation_ready))
   );
 
   if (!list.length) {
@@ -396,15 +402,15 @@ async function renderHall() {
 
   // 顶部「为你推荐」区块（跨筛选，取专业匹配度最高的若干项）
   let strip = "";
-  if (major) {
+  if (major && state.hallReadiness === "all") {
     const matched = all
       .map((c) => ({ c, l: levelOf(c) }))
-      .filter((x) => x.l > 0)
+      .filter((x) => x.l > 0 && x.c.recommendation_ready)
       .sort((a, b) => b.l - a.l || byDeadline(a.c, b.c))
       .slice(0, 6);
     if (matched.length) {
       strip = `<div class="reco-strip">
-        <div class="reco-head">🎯 为你推荐 · 基于你的专业「${escapeHtml(major)}」匹配到 ${matched.length}+ 项赛事</div>
+        <div class="reco-head">与你专业相关 · ${escapeHtml(major)} · ${matched.length} 项可正式推荐赛事</div>
         <div class="cards reco-cards">${matched.map((x) => compCardHtml(x.c, x.l)).join("")}</div>
       </div>`;
     }
@@ -425,6 +431,11 @@ async function renderHall() {
 
 $("#filter-cat").addEventListener("change", renderHall);
 $("#filter-year").addEventListener("change", renderHall);
+$$('.hall-trust-filter button').forEach((button) => button.addEventListener("click", () => {
+  state.hallReadiness = button.dataset.readiness;
+  $$('.hall-trust-filter button').forEach((item) => item.classList.toggle("active", item === button));
+  renderHall();
+}));
 
 // ---------------------------------------------------------------------------
 // 赛事详情
@@ -503,14 +514,19 @@ async function renderDetail(id) {
         <span class="tag cat">${CAT_LABEL[c.category] || c.category}</span>
         <span class="tag year">${c.document_year}</span>
         ${statusTag(c)}
-        ${(c.official_source_status === "not_found") ? `<span class="tag src-unverified">来源待确认</span>` : (c.official_source_status === "found" ? `<span class="tag src-verified">官方已核验</span>` : "")}
+        ${(c.official_source_status === "not_found") ? `<span class="tag src-unverified">未找到官方来源</span>` : (detail.recommendation_ready ? `<span class="tag src-verified">官网来源已确认</span>` : `<span class="tag src-unverified">关键证据待补充</span>`)}
       </div>
       </div>
       <div class="detail-actions">
         ${officialUrl ? `<a class="btn ghost" href="${escapeHtml(officialUrl)}" target="_blank" rel="noopener">访问官网</a>` : ""}
-        <button id="join-project" class="btn primary">加入我的项目</button>
+        ${detail.recommendation_ready ? `<button id="join-project" class="btn primary">加入我的项目</button>` : ""}
       </div>
     </div>
+
+    ${!detail.recommendation_ready ? `<div class="verify-warn">
+      <strong>候选信息，不参与资格判断或匹配评分</strong>
+      <div>${escapeHtml((detail.readiness_reasons || []).join("；") || "关键证据待补充")}。请访问官网核对最新通知。</div>
+    </div>` : ""}
 
     ${c.official_source_status === "not_found" ? `
     <div class="verify-warn">
@@ -547,7 +563,7 @@ async function renderDetail(id) {
         <div class="refs-list" style="padding-top:8px;">
           ${ev.map((e) => {
             const lvl = e.trust_level || e.trusted_level || "A";
-            const lvlLabel = ({ A: "可信 A", B: "待核 B", C: "存疑 C" })[lvl] || lvl;
+            const lvlLabel = ({ A: "官网证据 A", B: "部分证据 B", C: "待核验 C" })[lvl] || lvl;
             const src = (e.document_name || "") + (e.page ? " 第" + e.page + "页" : "");
             return `<div class="ref">
               <span class="lvl ${lvl}">${lvlLabel}</span>
@@ -562,7 +578,8 @@ async function renderDetail(id) {
     <div class="section source-note"><p class="muted">以上信息来自赛事官方通知，请以学校官网或赛事官网最新发布为准。</p></div>
   `;
 
-  $("#join-project").addEventListener("click", () => joinProject(c.competition_id));
+  const joinButton = $("#join-project");
+  if (joinButton) joinButton.addEventListener("click", () => joinProject(c.competition_id));
 }
 
 // 赛事隔离 RAG 检索：结果复用引用弹窗
@@ -617,9 +634,9 @@ async function renderRecommend() {
     $("#recommend-list").innerHTML = "";
     return;
   }
-  const formalCount = recs.filter((r) => r.eligible).length;
-  const candidateCount = recs.filter((r) => r.recommendation_status === "candidate_only").length;
-  $("#recommend-hint").textContent = `共 ${recs.length} 项赛事：${formalCount} 项正式推荐，${candidateCount} 项候选参考。`;
+  $("#recommend-hint").textContent = recs.length
+    ? `共 ${recs.length} 项正式推荐；候选信息请前往赛事大厅查看。`
+    : "当前没有同时通过官网来源、关键证据、资格与报名时间门控的赛事。";
 
   // 排序：可推荐在前
   const order = { highly_suitable: 0, suitable: 1, marginal: 2, not_prioritized: 3, candidate_only: 4, ineligible: 5 };
@@ -729,6 +746,7 @@ async function renderProjects() {
           <button class="btn danger project-delete" data-pid="${p.project_id}">删除项目</button>
         </div>
       </header>
+      ${p.recommendation_ready ? "" : `<div class="project-trust-warning">来源状态已变化：${escapeHtml((p.readiness_reasons || []).join("；"))}。项目数据已保留，请重新核对官网。</div>`}
       <div class="deadline-strip"><span>报名截止 <b>${escapeHtml(p.registration_deadline || "未明确")}</b></span><span>提交截止 <b>${escapeHtml(p.submission_deadline || "未明确")}</b></span></div>
       <div class="progress-line"><span style="width:${pct}%"></span></div><div class="progress-copy">已完成 ${done}/${p.items.length} · ${pct}%</div>
       <div class="project-columns">
@@ -895,6 +913,9 @@ async function agentAsk() {
   let url = `/api/agent/ask?question=${encodeURIComponent(q)}&top_k=4`;
   if (uid) url += `&user_id=${encodeURIComponent(uid)}`;
   if (cid) url += `&competition_id=${encodeURIComponent(cid)}`;
+  const mdlEl = document.getElementById("agent-model");
+  const mdl = mdlEl && mdlEl.value ? mdlEl.value : "";
+  if (mdl) url += `&model=${encodeURIComponent(mdl)}`;
 
   let data;
   try {
@@ -966,6 +987,14 @@ async function agentAsk() {
 
 $("#agent-send").addEventListener("click", agentAsk);
 $("#agent-q").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); agentAsk(); } });
+// 模型选择器：启动时从 localStorage 恢复，变更即记忆
+(function initModelSelect() {
+  const mdl = document.getElementById("agent-model");
+  if (!mdl) return;
+  const saved = localStorage.getItem("agent_model");
+  if (saved) mdl.value = saved;
+  mdl.addEventListener("change", () => localStorage.setItem("agent_model", mdl.value));
+})();
 $("#agent-q").addEventListener("input", (e) => {
   e.currentTarget.style.height = "auto";
   e.currentTarget.style.height = `${Math.min(e.currentTarget.scrollHeight, 160)}px`;
@@ -1041,8 +1070,15 @@ function renderAdminView() {
   $("#adm-step3").classList.add("hidden");
   $("#adm-blocks").innerHTML = "";
   $("#adm-save-msg").textContent = "";
+  $("#adm-token").value = sessionStorage.getItem("cia_admin_token") || "";
   renderAdminEvidence();
   setAdminStep(1);
+}
+
+function adminHeaders() {
+  const token = ($("#adm-token").value || "").trim();
+  if (token) sessionStorage.setItem("cia_admin_token", token);
+  return token ? { "X-Admin-Token": token } : {};
 }
 
 async function adminParse() {
@@ -1059,7 +1095,7 @@ async function adminParse() {
   }
   let up;
   try {
-    up = await apiPost("/api/admin/upload", { filename: file.name, content_base64: b64 });
+    up = await apiPost("/api/admin/upload", { filename: file.name, content_base64: b64 }, adminHeaders());
   } catch (e) {
     $("#adm-parse-msg").textContent = "上传失败：" + e.message;
     return;
@@ -1072,7 +1108,7 @@ async function adminParse() {
   };
   let data;
   try {
-    data = await apiPost("/api/admin/parse", payload);
+    data = await apiPost("/api/admin/parse", payload, adminHeaders());
   } catch (e) {
     $("#adm-parse-msg").textContent = "解析失败：" + e.message;
     return;
@@ -1095,7 +1131,8 @@ function renderAdminBlocks(blocks) {
     return;
   }
   const fieldOpts = `
-    <option value="team_max">团队人数</option>
+    <option value="team_min">团队最少人数</option>
+    <option value="team_max">团队最多人数</option>
     <option value="registration_deadline">报名截止</option>
     <option value="submission_deadline">提交截止</option>
     <option value="eligible_students">参赛对象</option>
@@ -1207,7 +1244,7 @@ $("#adm-form").addEventListener("submit", async (e) => {
   $("#adm-save-msg").textContent = "入库中…";
   setAdminStep(3);
   try {
-    const d = await apiPost("/api/admin/competitions", comp);
+    const d = await apiPost("/api/admin/competitions", comp, adminHeaders());
     $("#adm-save-msg").textContent = `✓ 已入库 ${d.competition_id}（证据 ${d.evidence_count} 条，RAG ${d.rag_chunks} 块）`;
     $("#adm-save-msg").className = "msg ok";
     setAdminStep(4);

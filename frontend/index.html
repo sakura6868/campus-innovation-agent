@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>校园科创导航智能体</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='10' fill='%2316181d'/%3E%3Ctext x='32' y='40' text-anchor='middle' font-family='Arial' font-size='25' font-weight='700' fill='white'%3ECI%3C/text%3E%3C/svg%3E" />
-  <link rel="stylesheet" href="/static/styles.css?v=20260719.3" />
+  <link rel="stylesheet" href="/static/styles.css?v=20260719.4" />
 </head>
 <body>
   <header class="topnav">
@@ -143,6 +143,11 @@
           </select>
         </div>
       </div>
+      <div class="hall-trust-filter segmented" role="group" aria-label="赛事可信状态">
+        <button type="button" class="active" data-readiness="all">全部赛事</button>
+        <button type="button" data-readiness="ready">可正式推荐</button>
+        <button type="button" data-readiness="candidate">待核验候选</button>
+      </div>
       <div id="hall-list" class="cards"></div>
     </section>
 
@@ -206,6 +211,14 @@
             <textarea id="agent-q" rows="1" placeholder="向校园科创智能体提问"></textarea>
             <div class="agent-composer-footer">
               <span>Enter 发送 · Shift + Enter 换行</span>
+              <label class="model-select" title="切换润色模型（需后端已配置对应 LLM key）">
+                <span>模型</span>
+                <select id="agent-model">
+                  <option value="qwen-plus">qwen-plus</option>
+                  <option value="qwen-max">qwen-max</option>
+                  <option value="qwen-turbo">qwen-turbo</option>
+                </select>
+              </label>
               <button id="agent-send" class="agent-send" type="button" title="发送问题" aria-label="发送问题">↑</button>
             </div>
           </div>
@@ -229,6 +242,9 @@
 
       <div class="card admin-stage admin-stage-active">
         <header class="stage-head"><span class="stage-index">01</span><div><h3>上传官方通知</h3><p>支持 PDF、DOC 与 DOCX 文件</p></div></header>
+        <label class="admin-token-field">管理员令牌
+          <input id="adm-token" type="password" autocomplete="off" placeholder="X-Admin-Token" />
+        </label>
         <div class="admin-file-row">
           <input id="adm-file" type="file" accept=".pdf,.docx,.doc" />
         </div>
@@ -395,6 +411,6 @@
 
   <div id="toast" class="toast hidden"></div>
 
-  <script src="/static/app.js?v=20260719.3"></script>
+  <script src="/static/app.js?v=20260719.4"></script>
 </body>
 </html>

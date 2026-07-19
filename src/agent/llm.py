@@ -49,13 +49,17 @@ def is_llm_enabled() -> bool:
     return bool(os.getenv("AGENT_LLM_API_KEY"))
 
 
-def _post_chat(system: str, user: str) -> Optional[str]:
-    """调用 OpenAI 兼容 /chat/completions；任何异常都返回 None（优雅降级）。"""
+def _post_chat(system: str, user: str, model: Optional[str] = None) -> Optional[str]:
+    """调用 OpenAI 兼容 /chat/completions；任何异常都返回 None（优雅降级）。
+
+    ``model`` 为可选请求级覆盖：传入时优先于环境变量 ``AGENT_LLM_MODEL``，
+    便于前端在同源 key 的模型间（如 qwen-plus / qwen-max / qwen-turbo）切换。
+    """
     if not is_llm_enabled():
         return None
     key = os.getenv("AGENT_LLM_API_KEY") or ""
     base_url = (os.getenv("AGENT_LLM_BASE_URL") or "https://api.openai.com/v1").rstrip("/")
-    model = os.getenv("AGENT_LLM_MODEL", "gpt-4o-mini")
+    model = model or os.getenv("AGENT_LLM_MODEL", "gpt-4o-mini")
     try:
         temperature = float(os.getenv("AGENT_LLM_TEMPERATURE", "0.3"))
     except (TypeError, ValueError):
@@ -91,11 +95,12 @@ _POLISH_SYSTEM = (
 )
 
 
-def polish(draft: str, context: str) -> Optional[str]:
+def polish(draft: str, context: str, model: Optional[str] = None) -> Optional[str]:
     """润色确定性草稿（用于答案 / 组队文案）。
 
     未启用或调用失败 → 返回 None（调用方回退原稿）。
     若润色结果破坏了引用标记 [n] → 返回 None（同样回退原稿，保证引用安全）。
+    ``model`` 可选，请求级覆盖默认模型。
     """
     if not draft or not is_llm_enabled():
         return None
@@ -103,7 +108,7 @@ def polish(draft: str, context: str) -> Optional[str]:
         f"【参考事实 / 上下文】\n{context}\n\n"
         f"【待润色草稿】\n{draft}"
     )
-    out = _post_chat(_POLISH_SYSTEM, user)
+    out = _post_chat(_POLISH_SYSTEM, user, model=model)
     if not out:
         return None
     # 引用标记安全校验：仅当原稿含 [n] 时才校验
@@ -113,9 +118,9 @@ def polish(draft: str, context: str) -> Optional[str]:
     return out
 
 
-def complete(system: str, user: str) -> Optional[str]:
+def complete(system: str, user: str, model: Optional[str] = None) -> Optional[str]:
     """通用问答接口（供未来自由对话 / 复杂意图使用）。"""
-    return _post_chat(system, user)
+    return _post_chat(system, user, model=model)
 
 
 if __name__ == "__main__":

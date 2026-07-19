@@ -51,6 +51,7 @@ from recommendation.engine import (
     soft_match_score,
 )
 from schemas import Citation, Competition, UserProfile
+from trust import assess_source_readiness
 
 
 # ---------------------------------------------------------------------------
@@ -64,6 +65,7 @@ class AgentState(TypedDict, total=False):
     user_id: Optional[str]
     competition_id: Optional[str]     # 可由前端直接指定，否则路由自动锁定
     top_k: int
+    model: Optional[str]               # 可选：请求级覆盖默认 LLM 模型
 
     # 路由结果
     intent: str                       # qa | detail | recommend | team | unknown
@@ -169,13 +171,13 @@ def _resolve_competition_versioned(
     if len(same_name) == 1:
         return best, None, None
 
-    verified = [c for c in same_name if c.data_status.value == "verified"]
+    verified = [c for c in same_name if assess_source_readiness(c).ready]
     years = "、".join(str(c.document_year) for c in sorted(same_name, key=lambda item: item.document_year, reverse=True))
     if verified:
         selected = max(verified, key=lambda item: item.document_year)
-        note = f"你没有指定年份，以下使用最新已核验版本：{selected.document_year}年（{selected.doc_version}）。"
+        note = f"你没有指定年份，以下使用最新官网来源已确认版本：{selected.document_year}年（{selected.doc_version}）。"
         return selected, note, None
-    clarification = f"“{best.competition_name}”存在多个年份版本（{years}），且暂无已核验版本。请明确年份后再查询。"
+    clarification = f"“{best.competition_name}”存在多个年份版本（{years}），且暂无官网来源与关键证据完整的版本。请明确年份后再查询。"
     return None, None, clarification
 
 
@@ -244,15 +246,16 @@ def _asks_team_size(question: str) -> bool:
 # ---------------------------------------------------------------------------
 
 
-def _llm_polish(draft: str, context: str) -> str:
+def _llm_polish(draft: str, context: str, model: Optional[str] = None) -> str:
     """若启用 LLM，则对确定性草稿做自然语言润色；否则原样返回。
 
     仅润色措辞，绝不改写引用编号、门控结论与数值——这些来自本地可信数据。
     实现见 src/agent/llm.py（OpenAI 兼容，含引用安全校验与优雅回退）。
+    ``model`` 可选，请求级覆盖默认模型（前端模型选择器透传）。
     """
     from agent.llm import polish as _polish
 
-    out = _polish(draft, context)
+    out = _polish(draft, context, model=model)
     return out if out else draft
 
 
@@ -431,7 +434,7 @@ def node_gate(state: AgentState) -> AgentState:
     cid = state.get("resolved_competition")
     profile = _load_profile(state)
     comp = db.get_competition(cid) if cid else None
-    pending_review = bool(comp and comp.data_status.value == "unverified")
+    pending_review = bool(comp and not assess_source_readiness(comp).ready)
     if comp is None or profile is None:
         trace.append("硬性门控：跳过（缺用户画像或赛事）")
         return {**state, "gate": {"skipped": True}, "pending_review": pending_review, "trace": trace}
@@ -441,7 +444,7 @@ def node_gate(state: AgentState) -> AgentState:
     if problems:
         gate = {"eligible": False, "reasons": [f"数据不可用：{p}" for p in problems]}
         trace.append("硬性门控：数据有效性未通过")
-        return {**state, "gate": gate, "pending_review": comp.data_status.value == "unverified", "trace": trace}
+        return {**state, "gate": gate, "pending_review": not assess_source_readiness(comp).ready, "trace": trace}
 
     eligible, reasons = eligibility_gate(profile, comp, today)
     gate = {
@@ -453,7 +456,7 @@ def node_gate(state: AgentState) -> AgentState:
     return {
         **state,
         "gate": gate,
-        "pending_review": comp.data_status.value == "unverified",
+        "pending_review": not assess_source_readiness(comp).ready,
         "trace": trace,
     }
 
@@ -497,6 +500,11 @@ def node_team_copy(state: AgentState) -> AgentState:
     comp = db.get_competition(cid)
     profile = _load_profile(state)
     citations = state.get("citations") or []
+    source_ready = assess_source_readiness(comp).ready
+    if not source_ready:
+        trace.append("组队文案：跳过（关键证据待补充）")
+        copy = "该赛事目前仅作为候选信息展示，关键字段证据尚不完整，暂不生成组队招募结论。请先查看赛事官网最新通知。"
+        return {**state, "team_copy": copy, "pending_review": True, "trace": trace}
 
     team_txt = format_team_size(comp.team_min, comp.team_max)
     skills = "、".join(comp.required_skills) if comp.required_skills else "相关技能不限"
@@ -524,12 +532,9 @@ def node_team_copy(state: AgentState) -> AgentState:
         f"如果你对{('、'.join(comp.evaluation_dimensions) if comp.evaluation_dimensions else '这项赛事')}感兴趣，"
         f"欢迎私信我一起冲！报名信息以官方通知为准。"
     )
-    if comp.data_status.value == "unverified":
-        copy += "\n\n⚠️ 以上赛事信息由 AI 整理，报名前请以官网最新通知为准。"
-
-    copy = _llm_polish(copy, f"赛事={comp.competition_name}，队伍={team_txt}，技能={skills}，截止={deadline}")
+    copy = _llm_polish(copy, f"赛事={comp.competition_name}，队伍={team_txt}，技能={skills}，截止={deadline}", model=state.get("model"))
     trace.append("组队文案：已生成（含引用编号）")
-    return {**state, "team_copy": copy, "pending_review": comp.data_status.value == "unverified", "trace": trace}
+    return {**state, "team_copy": copy, "pending_review": False, "trace": trace}
 
 
 # ---------------------------------------------------------------------------
@@ -547,8 +552,7 @@ def node_recommend_all(state: AgentState) -> AgentState:
     comps = db.get_all_competitions()
     results = recommend_for_user(profile, comps, date.today())
     formal = [r for r in results if r.eligible][:5]
-    candidates = [r for r in results if r.recommendation_status == "candidate_only"][:5]
-    selected = formal if formal else candidates
+    selected = formal
 
     # 为每条可推荐赛事附 1 条最有代表性的引用（团队/技能）
     rag = get_rag()
@@ -576,7 +580,7 @@ def node_recommend_all(state: AgentState) -> AgentState:
         })
 
     trace.append(
-        f"全库推荐：共 {len(results)} 条，正式推荐 {len(formal)} 条，候选信息 {len(candidates)} 条"
+        f"全库推荐：共检查 {len(results)} 条，正式推荐 {len(formal)} 条；候选信息仅在赛事目录展示"
     )
     return {**state, "recommendations": recos, "citations": all_citations, "trace": trace}
 
@@ -615,18 +619,13 @@ def node_compose(state: AgentState) -> AgentState:
     elif intent == "recommend":
         recos = state.get("recommendations") or []
         if not recos:
-            answer = "暂时无法给出推荐：请先在「个人画像」中填写并授权保存资料（学历/年级/专业/技能等）。"
+            answer = "暂时没有通过官网来源、关键证据和报名时间门控的正式推荐。请检查个人画像，或前往「赛事大厅」查看待核验候选并自行核对官网。"
         else:
             status_map = {
                 "highly_suitable": "高度适合", "suitable": "比较适合",
                 "marginal": "可参加需补充", "not_prioritized": "暂不优先",
-                "candidate_only": "候选信息（未评分）",
             }
-            candidate_only = all(r.get("recommendation_status") == "candidate_only" for r in recos)
-            if candidate_only:
-                lines = ["当前没有已完成人工核验的赛事可进入正式推荐。以下仅为候选信息，不进行资格判断或匹配评分：\n"]
-            else:
-                lines = ["根据你的画像，门控+评分后为你推荐以下赛事（已过滤不符合硬性资格、以及过时或已开赛的赛事）：\n"]
+            lines = ["根据你的画像，门控+评分后为你推荐以下赛事（已过滤关键证据不完整、不符合硬性资格以及不可报名的赛事）：\n"]
             for i, r in enumerate(recos, 1):
                 mark = _cite_marker(r["cite_index"]) if r.get("cite_index") is not None else ""
                 tags = []
@@ -637,7 +636,7 @@ def node_compose(state: AgentState) -> AgentState:
                 lines.append(
                     f"{i}. {r['competition_name']} · {status_map.get(r['recommendation_status'], r['recommendation_status'])} · {sc}{mark}{tag_s}"
                 )
-            lines.append("\n请以官方通知为准。候选信息须经人工核验后才会进入正式推荐。")
+            lines.append("\n以上结论基于已锚定的官方来源，报名前仍请查看赛事官网最新通知。")
             answer = "\n".join(lines)
         answer += _citations_appendix(citations)
 
@@ -677,7 +676,7 @@ def node_compose(state: AgentState) -> AgentState:
                 sc = state.get("score") or {}
                 lines.append(f"\n✅ 你符合报名硬性条件，综合匹配度约 {sc.get('total')} 分。")
             answer = "\n".join(lines) + _citations_appendix(citations)
-        answer = _llm_polish(answer, f"赛事={name}；证据条数={len(citations)}")
+        answer = _llm_polish(answer, f"赛事={name}；证据条数={len(citations)}", model=state.get("model"))
 
     else:
         answer = state.get("clarification") or (
@@ -686,6 +685,8 @@ def node_compose(state: AgentState) -> AgentState:
 
     if state.get("version_resolution_note"):
         answer = state["version_resolution_note"] + "\n\n" + answer
+    if state.get("pending_review") and intent in ("qa", "detail"):
+        answer += "\n\n该赛事目前仅作为候选信息展示，关键字段证据尚不完整；以上内容不构成资格判断或匹配评分，请以官网最新通知为准。"
 
     trace.append("组装答案：完成")
     return {**state, "answer": answer, "trace": trace}
@@ -763,13 +764,19 @@ def run_agent(
     user_id: Optional[str] = None,
     competition_id: Optional[str] = None,
     top_k: int = 4,
+    model: Optional[str] = None,
 ) -> dict:
-    """一次问答，走完整闭环，返回可直接序列化的结果字典。"""
+    """一次问答，走完整闭环，返回可直接序列化的结果字典。
+
+    ``model`` 可选：请求级覆盖默认 LLM 模型（前端模型选择器透传），
+    仅在已配置 LLM key 时生效；未配置或调用失败自动回退确定性模板。
+    """
     init: AgentState = {
         "question": question,
         "user_id": user_id,
         "competition_id": competition_id,
         "top_k": top_k,
+        "model": model,
         "trace": [],
         "citations": [],
         "pending_review": False,
