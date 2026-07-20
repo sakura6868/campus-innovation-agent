@@ -55,7 +55,7 @@ from pydantic import BaseModel
 
 import db
 from rag.store import get_rag, embedding_backend
-from recommendation.engine import recommend_for_user
+from recommendation.engine import recommend_for_user, recommend_teammates
 from trust import assess_recommendation_readiness, assess_source_readiness
 from schemas import (
     Citation,
@@ -228,6 +228,21 @@ def recommendations(user_id: str) -> list[RecommendationResult]:
         for item in recommend_for_user(profile, comps, date.today())
         if item.eligible and item.score is not None
     ]
+
+
+@app.get("/api/users/{user_id}/teammates", tags=["队友推荐"])
+def user_teammates(user_id: str, top_k: int = Query(5, ge=1, le=20)) -> dict:
+    """基于画像，从队友库中推荐互补搭档（按互补度降序）。"""
+    seeker = db.get_user_profile(user_id)
+    if seeker is None:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    candidates = db.list_user_profiles(exclude_user_id=user_id)
+    matches = recommend_teammates(seeker, candidates, top_k=top_k)
+    return {
+        "user_id": user_id,
+        "count": len(matches),
+        "matches": [m.model_dump(mode="json") for m in matches],
+    }
 
 
 # ---------------------------------------------------------------------------

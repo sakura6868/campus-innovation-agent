@@ -27,6 +27,7 @@ from agent.graph import run_agent  # noqa: E402
 from rag.store import get_rag  # noqa: E402
 from recommendation.engine import recommend_for_user  # noqa: E402
 from schemas import (  # noqa: E402
+    Citation,
     Competition,
     CompetitionCategory,
     DataStatus,
@@ -68,6 +69,21 @@ def profile(user_id: str = "formal_eval_user") -> UserProfile:
 
 
 def synthetic_competition(**overrides) -> Competition:
+    checked_at = date.today().isoformat()
+    source_url = "https://example.edu/formal-evaluation"
+    evidence = [
+        Citation(
+            field=field,
+            page=None,
+            source_text=f"官方评测原文：{field}",
+            document_name="formal-evaluation.html",
+            source_url=source_url,
+            acquired_date=checked_at,
+            last_verified_at=checked_at,
+            trusted_level=TrustedLevel.A,
+        )
+        for field in ("registration_deadline", "eligible_students", "team_min", "team_max", "required_materials")
+    ]
     values = {
         "competition_id": "formal_eval_competition",
         "competition_name": "正式评测赛事",
@@ -75,11 +91,13 @@ def synthetic_competition(**overrides) -> Competition:
         "category": CompetitionCategory.SOFTWARE,
         "eligible_students": [EducationLevel.UNDERGRADUATE],
         "registration_deadline": date.today() + timedelta(days=30),
-        "official_source_url": "https://example.edu/formal-evaluation",
-        "source_acquired_date": date.today().isoformat(),
+        "official_source_url": source_url,
+        "official_source_status": "found",
+        "source_acquired_date": checked_at,
         "trusted_level": TrustedLevel.A,
         "data_status": DataStatus.VERIFIED,
-        "last_verified_at": date.today().isoformat(),
+        "last_verified_at": checked_at,
+        "evidence": evidence,
     }
     values.update(overrides)
     return Competition(**values)
@@ -179,13 +197,14 @@ def core_evidence_metadata_is_complete() -> str:
     for competition_id, raw in load_core_evidence():
         for item in raw.get("evidence", []):
             checked += 1
-            if not isinstance(item.get("page"), int):
-                raise AssertionError(f"{competition_id}.{item.get('field')} 缺少页码")
+            is_pdf = str(item.get("document_name", "")).lower().endswith(".pdf") or ".pdf" in str(item.get("source_url", "")).lower()
+            if is_pdf and not isinstance(item.get("page"), int):
+                raise AssertionError(f"{competition_id}.{item.get('field')} 的 PDF 证据缺少页码")
             if not item.get("source_text") or not str(item.get("source_url", "")).startswith("http"):
                 raise AssertionError(f"{competition_id}.{item.get('field')} 原文或链接无效")
             if not item.get("acquired_date") or not item.get("last_verified_at"):
                 raise AssertionError(f"{competition_id}.{item.get('field')} 日期元数据不完整")
-    return f"{checked}/{checked} 条核心证据具备页码、原文、链接、获取和核验日期"
+    return f"{checked}/{checked} 条推荐级证据具备定位信息、原文、链接、获取和来源检查日期"
 
 
 def rag_deadline_citations_are_official() -> str:
@@ -231,9 +250,9 @@ def unverified_project_creation_is_blocked() -> str:
 
 def unverified_agent_answer_is_labeled() -> str:
     result = run_agent("2026年蓝桥杯报名截止", competition_id="lanqiao_2026", top_k=4)
-    if not result["pending_review"] or "待人工确认" not in result["answer"]:
+    if not result["pending_review"] or "候选信息" not in result["answer"]:
         raise AssertionError("Agent 未标注未核验状态")
-    return "Agent 回答明确标注待人工确认"
+    return "Agent 回答明确标注候选信息且不输出资格评分"
 
 
 def missing_national_deadline_is_not_invented() -> str:
@@ -307,6 +326,16 @@ def latest_freeze() -> dict | None:
 
 
 def render_report(payload: dict) -> str:
+    all_formal_passed = payload["formal_summary"]["passed"] == payload["formal_summary"]["total"]
+    all_regression_passed = payload["regression"]["successful"]
+    if all_formal_passed and all_regression_passed:
+        conclusion = "本轮15条正式指标用例全部通过，五项核心指标均为100%。"
+    else:
+        conclusion = (
+            f"本轮正式指标通过 {payload['formal_summary']['passed']}/{payload['formal_summary']['total']}，"
+            f"自动回归通过 {payload['regression']['passed']}/{payload['regression']['tests_run']}；"
+            "未通过项须修复后才能作为提交版结果。"
+        )
     lines = [
         "# 校园科创导航智能体量化评测报告",
         "",
@@ -346,7 +375,7 @@ def render_report(payload: dict) -> str:
         "",
         "## 结论与边界",
         "",
-        "本轮15条正式指标用例全部通过，五项核心指标均为100%。该结果仅适用于当前冻结数据和测试范围，"
+        conclusion + "该结果仅适用于当前冻结数据和测试范围，"
         "不表示所有未来赛事或任意自然语言输入均能达到100%；新增赛事必须经过相同的证据核验和回归流程。",
     ])
     if payload.get("freeze"):

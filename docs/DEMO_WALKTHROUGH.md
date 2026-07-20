@@ -1,6 +1,6 @@
 # 固定账号端到端演示验收记录
 
-- 验收日期：2026-07-16
+- 验收日期：2026-07-19
 - 固定账号：`mock_user_001`（示例用户）
 - 浏览器尺寸：1440 x 960
 - 验收服务：`http://127.0.0.1:8011/`
@@ -11,7 +11,7 @@
 | 步骤 | 实际操作 | 验收结果 | 证据 |
 | --- | --- | --- | --- |
 | 1 | 使用固定示例账号登录 | 成功进入个性化推荐 | [登录页](../demo/acceptance/walkthrough-00-login.png) |
-| 2 | 查看推荐 | 展示3项正式推荐、9项未核验候选和9项已拦截赛事；仅正式推荐有分数 | [推荐页](../demo/acceptance/walkthrough-01-recommendations.png) |
+| 2 | 查看推荐 | 页面只展示通过官网来源、五类证据、时间与资格门控的正式推荐；候选赛事在大厅独立筛选 | [推荐页](../demo/acceptance/walkthrough-01-recommendations.png) |
 | 3 | 展开中国软件杯官方依据 | 展示PDF名称、证据字段和页码 | [官方依据](../demo/acceptance/walkthrough-02-official-evidence.png) |
 | 4 | 点击“加入我的项目” | 创建项目并自动生成任务计划和材料清单 | [项目创建](../demo/acceptance/walkthrough-03-project-created.png) |
 | 5 | 完成首项任务并新增“最终答辩PPT”材料 | 完成进度更新，材料及日期持久化 | [任务与材料](../demo/acceptance/walkthrough-04-tasks-materials.png) |
@@ -26,7 +26,7 @@
 - SHA-256：`d1f3f37abbee7eb0a8b2dba16d6c083fec35e96b671f58409388f8d0f185c994`
 - 包含报名截止：`DTSTART;VALUE=DATE:20260720`
 - 包含提交截止：`DTSTART;VALUE=DATE:20260720`
-- 官方日期事件说明：`来自已核验赛事主表`
+- 官方日期事件说明：`来自官网来源与关键证据完整的赛事主表`
 
 ## 三个安全场景
 
@@ -34,7 +34,7 @@
 | --- | --- | --- |
 | 未核验赛事不评分 | APMCM 显示“候选信息·未评分”，匹配度为 `—`，不提供加入项目按钮 | [未核验拦截](../demo/acceptance/safety-01-unverified-no-score.png) |
 | 已截止赛事不推荐 | 服务外包大赛显示“不符合·一票否决”和“报名已经截止”，匹配度为 `—` | [截止门控](../demo/acceptance/safety-02-expired-not-recommended.png) |
-| 同名赛事未指定年份 | Agent 明示“使用最新已核验版本：2026年”，并附对应版本、日期与官方证据 | [多年份消歧](../demo/acceptance/safety-03-same-name-latest-verified.png) |
+| 同名赛事未指定年份 | 存在推荐级版本时明示“最新官网来源已确认版本”；只有候选版本时追问具体年份 | [多年份消歧](../demo/acceptance/safety-03-same-name-latest-verified.png) |
 
 ## 验收结论
 

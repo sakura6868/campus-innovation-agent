@@ -91,7 +91,7 @@ def parse_docx(
 
 
 def locate_evidence(parse_result: ParseResult, keyword: str) -> Optional[ParsedBlock]:
-    """给定关键词，定位首个命中的文本块，用于人工核验与证据抽取。"""
+    """给定关键词，定位首个命中的文本块，用于来源检查与证据抽取。"""
     for block in parse_result.blocks:
         if keyword in block.text:
             return block

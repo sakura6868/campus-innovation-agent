@@ -12,6 +12,8 @@ services:
         fromDatabase:
           name: campus-db
           property: connectionString   # 自动注入免费 Postgres 的连接串
+      - key: ADMIN_API_TOKEN
+        generateValue: true            # 所有数据维护接口强制使用 X-Admin-Token
       # RAG_USE_ST 不显式设置即「自动」：本地已预热 all-MiniLM-L6-v2 时默认开启真·语义检索；
       # Render 免费实例未打包模型时自动降级轻量关键词检索，保证启动零联网依赖。
       # 如需在 Render 启用语义检索，请在 Dockerfile 中把模型打包进镜像后设 RAG_USE_ST=1。

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>校园科创导航智能体</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='10' fill='%2316181d'/%3E%3Ctext x='32' y='40' text-anchor='middle' font-family='Arial' font-size='25' font-weight='700' fill='white'%3ECI%3C/text%3E%3C/svg%3E" />
-  <link rel="stylesheet" href="/static/styles.css?v=20260719.8" />
+  <link rel="stylesheet" href="/static/styles.css?v=20260720.4" />
 </head>
 <body>
   <header class="topnav">
@@ -175,7 +175,12 @@
             <h2>智能问答</h2>
             <p>基于官方通知，为你核对赛事规则与参赛资格</p>
           </div>
-          <span class="agent-trust"><span aria-hidden="true">✓</span> 智能体已就绪</span>
+          <div class="agent-title-actions">
+            <span id="agent-llm-status" class="agent-llm-status" data-on="0">
+              <span class="agent-llm-dot"></span><span class="agent-llm-text">检测中…</span>
+            </span>
+            <span class="agent-trust"><span aria-hidden="true">✓</span> 智能体已就绪</span>
+          </div>
         </header>
 
         <div class="agent-context-bar" aria-label="问答上下文">
@@ -198,41 +203,31 @@
             <h3>今天想了解什么赛事？</h3>
             <p>可以询问时间、参赛资格、团队要求，或让智能体根据你的画像推荐。</p>
             <div id="agent-chips" class="chips agent-prompts">
-              <button type="button" class="chip" data-q="蓝桥杯团队几人？报名什么时候截止">核对蓝桥杯截止时间</button>
               <button type="button" class="chip" data-q="推荐适合我的比赛">推荐适合我的比赛</button>
-              <button type="button" class="chip" data-q="帮我写一份数学建模竞赛的组队招募文案">生成组队招募文案</button>
+              <button type="button" class="chip" data-q="帮我找互补队友">🤝 帮我找互补队友</button>
+              <button type="button" class="chip" data-q="蓝桥杯团队几人？报名什么时候截止">核对蓝桥杯截止时间</button>
               <button type="button" class="chip" data-q="介绍一下中国软件杯">了解中国软件杯</button>
             </div>
           </div>
         </div>
 
         <div class="agent-composer-wrap">
+          <div id="agent-quick" class="agent-quick" aria-label="快捷提问">
+            <button type="button" class="quick-chip" data-q="推荐适合我的比赛">推荐赛事</button>
+            <button type="button" class="quick-chip" data-q="帮我找互补队友">🤝 找队友</button>
+            <button type="button" class="quick-chip" data-q="有哪些还在报名中的比赛">报名中赛事</button>
+          </div>
           <div class="agent-input">
-            <div class="agent-input-toolbar">
-              <div class="agent-toolbar-left">
-                <label class="model-select" title="切换润色模型（需后端已配置对应 LLM key）">
-                  <span>模型</span>
-                  <select id="agent-model">
-                    <option value="qwen-plus">qwen-plus</option>
-                    <option value="qwen-max">qwen-max</option>
-                    <option value="qwen-turbo">qwen-turbo</option>
-                  </select>
-                </label>
-                <div class="agent-theme-picker" aria-label="选择主题色" title="切换主题色">
-                  <button type="button" data-theme="blue" aria-label="蓝色" style="--swatch:#3b82f6"></button>
-                  <button type="button" data-theme="purple" aria-label="紫色" style="--swatch:#8b5cf6"></button>
-                  <button type="button" data-theme="teal" aria-label="青色" style="--swatch:#14b8a6"></button>
-                  <button type="button" data-theme="green" aria-label="绿色" style="--swatch:#22c55e"></button>
-                  <button type="button" data-theme="orange" aria-label="橙色" style="--swatch:#f97316"></button>
-                </div>
-              </div>
-              <span id="agent-llm-status" class="agent-llm-status" data-on="0">
-                <span class="agent-llm-dot"></span><span class="agent-llm-text">检测中…</span>
-              </span>
-            </div>
-            <textarea id="agent-q" rows="1" placeholder="随心输入 · 赛事 / 组队 / 规划都可以问"></textarea>
-            <div class="agent-composer-footer">
-              <span>Enter 发送 · Shift + Enter 换行</span>
+            <button type="button" class="agent-attach" title="添加附件" aria-label="添加附件">+</button>
+            <textarea id="agent-q" rows="1" placeholder="随心输入"></textarea>
+            <div class="agent-input-right">
+              <label class="model-select" title="切换润色模型（需后端已配置对应 LLM key）">
+                <select id="agent-model">
+                  <option value="qwen-plus">qwen-plus</option>
+                  <option value="qwen-max">qwen-max</option>
+                  <option value="qwen-turbo">qwen-turbo</option>
+                </select>
+              </label>
               <button id="agent-send" class="agent-send" type="button" title="发送问题" aria-label="发送问题">↑</button>
             </div>
           </div>
@@ -423,8 +418,21 @@
     </div>
   </div>
 
+  <!-- 组队邀约弹窗 -->
+  <div id="invite-modal" class="modal hidden">
+    <div class="modal-box">
+      <h3>🤝 组队邀约</h3>
+      <p class="invite-sub">已根据你们双方的画像与互补点生成邀请文案，可直接复制或稍作修改后发送。</p>
+      <textarea id="invite-text" class="invite-text" rows="8"></textarea>
+      <div class="row">
+        <button id="invite-copy" class="btn primary">复制文案</button>
+        <button id="invite-close" class="btn">关闭</button>
+      </div>
+    </div>
+  </div>
+
   <div id="toast" class="toast hidden"></div>
 
-  <script src="/static/app.js?v=20260719.8"></script>
+  <script src="/static/app.js?v=20260720.4"></script>
 </body>
 </html>

@@ -3,8 +3,8 @@
 默认使用 SQLite（零外部依赖、易部署）；通过环境变量 DATABASE_URL
 切换到 PostgreSQL 等生产数据库（SQLAlchemy 统一接口，无需改业务代码）。
 
-数据来源：data/ground_truth/samples/*.json（官方材料人工核验冷启动集）。
-seed 为幂等 upsert，重复运行不会重复插入，也不会丢失人工修正。
+数据来源：data/ground_truth/samples/*.json（官方来源锚定数据集）。
+seed 为幂等 upsert，重复运行不会重复插入。
 
 提供能力：
   - init_db()            建表 + 首次 seed（赛事 + 演示用户）
@@ -63,6 +63,7 @@ from schemas import (
     Verification,
 )
 from fact_formatting import format_team_size
+from trust import assess_recommendation_readiness, assess_source_readiness, is_registerable_now
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 GROUND_TRUTH_DIR = PROJECT_ROOT / "data" / "ground_truth" / "samples"
@@ -514,6 +515,49 @@ DEMO_USERS: list[UserProfile] = [
         persona="研究生 · AI方向，偏研究型高含金量赛事",
         avatar="🧠",
     ),
+    # —— 以下为「队友推荐」候选池补充：补齐计算机全栈选手常缺的设计/可视化/硬件能力 ——
+    UserProfile(
+        user_id="mate_ui",
+        education_level=EducationLevel.UNDERGRADUATE,
+        grade=Grade.JUNIOR,
+        major="视觉传达设计",
+        skills=["UI设计", "Figma", "Photoshop", "海报设计", "品牌视觉", "交互设计"],
+        experiences=["大广赛", "中国大学生计算机设计大赛"],
+        weekly_available_hours=14,
+        expected_team_size=3,
+        privacy_consent=True,
+        display_name="设计美学",
+        persona="设计美学型 · 负责界面与视觉呈现",
+        avatar="🎨",
+    ),
+    UserProfile(
+        user_id="mate_viz",
+        education_level=EducationLevel.UNDERGRADUATE,
+        grade=Grade.SOPHOMORE,
+        major="数据科学与大数据技术",
+        skills=["数据可视化", "Tableau", "PPT汇报", "Python", "统计分析", "Excel"],
+        experiences=["正大杯市场调研", "数据可视化校赛一等奖"],
+        weekly_available_hours=13,
+        expected_team_size=3,
+        privacy_consent=True,
+        display_name="数据讲述者",
+        persona="数据讲述型 · 负责图表与答辩汇报",
+        avatar="📊",
+    ),
+    UserProfile(
+        user_id="mate_hw",
+        education_level=EducationLevel.UNDERGRADUATE,
+        grade=Grade.JUNIOR,
+        major="自动化",
+        skills=["嵌入式", "STM32", "硬件电路", "C语言", "物联网", "传感器"],
+        experiences=["智能车竞赛", "电子设计大赛省赛"],
+        weekly_available_hours=16,
+        expected_team_size=4,
+        privacy_consent=True,
+        display_name="硬核工程",
+        persona="硬核工程型 · 负责硬件与嵌入式实现",
+        avatar="⚙️",
+    ),
 ]
 
 
@@ -711,11 +755,16 @@ def get_competition_detail(competition_id: str) -> Optional[CompetitionDetail]:
         )
     ]
 
+    readiness = assess_recommendation_readiness(comp, date.today())
     verification = Verification(
         status=comp.data_status,
         last_verified_at=comp.last_verified_at,
         trusted_level=comp.trusted_level,
-        note="已人工确认" if comp.data_status == DataStatus.VERIFIED else "AI整理，请以官网最新通知为准",
+        note=(
+            "官网来源已确认，关键字段具备可追溯证据；请以官网最新通知为准"
+            if assess_source_readiness(comp).ready
+            else "关键证据待补充，不用于正式资格判断或匹配评分"
+        ),
     )
 
     return CompetitionDetail(
@@ -724,6 +773,8 @@ def get_competition_detail(competition_id: str) -> Optional[CompetitionDetail]:
         requirements=requirements,
         sources=sources,
         verification=verification,
+        recommendation_ready=readiness.ready,
+        readiness_reasons=list(readiness.reasons),
     )
 
 
@@ -752,10 +803,13 @@ def get_user_profile(user_id: str) -> Optional[UserProfile]:
         return _user_to_pydantic(m)
 
 
-def list_user_profiles() -> list[UserProfile]:
-    """列出所有用户画像（用于登录页展示可选身份）。"""
+def list_user_profiles(exclude_user_id: Optional[str] = None) -> list[UserProfile]:
+    """列出所有用户画像；exclude_user_id 用于队友推荐时排除自己。"""
     with session_scope() as session:
-        rows = session.query(UserProfileModel).all()
+        q = session.query(UserProfileModel)
+        if exclude_user_id:
+            q = q.filter(UserProfileModel.user_id != exclude_user_id)
+        rows = q.all()
         return [_user_to_pydantic(m) for m in rows]
 
 
@@ -798,6 +852,7 @@ def delete_user_profile(user_id: str) -> dict:
 
 def _project_to_pydantic(m: UserProjectModel) -> UserProject:
     comp = m.competition
+    readiness = assess_recommendation_readiness(_competition_to_pydantic(comp), date.today())
     return UserProject(
         project_id=m.project_id,
         user_id=m.user_id,
@@ -809,6 +864,8 @@ def _project_to_pydantic(m: UserProjectModel) -> UserProject:
         submission_deadline=comp.submission_deadline,
         status=ProjectStatus(m.status),
         created_at=m.created_at.isoformat(),
+        recommendation_ready=readiness.ready,
+        readiness_reasons=list(readiness.reasons),
         items=[
             ProjectItem(
                 item_id=i.item_id,
@@ -849,10 +906,10 @@ def create_user_project(user_id: str, competition_id: str) -> UserProject:
         comp = session.get(CompetitionModel, competition_id)
         if comp is None:
             raise ValueError("competition_not_found")
-        if comp.data_status != DataStatus.VERIFIED.value:
+        competition = _competition_to_pydantic(comp)
+        if not assess_source_readiness(competition).ready:
             raise ValueError("competition_unverified")
-        effective_deadline = comp.registration_deadline or comp.submission_deadline
-        if effective_deadline is not None and effective_deadline < date.today():
+        if not is_registerable_now(competition, date.today()):
             raise ValueError("competition_expired")
         existing = (
             session.query(UserProjectModel)
@@ -977,9 +1034,8 @@ def delete_project_item(user_id: str, project_id: int, item_id: int) -> bool:
 def upsert_competition(comp: Competition) -> Competition:
     """创建或更新赛事（含 evidence 列表）。
 
-    用于「上传→解析→人工确认」闭环：调用方在确认时把 data_status 置为
-    verified，并把人工关联的原文块作为 evidence 写入，从而保证后续问答的
-    引用可追溯到官方通知、且数据状态升级为已核验。幂等：按 competition_id 覆盖。
+    用于「上传→解析→来源确认」闭环：调用方关联官方原文 evidence，状态由
+    统一完整性规则决定。幂等：按 competition_id 覆盖。
     """
     with session_scope() as session:
         cid = comp.competition_id
@@ -1024,6 +1080,8 @@ def upsert_competition(comp: Competition) -> Competition:
             comp.data_status.value if isinstance(comp.data_status, DataStatus) else comp.data_status
         )
         existing.last_verified_at = comp.last_verified_at
+        existing.official_source_status = comp.official_source_status
+        existing.notes = comp.notes
         existing.doc_version = comp.doc_version
 
         # evidence：先删后插，保证与本次确认一致

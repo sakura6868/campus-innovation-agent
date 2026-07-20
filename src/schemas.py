@@ -61,7 +61,7 @@ class Grade(str, Enum):
 
 
 class TrustedLevel(str, Enum):
-    """数据可信等级：A=已人工确认，B=部分确认，C=待核验。"""
+    """数据可信等级：A=官网来源与关键证据完整，B=部分完整，C=待核验。"""
 
     A = "A"
     B = "B"
@@ -69,9 +69,9 @@ class TrustedLevel(str, Enum):
 
 
 class DataStatus(str, Enum):
-    VERIFIED = "verified"         # 已人工确认
-    UNVERIFIED = "unverified"     # 待人工确认
-    STALE = "stale"               # 超过 90 天未核验
+    VERIFIED = "verified"         # 官网来源已确认且通过自动完整性检查
+    UNVERIFIED = "unverified"     # 关键证据待补充
+    STALE = "stale"               # 来源长期未复查
 
 
 class ProjectStatus(str, Enum):
@@ -97,7 +97,7 @@ class FactTag(str, Enum):
     OFFICIAL = "官方规则"
     SYSTEM = "系统计算"
     SUGGESTION = "智能建议"
-    PENDING = "待人工确认"
+    PENDING = "关键证据待补充"
 
 
 # ---------------------------------------------------------------------------
@@ -114,7 +114,7 @@ class Citation(BaseModel):
     document_name: Optional[str] = Field(None, description="文档名称，如 蓝桥杯_2026_官方通知.pdf")
     source_url: Optional[str] = Field(None, description="官方链接")
     acquired_date: Optional[str] = Field(None, description="数据获取日期 YYYY-MM-DD")
-    last_verified_at: Optional[str] = Field(None, description="最后人工核验日期 YYYY-MM-DD")
+    last_verified_at: Optional[str] = Field(None, description="最后来源检查日期 YYYY-MM-DD")
     trusted_level: TrustedLevel = Field(TrustedLevel.A, description="本条证据可信等级")
 
 
@@ -166,7 +166,7 @@ class Verification(BaseModel):
 
 
 class Competition(BaseModel):
-    """赛事结构化信息（来自官方通知抽取 + 人工 Ground Truth）。"""
+    """赛事结构化信息（来自官方通知抽取 + 可追溯 Ground Truth）。"""
 
     competition_id: str = Field(..., description="全局唯一 ID，如 lanqiao_2026")
     competition_name: str
@@ -249,6 +249,23 @@ class UserProfile(BaseModel):
         return self.privacy_consent
 
 
+class TeammateMatch(BaseModel):
+    """基于画像的互补队友推荐结果。"""
+
+    user_id: str
+    display_name: Optional[str] = None
+    persona: Optional[str] = None
+    avatar: Optional[str] = None
+    major: str
+    grade: str
+    education_level: str
+    skills: list[str] = Field(default_factory=list)
+    experiences: list[str] = Field(default_factory=list)
+    weekly_available_hours: int = 10
+    match_score: float = Field(0.0, description="互补匹配度 0-100")
+    reasons: list[str] = Field(default_factory=list, description="互补理由（中文）")
+
+
 # ---------------------------------------------------------------------------
 # API 响应包裹（第零周冻结的接口契约）
 # ---------------------------------------------------------------------------
@@ -262,6 +279,8 @@ class CompetitionDetail(BaseModel):
     requirements: list[RequirementItem] = Field(default_factory=list)
     sources: list[SourceItem] = Field(default_factory=list)
     verification: Verification
+    recommendation_ready: bool = False
+    readiness_reasons: list[str] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -305,7 +324,7 @@ class RecommendationResult(BaseModel):
     match_breakdown: Optional[MatchBreakdown] = None
     explanation: dict[str, Any] = Field(default_factory=dict, description="资格/匹配/缺口/队友/时间/下一步")
     urgent: bool = Field(False, description="临近截止标签，不因此提高适配度")
-    pending_review: bool = Field(False, description="数据基于AI整理、待人工终审；UI 显示「待人工确认」标签")
+    pending_review: bool = Field(False, description="关键证据仍待补充；不得输出正式评分")
 
 
 # ---------------------------------------------------------------------------
@@ -344,6 +363,8 @@ class UserProject(BaseModel):
     submission_deadline: Optional[date] = None
     status: ProjectStatus = ProjectStatus.PLANNED
     created_at: str
+    recommendation_ready: bool = True
+    readiness_reasons: list[str] = Field(default_factory=list)
     items: list[ProjectItem] = Field(default_factory=list)
 
 

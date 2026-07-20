@@ -52,6 +52,7 @@ from recommendation.engine import (
     data_validity_check,
     eligibility_gate,
     recommend_for_user,
+    recommend_teammates,
     soft_match_score,
 )
 from schemas import Citation, Competition, UserProfile
@@ -73,7 +74,7 @@ class AgentState(TypedDict, total=False):
     model: Optional[str]               # 可选：请求级覆盖默认 LLM 模型
 
     # 路由结果
-    intent: str                       # qa | detail | recommend | team | unknown
+    intent: str                       # qa | detail | recommend | team | teammate | chat | unknown
     resolved_competition: Optional[str]
     resolved_name: Optional[str]
     version_resolution_note: Optional[str]
@@ -86,6 +87,7 @@ class AgentState(TypedDict, total=False):
     score: dict
     recommendations: list[dict]
     team_copy: str
+    teammate_matches: list[dict]      # 基于画像的互补队友推荐
 
     # 输出
     answer: str
@@ -205,7 +207,11 @@ def _resolve_competition(question: str, comps: list[Competition]) -> Optional[Co
 # ---------------------------------------------------------------------------
 
 _KW_RECOMMEND = ["推荐", "适合我", "适合参加", "该参加", "选哪个", "报哪个", "有什么比赛", "参加什么"]
-_KW_TEAM = ["组队", "招募", "招新", "招人", "队友", "文案", "招队友", "找队友", "队员"]
+_KW_TEAMMATE = [
+    "推荐队友", "匹配队友", "找队友", "找搭档", "组队搭档", "互补队友",
+    "队友推荐", "组队成员", "想找队友", "帮我找队友", "缺队友", "需要队友", "组队缺",
+]
+_KW_TEAM = ["组队招募", "招募", "招新", "招人", "招队友", "文案", "写一份", "招队员", "找人组队"]
 _KW_DETAIL = ["介绍", "详情", "是什么", "概况", "简介", "了解一下"]
 _KW_CHAT = [
     "规划", "计划", "建议", "怎么准备", "如何准备", "怎么选", "如何选",
@@ -217,6 +223,8 @@ _KW_CHAT = [
 
 def _classify_intent(question: str, has_comp: bool) -> str:
     q = question
+    if any(k in q for k in _KW_TEAMMATE):
+        return "teammate"
     if any(k in q for k in _KW_TEAM):
         return "team"
     if any(k in q for k in _KW_RECOMMEND):
@@ -590,6 +598,23 @@ def node_team_copy(state: AgentState) -> AgentState:
 
 
 # ---------------------------------------------------------------------------
+# 节点 5.5：基于画像的互补队友推荐（teammate intent 专用）
+# ---------------------------------------------------------------------------
+def node_teammate_match(state: AgentState) -> AgentState:
+    trace = list(state.get("trace") or [])
+    seeker = _load_profile(state)
+    if seeker is None:
+        trace.append("队友推荐：跳过（无可用画像）")
+        return {**state, "teammate_matches": [], "trace": trace}
+
+    candidates = db.list_user_profiles(exclude_user_id=seeker.user_id)
+    matches = recommend_teammates(seeker, candidates, top_k=state.get("top_k") or 5)
+    matches_dict = [m.model_dump(mode="json") for m in matches]
+    trace.append(f"队友推荐：从 {len(candidates)} 名候选中匹配出 {len(matches)} 名互补队友")
+    return {**state, "teammate_matches": matches_dict, "trace": trace}
+
+
+# ---------------------------------------------------------------------------
 # 节点 6：全库推荐（recommend intent 专用）
 # ---------------------------------------------------------------------------
 
@@ -794,6 +819,27 @@ def node_compose(state: AgentState) -> AgentState:
         trace.append("组装答案：chat 回退提示")
         return {**state, "answer": answer, "trace": trace}
 
+    if intent == "teammate":
+        matches = state.get("teammate_matches") or []
+        if not matches:
+            answer = (
+                "暂时没有可供匹配的队友候选。你可以先完善个人画像（专业、技能、年级），"
+                "系统会从队友库中为你推荐互补搭档。"
+            )
+        else:
+            lines = ["根据你的画像，我为你匹配了以下互补队友（按互补度排序）：\n"]
+            for i, m in enumerate(matches, 1):
+                name = m.get("display_name") or m.get("user_id")
+                lines.append(
+                    f"{i}. {name}（{m.get('major')} · {m.get('grade')}）— 互补度 {m.get('match_score'):.0f} 分"
+                )
+                for r in (m.get("reasons") or [])[:3]:
+                    lines.append(f"   · {r}")
+            lines.append("\n可在「我的队友」中查看完整画像与联系方式（演示环境为虚拟候选）。")
+            answer = "\n".join(lines)
+        trace.append("组装答案：teammate 互补队友推荐")
+        return {**state, "answer": answer, "trace": trace}
+
     if intent == "team":
         body = state.get("team_copy") or "未能生成组队文案。"
         answer = body + _citations_appendix(citations)
@@ -897,6 +943,7 @@ def build_graph():
     g.add_node("gate", node_gate)
     g.add_node("score", node_score)
     g.add_node("team_copy", node_team_copy)
+    g.add_node("teammate_match", node_teammate_match)
     g.add_node("recommend_all", node_recommend_all)
     g.add_node("compose", node_compose)
 
@@ -911,6 +958,7 @@ def build_graph():
             "detail": "retrieve",
             "team": "retrieve",
             "chat": "retrieve",
+            "teammate": "teammate_match",
             "recommend": "recommend_all",
             "unknown": "compose",
         },
@@ -927,6 +975,7 @@ def build_graph():
 
     g.add_conditional_edges("score", _after_score, {"team_copy": "team_copy", "compose": "compose"})
     g.add_edge("team_copy", "compose")
+    g.add_edge("teammate_match", "compose")
     g.add_edge("recommend_all", "compose")
     g.add_edge("compose", END)
 
@@ -979,6 +1028,7 @@ def run_agent(
         "gate": final.get("gate") or {},
         "score": final.get("score") or {},
         "recommendations": final.get("recommendations") or [],
+        "teammate_matches": final.get("teammate_matches") or [],
         "pending_review": bool(final.get("pending_review")),
         "trace": final.get("trace") or [],
         "error": final.get("error"),

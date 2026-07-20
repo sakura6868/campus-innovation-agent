@@ -3,7 +3,10 @@
   "document_year": 2026,
   "organizer": "教育部高等学校计算机类专业教学指导委员会、教育部高等学校软件工程专业教学指导委员会、教育部高等学校大学计算机课程教学指导委员会、全国高等学校计算机教育研究会",
   "category": "software",
-  "eligible_students": ["本科生", "研究生"],
+  "eligible_students": [
+    "本科生",
+    "研究生"
+  ],
   "allowed_grades": null,
   "allowed_majors": null,
   "team_required": true,
@@ -11,13 +14,26 @@
   "team_max": 3,
   "registration_deadline": "2026-07-06",
   "submission_deadline": "2026-07-06",
-  "required_materials": ["作品说明文档", "演示视频", "可运行的App应用"],
-  "evaluation_dimensions": ["创意与创新性", "界面与交互设计", "商业/应用前景", "作品资料完整性"],
-  "required_skills": ["iOS/Swift移动应用开发", "UI设计", "交互设计"],
+  "required_materials": [
+    "作品说明文档",
+    "演示视频",
+    "可运行的App应用"
+  ],
+  "evaluation_dimensions": [
+    "创意与创新性",
+    "界面与交互设计",
+    "商业/应用前景",
+    "作品资料完整性"
+  ],
+  "required_skills": [
+    "iOS/Swift移动应用开发",
+    "UI设计",
+    "交互设计"
+  ],
   "official_source_url": "http://www.appcontest.net/",
   "source_acquired_date": "2026-07-18",
-  "trusted_level": "A",
-  "data_status": "verified",
+  "trusted_level": "B",
+  "data_status": "unverified",
   "official_source_status": "found",
   "last_verified_at": "2026-07-18",
   "doc_version": "2026_v2",

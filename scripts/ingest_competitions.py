@@ -105,7 +105,8 @@ def coerce_edu(values) -> list[str]:
         if v not in seen:
             seen.add(v)
             res.append(v)
-    return res or ["本科生"]
+    # 未识别的学历保持未知；空列表会让记录停留在候选区，禁止静默按本科生处理。
+    return res
 
 
 def build_competition(raw: dict, existing_ids: set) -> tuple[dict, str]:
@@ -147,7 +148,7 @@ def build_competition(raw: dict, existing_ids: set) -> tuple[dict, str]:
         "data_status": "unverified",
         "last_verified_at": None,
         "official_source_status": "found" if url else None,
-        "notes": raw.get("notes") or f"自动发现于 {date.today().isoformat()}，待人工核验。",
+        "notes": raw.get("notes") or f"自动发现于 {date.today().isoformat()}，关键证据待补充。",
         "evidence": [],
         "doc_version": raw.get("doc_version") or f"{year}_v1",
     }
@@ -157,14 +158,15 @@ def build_competition(raw: dict, existing_ids: set) -> tuple[dict, str]:
 def push_to_render(records: list[dict]) -> dict:
     if not RENDER_API_BASE:
         return {"skipped": True, "reason": "RENDER_API_BASE 未设置"}
+    if not ADMIN_API_TOKEN:
+        return {"skipped": True, "reason": "ADMIN_API_TOKEN 未设置，拒绝向管理接口发送数据"}
     url = f"{RENDER_API_BASE}/api/admin/competitions/bulk"
     payload = json.dumps({"competitions": records}).encode("utf-8")
     req = urllib.request.Request(
         url, data=payload, method="POST",
         headers={"Content-Type": "application/json"},
     )
-    if ADMIN_API_TOKEN:
-        req.add_header("X-Admin-Token", ADMIN_API_TOKEN)
+    req.add_header("X-Admin-Token", ADMIN_API_TOKEN)
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:
             return {"ok": True, "response": json.loads(resp.read().decode("utf-8"))}

@@ -17,9 +17,11 @@ from schemas import (
     GateReason,
     MatchBreakdown,
     RecommendationResult,
+    TeammateMatch,
     UserProfile,
 )
 from fact_formatting import format_team_size
+from trust import assess_source_readiness, is_registerable_now
 
 
 # ---------------------------------------------------------------------------
@@ -29,18 +31,7 @@ from fact_formatting import format_team_size
 
 def data_validity_check(comp: Competition, current: date) -> list[str]:
     """返回阻止赛事进入正式推荐的原因；空列表表示数据可用。"""
-    problems: list[str] = []
-    if not comp.official_source_url:
-        problems.append("缺少官方来源")
-    if comp.document_year is None:
-        problems.append("缺少明确年份")
-    if comp.registration_deadline is None and comp.submission_deadline is None:
-        problems.append("缺少有效报名时间")
-    if comp.data_status == DataStatus.UNVERIFIED:
-        problems.append("尚未完成人工核验")
-    if comp.data_status == DataStatus.STALE:
-        problems.append("长期未核验（超过90天）")
-    return problems
+    return list(assess_source_readiness(comp).reasons)
 
 
 # ---------------------------------------------------------------------------
@@ -90,30 +81,6 @@ def eligibility_gate(
 # ---------------------------------------------------------------------------
 # 时间门控（用户规则）：仅推送当前仍可报名的赛事
 # ---------------------------------------------------------------------------
-
-
-def is_registerable_now(comp: Competition, current: date) -> bool:
-    """仅当赛事「当前仍可报名」时返回 True；否则（过时 / 已在参赛时间）不推送。
-
-    排除规则：
-      - 已在参赛时间：赛事开始日 <= 今天（报名通常已截止）
-      - 已完全结束：赛事结束日 < 今天
-      - 过时：报名截止日 < 今天
-      - 过时（兜底）：无报名截止信息时，以提交截止日 < 今天判断
-    """
-    if comp.competition_start_date is not None and comp.competition_start_date <= current:
-        return False
-    if comp.competition_end_date is not None and comp.competition_end_date < current:
-        return False
-    if comp.registration_deadline is not None and comp.registration_deadline < current:
-        return False
-    if (
-        comp.registration_deadline is None
-        and comp.submission_deadline is not None
-        and comp.submission_deadline < current
-    ):
-        return False
-    return True
 
 
 # ---------------------------------------------------------------------------
@@ -228,26 +195,33 @@ def recommend_for_user(
     results: list[RecommendationResult] = []
 
     for comp in competitions:
-        # 时间门控（用户规则）：仅推送当前仍可报名的赛事；
-        # 过时（截止已过）或已在参赛时间的赛事一律不推送。
+        # 时间问题属于明确的一票否决，保留结果以便 API / 评测解释 score=null。
         if not is_registerable_now(comp, current):
-            continue
-        pending = comp.data_status == DataStatus.UNVERIFIED
-        # 第一层：数据有效性
-        problems = data_validity_check(comp, current)
-        # 「尚未完成人工核验」仅为软标记，不阻断未核验赛事进入推荐；
-        # 其余数据可用性问题（缺来源/年份/时间等）仍一票否决。
-        blocking = [p for p in problems if not (pending and p == "尚未完成人工核验")]
-        if blocking:
-            # 数据不可靠：不进入正式推荐列表，仅记录
             results.append(
                 RecommendationResult(
                     competition_id=comp.competition_id,
                     competition_name=comp.competition_name,
                     recommendation_status="ineligible",
                     eligible=False,
-                    gate_reasons=[GateReason(reason=f"数据不可用：{p}") for p in blocking],
-                    explanation={"数据状态": "来源不可靠，未进入正式推荐"},
+                    gate_reasons=[GateReason(reason="赛事当前已不可报名")],
+                    explanation={"时间": "赛事已截止、已开赛或已结束，不进入评分"},
+                )
+            )
+            continue
+        source_readiness = assess_source_readiness(comp)
+        pending = not source_readiness.ready
+        # 第一层：数据有效性
+        problems = data_validity_check(comp, current)
+        if problems:
+            # 来源或关键字段证据不完整：仅作为目录候选，不进行资格判断或评分。
+            results.append(
+                RecommendationResult(
+                    competition_id=comp.competition_id,
+                    competition_name=comp.competition_name,
+                    recommendation_status="candidate_only",
+                    eligible=False,
+                    gate_reasons=[GateReason(reason=f"候选信息：{p}") for p in problems],
+                    explanation={"数据状态": "关键证据待补充，仅在赛事目录展示"},
                     pending_review=pending,
                 )
             )
@@ -301,3 +275,91 @@ def recommend_for_user(
         )
     )
     return results
+
+
+# ---------------------------------------------------------------------------
+# 队友推荐：基于画像的互补匹配
+# ---------------------------------------------------------------------------
+
+
+def _grade_level(grade: str) -> int:
+    return {"大一": 1, "大二": 2, "大三": 3, "大四": 4, "研究生": 5}.get(grade, 2)
+
+
+def _teammate_score(seeker: UserProfile, c: UserProfile) -> tuple[float, list[str]]:
+    """互补度评分（0-100）与中文理由。五个维度加权：技能互补40/专业互补25/年级搭配15/时间互补10/经验匹配10。"""
+    reasons: list[str] = []
+    seeker_skills = {s.lower() for s in seeker.skills}
+    cand_skills = {s.lower() for s in c.skills}
+
+    # 技能互补（40%）：候选具备而 seeker 缺失的技能越多，互补度越高
+    missing = cand_skills - seeker_skills
+    skill_comp = 100.0 * len(missing) / len(cand_skills) if cand_skills else 0.0
+    if missing:
+        shown = "、".join(list({s for s in c.skills if s.lower() in missing})[:3])
+        reasons.append(f"技能互补：你尚未掌握的 {shown} 正是 TA 的强项")
+
+    # 专业互补（25%）：跨学科组队视角更全
+    if seeker.major != c.major:
+        major_comp = 100.0
+        reasons.append(f"专业互补：你是{seeker.major}，TA 是{c.major}，跨学科组合")
+    else:
+        major_comp = 45.0
+
+    # 年级搭配（15%）：经验梯度合理
+    diff = abs(_grade_level(seeker.grade) - _grade_level(c.grade))
+    grade_comp = 100.0 if diff >= 2 else (80.0 if diff == 1 else 60.0)
+    if diff >= 1:
+        reasons.append(f"年级搭配：{seeker.grade} + {c.grade}，经验梯度合理")
+
+    # 时间互补（10%）：每周可投入工时差异越大，节奏搭配越灵活
+    maxh = max(seeker.weekly_available_hours, c.weekly_available_hours, 1)
+    time_comp = 100.0 * (1 - abs(seeker.weekly_available_hours - c.weekly_available_hours) / maxh)
+    if abs(seeker.weekly_available_hours - c.weekly_available_hours) >= 6:
+        reasons.append(f"时间互补：TA 每周可投入 {c.weekly_available_hours}h，与你形成节奏搭配")
+
+    # 经验匹配（10%）：候选有参赛经历即加分
+    if c.experiences:
+        exp_comp = 75.0
+        reasons.append(f"经验加持：TA 有{'、'.join(c.experiences[:2])}等经历")
+    else:
+        exp_comp = 45.0
+
+    total = (
+        0.40 * skill_comp
+        + 0.25 * major_comp
+        + 0.15 * grade_comp
+        + 0.10 * time_comp
+        + 0.10 * exp_comp
+    )
+    return round(total, 1), reasons
+
+
+def recommend_teammates(
+    seeker: UserProfile, candidates: list[UserProfile], top_k: int = 5
+) -> list[TeammateMatch]:
+    """从候选池中为 seeker 推荐互补队友，按互补度降序返回前 top_k 名。"""
+    matches: list[TeammateMatch] = []
+    for c in candidates:
+        if c.user_id == seeker.user_id:
+            continue
+        score, reasons = _teammate_score(seeker, c)
+        edu = c.education_level.value if hasattr(c.education_level, "value") else str(c.education_level)
+        matches.append(
+            TeammateMatch(
+                user_id=c.user_id,
+                display_name=c.display_name,
+                persona=c.persona,
+                avatar=c.avatar,
+                major=c.major,
+                grade=c.grade,
+                education_level=edu,
+                skills=c.skills,
+                experiences=c.experiences,
+                weekly_available_hours=c.weekly_available_hours,
+                match_score=score,
+                reasons=reasons[:4],
+            )
+        )
+    matches.sort(key=lambda m: m.match_score, reverse=True)
+    return matches[:top_k]

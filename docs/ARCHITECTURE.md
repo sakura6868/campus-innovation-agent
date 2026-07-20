@@ -1,6 +1,6 @@
 # 校园科创导航智能体架构说明
 
-_提交版技术架构，更新于 2026-07-16。_
+_提交版技术架构，更新于 2026-07-19。_
 
 ---
 
@@ -11,10 +11,10 @@ _提交版技术架构，更新于 2026-07-16。_
 ```mermaid
 flowchart LR
     accTitle: Trusted competition data flow
-    accDescr: Official documents are parsed, manually verified, stored once, isolated for retrieval, and then consumed by recommendation and project planning without copying deadlines.
+    accDescr: Official documents are parsed, checked by deterministic source and evidence rules, isolated for retrieval, and then consumed by recommendation and project planning without copying deadlines.
 
     official[📥 官方 PDF 或 Word] --> parse[⚙️ 页码文本解析]
-    parse --> review{🔍 人工核验}
+    parse --> review{🔍 来源与证据检查}
     review -->|通过| truth[📝 Ground Truth]
     review -->|待确认| candidate[⚠️ 候选信息]
     truth --> database[(💾 SQLite)]
@@ -43,6 +43,7 @@ flowchart LR
 | API | `src/api.py` | HTTP 接口、上传解析、项目与 ICS 导出 |
 | 数据访问 | `src/db.py` | SQLAlchemy 模型、Ground Truth 灌库、用户项目持久化 |
 | 契约 | `src/schemas.py` | Pydantic 输入输出模型与枚举 |
+| 可信判定 | `src/trust.py` | 官网直链、五类关键证据与报名状态统一检查 |
 | 推荐 | `src/recommendation/engine.py` | 数据有效性、资格门控、软评分 |
 | 检索 | `src/rag/store.py` | 赛事 ID、年份、版本三重隔离检索 |
 | Agent | `src/agent/graph.py` | 意图路由、版本消歧、检索、门控、回答编排 |
@@ -50,12 +51,13 @@ flowchart LR
 
 ## 🔒 可信规则
 
-1. `registration_deadline` 和 `submission_deadline` 只从 Ground Truth 或人工确认接口写入赛事主表。
+1. `registration_deadline` 和 `submission_deadline` 只从 Ground Truth 或受管理员令牌保护的来源确认接口写入赛事主表。
 2. 用户项目只保存 `competition_id`，页面与 ICS 每次从赛事主表读取截止日期。
 3. `unverified` 赛事固定返回 `candidate_only`、`score=null`、`eligible=false`。
 4. 已截止赛事固定返回 `ineligible`、`score=null`，不执行软评分。
-5. 同名多年份查询优先匹配用户明确年份；未写年份时仅可使用最新已核验版本并显式声明，否则追问。
-6. 报名截止问答只输出一个结构化规范日期，RAG 只提供 `registration_deadline` 页级证据。
+5. 同名多年份查询优先匹配用户明确年份；未写年份时仅可使用最新官网来源与关键证据完整版本并显式声明，否则追问。
+6. 只有 `verified + A + found + 五类关键证据完整 + 仍可报名` 的赛事可以评分。
+7. 报名截止问答只输出一个结构化规范日期，RAG 只提供同赛事、同年份的官方证据。
 
 ## 🗃️ 数据关系
 
@@ -66,10 +68,11 @@ flowchart LR
 | 方法 | 路径 | 用途 |
 | --- | --- | --- |
 | `GET` | `/api/competitions/{id}` | 赛事详情和证据 |
+| `GET` | `/api/competitions?readiness=...` | 全部、可推荐或候选赛事目录 |
 | `GET` | `/api/agent/ask` | Agent 闭环问答 |
 | `GET` | `/api/users/{id}/recommendations` | 门控与推荐 |
 | `POST` | `/api/users/{id}/projects` | 加入我的项目 |
 | `PATCH` | `/api/users/{id}/projects/{pid}/items/{iid}` | 更新条目状态 |
 | `GET` | `/api/users/{id}/projects/{pid}/calendar.ics` | 导出日历 |
 | `DELETE` | `/api/users/{id}/profile` | 删除画像和项目数据 |
-
+| `POST` | `/api/admin/*` | 受 `X-Admin-Token` 保护的数据维护接口 |

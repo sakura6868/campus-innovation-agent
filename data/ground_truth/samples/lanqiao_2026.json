@@ -3,7 +3,11 @@
   "document_year": 2026,
   "organizer": "蓝桥杯全国大学生软件和信息技术大赛组委会",
   "category": "programming",
-  "eligible_students": ["本科生", "研究生", "高职高专学生"],
+  "eligible_students": [
+    "本科生",
+    "研究生",
+    "高职高专学生"
+  ],
   "allowed_grades": null,
   "allowed_majors": null,
   "team_required": false,
@@ -11,13 +15,29 @@
   "team_max": 1,
   "registration_deadline": "2026-03-11",
   "submission_deadline": null,
-  "required_materials": ["身份证正反面照片", "学生证电子版", "2寸彩色证件照"],
-  "evaluation_dimensions": ["算法与编程能力", "解题正确率", "代码质量"],
-  "required_skills": ["C/C++", "Java", "Python", "算法", "Web应用开发", "软件测试", "网络安全"],
+  "required_materials": [
+    "身份证正反面照片",
+    "学生证电子版",
+    "2寸彩色证件照"
+  ],
+  "evaluation_dimensions": [
+    "算法与编程能力",
+    "解题正确率",
+    "代码质量"
+  ],
+  "required_skills": [
+    "C/C++",
+    "Java",
+    "Python",
+    "算法",
+    "Web应用开发",
+    "软件测试",
+    "网络安全"
+  ],
   "official_source_url": "https://dasai.lanqiao.cn/",
   "source_acquired_date": "2026-07-18",
-  "trusted_level": "A",
-  "data_status": "verified",
+  "trusted_level": "B",
+  "data_status": "unverified",
   "official_source_status": "found",
   "last_verified_at": "2026-07-18",
   "doc_version": "2026_v2",

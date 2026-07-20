@@ -912,6 +912,8 @@ async function agentAsk() {
   log.appendChild(aRow);
   log.scrollTop = log.scrollHeight;
 
+  const startTime = performance.now();
+
   let url = `/api/agent/ask?question=${encodeURIComponent(q)}&top_k=4`;
   if (uid) url += `&user_id=${encodeURIComponent(uid)}`;
   if (cid) url += `&competition_id=${encodeURIComponent(cid)}`;
@@ -958,13 +960,61 @@ async function agentAsk() {
       </details></div>`
     : "";
   const traceHtml = "";
+  // 暂存本轮队友数据，供「邀 TA 组队」按钮取用
+  currentTeammates = data.teammate_matches || [];
+  const teammateHtml = (currentTeammates.length)
+    ? `<div class="teammate-cards">
+        <div class="teammate-cards-head">🤝 为你匹配的互补队友</div>
+        ${currentTeammates.map((m, idx) => `
+          <div class="teammate-card">
+            <div class="tm-avatar">${escapeHtml(m.avatar || "🙂")}</div>
+            <div class="tm-main">
+              <div class="tm-name">${escapeHtml(m.display_name || m.user_id)} <span class="tm-score">互补度 ${Math.round(m.match_score)}</span></div>
+              <div class="tm-sub">${escapeHtml(m.major)} · ${escapeHtml(m.grade)} · 每周 ${m.weekly_available_hours}h</div>
+              ${m.persona ? `<div class="tm-persona">${escapeHtml(m.persona)}</div>` : ""}
+              <div class="tm-skills">${(m.skills || []).map((s) => `<span class="tm-tag">${escapeHtml(s)}</span>`).join("")}</div>
+              <ul class="tm-reasons">${(m.reasons || []).map((r) => `<li>${escapeHtml(r)}</li>`).join("")}</ul>
+              <div class="tm-actions"><button type="button" class="tm-invite" data-idx="${idx}">🤝 邀 TA 组队</button></div>
+            </div>
+          </div>`).join("")}
+      </div>`
+    : "";
+  const elapsed = ((performance.now() - startTime) / 1000).toFixed(2);
+  const rawAnswer = cleanAgentAnswer(data.answer);
+  const answerHtml = renderAnswerWithCites(rawAnswer);
+  const isLong = rawAnswer.length > 400;
+  const bodyClass = isLong ? "agent-answer-body is-collapsed" : "agent-answer-body";
+  const expandBtn = isLong ? '<button type="button" class="agent-expand-btn" aria-expanded="false">显示更多 <span class="chevron" aria-hidden="true">▼</span></button>' : "";
 
-  aRow.innerHTML = `<div class="msg-a">
-    <div class="agent-answer-head"><span class="agent-answer-mark">CI</span><strong>校园科创智能体</strong>${intentTag}</div>
-    <div class="agent-answer-body">${renderAnswerWithCites(cleanAgentAnswer(data.answer))}</div>
+  aRow.innerHTML = `<div class="agent-answer-mark" aria-hidden="true">CI</div>
+  <div class="msg-a">
+    <div class="agent-answer-head"><strong>校园科创智能体</strong>${intentTag}</div>
+    <div class="${bodyClass}">${answerHtml}</div>
+    ${expandBtn}
     ${refsHtml}
+    ${teammateHtml}
     ${traceHtml}
+    <div class="agent-meta"><span>处理耗时 ${elapsed}s</span><span>${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span></div>
   </div>`;
+
+  // 展开/收起长回答
+  const expandBtnEl = aRow.querySelector(".agent-expand-btn");
+  if (expandBtnEl) {
+    expandBtnEl.addEventListener("click", () => {
+      const body = aRow.querySelector(".agent-answer-body");
+      const collapsed = body.classList.toggle("is-collapsed");
+      body.classList.toggle("is-expanded", !collapsed);
+      expandBtnEl.setAttribute("aria-expanded", String(!collapsed));
+      expandBtnEl.innerHTML = collapsed
+        ? '显示更多 <span class="chevron" aria-hidden="true">▼</span>'
+        : '收起 <span class="chevron" aria-hidden="true">▲</span>';
+    });
+  }
+
+  // 队友卡片「邀 TA 组队」
+  aRow.querySelectorAll(".tm-invite").forEach((btn) => {
+    btn.addEventListener("click", () => openInviteModal(Number(btn.dataset.idx)));
+  });
 
   // 角标点击：定位并高亮对应官方依据
   $$(".cite", aRow).forEach((el) => {
@@ -1041,12 +1091,82 @@ $("#agent-q").addEventListener("input", (e) => {
   e.currentTarget.style.height = "auto";
   e.currentTarget.style.height = `${Math.min(e.currentTarget.scrollHeight, 160)}px`;
 });
-$$("#agent-chips .chip").forEach((el) => {
+// 引导气泡：填入问题并直接发送（提升功能发现性 + 演示顺滑度）
+function bindQuickChip(el) {
   el.addEventListener("click", () => {
-    $("#agent-q").value = el.dataset.q;
-    $("#agent-q").focus();
+    const q = el.dataset.q || "";
+    if (!q) return;
+    $("#agent-q").value = q;
+    agentAsk();
   });
-});
+}
+$$("#agent-chips .chip").forEach(bindQuickChip);
+$$("#agent-quick .quick-chip").forEach(bindQuickChip);
+
+// ---------------------------------------------------------------------------
+// 队友卡片「邀 TA 组队」：基于双方画像 + 互补点生成可编辑邀请文案
+// ---------------------------------------------------------------------------
+let currentTeammates = [];   // 本轮 agent 返回的队友数据，供按钮取用
+
+// 纯前端生成个性化邀约文案（稳定、离线可用、不依赖 LLM）
+function buildInviteText(seeker, mate) {
+  const hasMe = !!(seeker && (seeker.display_name || seeker.major));
+  const meName = (seeker && seeker.display_name)
+    || (seeker && seeker.major ? seeker.major + "专业的同学" : "");
+  const meMajor = (seeker && seeker.major) || "";
+  const meSkills = (seeker && seeker.skills && seeker.skills.length)
+    ? `我${meMajor ? "（" + meMajor + "专业）" : ""}擅长 ${seeker.skills.slice(0, 3).join("、")}`
+    : "";
+  const mateName = mate.display_name || mate.user_id;
+  const mateSkills = (mate.skills && mate.skills.length) ? mate.skills.slice(0, 3).join("、") : "";
+  // 取互补理由里最具说服力的 1-2 条
+  const comps = (mate.reasons || []).filter((r) => /互补|跨学科|搭配/.test(r)).slice(0, 2);
+  const compText = comps.length
+    ? comps.join("；") + "。"
+    : ((mate.reasons && mate.reasons[0]) || "咱们的背景很互补");
+  const head = hasMe ? `你好 ${mateName}！我是${meName}。` : `你好 ${mateName}！`;
+  const mid = meSkills
+    ? `${meSkills}，看到你是${mate.major}·${mate.grade}方向，擅长 ${mateSkills}。`
+    : `看到你是${mate.major}·${mate.grade}方向，擅长 ${mateSkills}。`;
+  return [
+    head,
+    mid,
+    `咱们的匹配度有 ${Math.round(mate.match_score)} 分——${compText}`,
+    `想邀请你一起组队参赛，方便的话加个联系方式聊聊？`,
+  ].join("\n");
+}
+
+function openInviteModal(idx) {
+  const mate = currentTeammates[idx];
+  if (!mate) return;
+  const ta = $("#invite-text");
+  if (ta) ta.value = buildInviteText(state.profile, mate);
+  const modal = $("#invite-modal");
+  if (modal) modal.classList.remove("hidden");
+}
+function closeInviteModal() {
+  const modal = $("#invite-modal");
+  if (modal) modal.classList.add("hidden");
+}
+// 事件绑定（模态 + 卡片按钮在渲染后绑定）
+(function bindInviteModal() {
+  const close = $("#invite-close");
+  if (close) close.addEventListener("click", closeInviteModal);
+  const copy = $("#invite-copy");
+  if (copy) copy.addEventListener("click", async () => {
+    const ta = $("#invite-text");
+    if (!ta) return;
+    const txt = ta.value || "";
+    try {
+      await navigator.clipboard.writeText(txt);
+      toast("邀请文案已复制");
+    } catch (e) {
+      ta.select();
+      try { document.execCommand("copy"); toast("邀请文案已复制"); }
+      catch (_) { toast("复制失败，请手动选择文本"); }
+    }
+  });
+})();
 
 // ---------------------------------------------------------------------------
 // 数据维护闭环（上传 → 解析 → 引用关联 → 确认入库）
