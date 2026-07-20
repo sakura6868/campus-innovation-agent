@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>校园科创导航智能体</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='10' fill='%2316181d'/%3E%3Ctext x='32' y='40' text-anchor='middle' font-family='Arial' font-size='25' font-weight='700' fill='white'%3ECI%3C/text%3E%3C/svg%3E" />
-  <link rel="stylesheet" href="/static/styles.css?v=20260720.4" />
+  <link rel="stylesheet" href="/static/styles.css?v=20260720.10" />
 </head>
 <body>
   <header class="topnav">
@@ -19,12 +19,13 @@
       <a href="#/recommend" data-nav="recommend">我的推荐</a>
       <a href="#/projects" data-nav="projects">我的项目</a>
       <a href="#/agent" data-nav="agent">智能问答</a>
-      <a href="#/admin" data-nav="admin">数据维护</a>
+      <a href="#/admin" data-nav="admin" id="nav-admin" class="hidden">数据维护</a>
     </nav>
     <div class="user-area">
       <span class="user-area-label">当前身份</span>
       <div id="user-chip" class="user-chip">未登录</div>
       <button id="switch-user-btn" class="btn ghost small hidden" title="切换 / 退出登录">切换身份</button>
+      <button id="admin-entry-btn" class="btn ghost small" title="管理员登录">管理员</button>
     </div>
   </header>
 
@@ -39,6 +40,10 @@
         </div>
         <span class="page-status"><span></span> 本地身份数据</span>
       </div>
+      <section id="test-switch-panel" class="test-switch hidden">
+        <header class="form-section-head"><span>★</span><div><h3>测试账号 · 切换学生类型</h3><p>选择不同学生画像，实时预览「千人千面」的推荐与问答效果</p></div></header>
+        <div id="test-types" class="test-types"></div>
+      </section>
       <form id="profile-form" class="profile-workspace form">
         <section class="profile-section">
           <header class="form-section-head"><span>01</span><div><h3>基本信息</h3><p>学历、专业与可投入时间</p></div></header>
@@ -178,6 +183,9 @@
           <div class="agent-title-actions">
             <span id="agent-llm-status" class="agent-llm-status" data-on="0">
               <span class="agent-llm-dot"></span><span class="agent-llm-text">检测中…</span>
+            </span>
+            <span id="agent-web-status" class="agent-llm-status web-off" data-on="0">
+              <span class="agent-llm-dot"></span><span class="agent-llm-text">联网搜索关闭</span>
             </span>
             <span class="agent-trust"><span aria-hidden="true">✓</span> 智能体已就绪</span>
           </div>
@@ -368,26 +376,57 @@
     </section>
   </main>
 
-  <!-- 登录界面（选择特色身份 / 自定义登录） -->
+  <!-- 登录界面（真密码登录 / 注册） -->
   <div id="login-overlay" class="login-overlay hidden">
     <div class="login-box">
-      <div class="login-head">
-        <div class="login-logo">CI</div>
-        <h1>校园科创导航</h1>
-        <p class="login-sub">让每一位学生快速找到适合自己的赛事，把参赛计划从信息搜集真正推向行动。</p>
-      </div>
+      <!-- 左侧品牌区 -->
+      <aside class="login-aside">
+        <div class="login-brand">
+          <div class="login-logo">CI</div>
+          <div>
+            <div class="login-brand-name">校园科创导航</div>
+            <div class="login-brand-sub">Campus Innovation Agent</div>
+          </div>
+        </div>
+        <div class="login-aside-body">
+          <h2>找到适合你的<br />那一场科创赛事</h2>
+          <ul class="login-points">
+            <li><span>1</span> 千人千面：按专业 · 年级 · 技能精准匹配</li>
+            <li><span>2</span> 官方溯源：每条推荐附可信依据与来源</li>
+            <li><span>3</span> 时间门控：只推当前仍可报名的赛事</li>
+          </ul>
+        </div>
+        <div class="login-aside-foot">南京理工大学 · 校内 Agent 参赛作品</div>
+      </aside>
 
-      <div class="login-section-title"><span>01</span> 选择演示身份</div>
-      <div id="login-users" class="login-users">
-        <div class="muted" style="padding:20px;">加载可选身份中…</div>
-      </div>
+      <!-- 右侧表单区 -->
+      <main class="login-main">
+        <div class="login-head">
+          <h1>欢迎回来</h1>
+          <p class="login-sub">登录或注册后即可使用画像匹配、赛事推荐与智能问答。</p>
+        </div>
 
-      <div class="login-divider"><span>使用自定义身份</span></div>
-      <div class="login-custom">
-        <input id="login-custom-id" type="text" placeholder="输入用户名（新用户将引导填写画像）" maxlength="32" />
-        <button id="login-custom-btn" class="btn primary">登录 / 注册</button>
-      </div>
-      <p class="login-tip muted">演示环境无需密码，用户名仅作为本地身份标识。</p>
+        <div class="login-tabs">
+          <button type="button" class="login-tab active" data-tab="login">登录</button>
+          <button type="button" class="login-tab" data-tab="register">注册</button>
+        </div>
+
+        <form id="login-form" class="login-form">
+          <label>用户名<input id="login-username" type="text" placeholder="用户名" autocomplete="username" maxlength="32" /></label>
+          <label>密码<input id="login-password" type="password" placeholder="密码" autocomplete="current-password" /></label>
+          <button type="submit" class="btn primary">登录</button>
+          <div id="login-msg" class="msg"></div>
+        </form>
+
+        <form id="register-form" class="login-form hidden">
+          <label>用户名<input id="reg-username" type="text" placeholder="3-32 位字母 / 数字 / 下划线" autocomplete="username" maxlength="32" /></label>
+          <label>密码<input id="reg-password" type="password" placeholder="至少 6 位" autocomplete="new-password" /></label>
+          <label>昵称（可选）<input id="reg-name" type="text" placeholder="留空则使用用户名" maxlength="32" /></label>
+          <button type="submit" class="btn primary">注册并登录</button>
+          <div id="register-msg" class="msg"></div>
+        </form>
+
+      </main>
     </div>
   </div>
 
@@ -433,6 +472,6 @@
 
   <div id="toast" class="toast hidden"></div>
 
-  <script src="/static/app.js?v=20260720.4"></script>
+  <script src="/static/app.js?v=20260720.10"></script>
 </body>
 </html>

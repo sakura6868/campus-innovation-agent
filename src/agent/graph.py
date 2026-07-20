@@ -58,6 +58,7 @@ from recommendation.engine import (
 from schemas import Citation, Competition, UserProfile
 from trust import assess_source_readiness
 from agent.llm import generate_answer as _llm_generate
+from agent.web_search import web_search as _web_search, is_web_search_enabled as _web_enabled
 
 
 # ---------------------------------------------------------------------------
@@ -213,6 +214,11 @@ _KW_TEAMMATE = [
 ]
 _KW_TEAM = ["组队招募", "招募", "招新", "招人", "招队友", "文案", "写一份", "招队员", "找人组队"]
 _KW_DETAIL = ["介绍", "详情", "是什么", "概况", "简介", "了解一下"]
+# 联网补充触发词：用户明显想要「最新 / 官方之外」的动态时，主动补联网检索
+_WEB_TRIGGER = [
+    "最新", "2026", "2025", "2024", "新闻", "官网", "今年", "最近", "动态",
+    "报名开始", "通知", "公告", "刚出", "新增", "更新", "实时", "网上", "查一下",
+]
 _KW_CHAT = [
     "规划", "计划", "建议", "怎么准备", "如何准备", "怎么选", "如何选",
     "策略", "路线", "方向", "经验", "分享", "攻略", "提升", "怎么学",
@@ -475,6 +481,36 @@ def node_retrieve(state: AgentState) -> AgentState:
         "citations": [_cite_dict(h) for h in hits],
         "trace": trace,
     }
+
+
+# ---------------------------------------------------------------------------
+# 节点 2.5：联网补充（可选，仅作本地官方证据的补充，不混入 [n] 引用）
+# ---------------------------------------------------------------------------
+
+
+def node_web_augment(state: AgentState) -> AgentState:
+    """对 qa/detail/chat 意图，在本地证据偏薄或用户明显要「最新动态」时，
+    调用可选联网搜索作为补充。结果存于 ``web_results``，由 compose 明确标注，
+    绝不与已核验的官方 [n] 引用混在一起。未启用 / 失败均返回空，不影响主链路。
+    """
+    trace = list(state.get("trace") or [])
+    if not _web_enabled():
+        return {**state, "web_results": []}
+    intent = state.get("intent") or ""
+    if intent not in ("qa", "detail", "chat"):
+        return {**state, "web_results": []}
+    q = state.get("question") or ""
+    cites = state.get("citations") or []
+    wants_web = any(k in q for k in _WEB_TRIGGER)
+    # 仅当「显式要联网」或「本地证据偏薄（<3 条）」时才补充，避免每次都打外部 API
+    if not wants_web and len(cites) >= 3:
+        return {**state, "web_results": []}
+    results = _web_search(q) or []
+    if results:
+        trace.append(f"联网补充：检索到 {len(results)} 条网络结果（标注为参考，不混入官方引用）")
+    else:
+        trace.append("联网补充：未启用或检索无结果，保持纯本地作答")
+    return {**state, "web_results": results, "trace": trace}
 
 
 # ---------------------------------------------------------------------------
@@ -920,6 +956,9 @@ def node_compose(state: AgentState) -> AgentState:
         if comp is None or comp.official_source_status != "found":
             answer += "\n\n该赛事目前仅作为候选信息展示，关键字段证据尚不完整；以上内容不构成资格判断或匹配评分，请以官网最新通知为准。"
 
+    # 联网补充：结果存于 state["web_results"]，由前端明确标注为「🌐 联网信息（仅供参考）」
+    # 并附可点击来源链接；不混入答案正文的官方 [n] 引用，保持证据一致性。
+
     trace.append("组装答案：完成")
     return {**state, "answer": answer, "trace": trace}
 
@@ -945,6 +984,7 @@ def build_graph():
     g.add_node("team_copy", node_team_copy)
     g.add_node("teammate_match", node_teammate_match)
     g.add_node("recommend_all", node_recommend_all)
+    g.add_node("web_augment", node_web_augment)
     g.add_node("compose", node_compose)
 
     g.add_edge(START, "route_intent")
@@ -964,9 +1004,10 @@ def build_graph():
         },
     )
 
-    # qa/detail：检索 → 门控 → 评分 → 组装
-    # team：      检索 → 门控 → 评分 → 组队文案 → 组装
-    g.add_edge("retrieve", "gate")
+    # qa/detail：检索 → 联网补充 → 门控 → 评分 → 组装
+    # team：      检索 → 联网补充 → 门控 → 评分 → 组队文案 → 组装
+    g.add_edge("retrieve", "web_augment")
+    g.add_edge("web_augment", "gate")
     g.add_edge("gate", "score")
 
     # score 之后根据意图决定是否生成组队文案
@@ -1015,6 +1056,7 @@ def run_agent(
         "model": model,
         "trace": [],
         "citations": [],
+        "web_results": [],
         "pending_review": False,
     }
     final = get_graph().invoke(init)
@@ -1031,6 +1073,7 @@ def run_agent(
         "teammate_matches": final.get("teammate_matches") or [],
         "pending_review": bool(final.get("pending_review")),
         "trace": final.get("trace") or [],
+        "web_results": final.get("web_results") or [],
         "error": final.get("error"),
     }
 

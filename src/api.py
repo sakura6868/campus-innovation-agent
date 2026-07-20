@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import base64
 import os
+import re
 import secrets
 from contextlib import asynccontextmanager
 from datetime import date, datetime, timedelta, timezone
@@ -51,7 +52,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
 from fastapi.security import APIKeyHeader
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 import db
 from rag.store import get_rag, embedding_backend
@@ -246,6 +247,81 @@ def user_teammates(user_id: str, top_k: int = Query(5, ge=1, le=20)) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# 认证：注册 / 登录 / 测试账号学生类型
+# ---------------------------------------------------------------------------
+class AuthRegisterPayload(BaseModel):
+    username: str = Field(..., min_length=3, max_length=32)
+    password: str = Field(..., min_length=6, max_length=64)
+    display_name: str | None = Field(None, max_length=32)
+
+
+class AuthLoginPayload(BaseModel):
+    username: str
+    password: str
+
+
+@app.post("/api/auth/register", tags=["认证"])
+def auth_register(payload: AuthRegisterPayload) -> dict:
+    """注册新账号（用户名仅限字母 / 数字 / 下划线，3-32 位）。"""
+    username = (payload.username or "").strip()
+    if not re.fullmatch(r"[A-Za-z0-9_]+", username):
+        raise HTTPException(status_code=400, detail="用户名仅限字母、数字、下划线（3-32 位）")
+    ok = db.create_auth_user(username, payload.password, is_test=False, display_name=payload.display_name)
+    if not ok:
+        raise HTTPException(status_code=409, detail="用户名已存在")
+    return {"username": username, "is_test": False, "display_name": payload.display_name or username}
+
+
+@app.post("/api/auth/login", tags=["认证"])
+def auth_login(payload: AuthLoginPayload) -> dict:
+    """用户名 + 密码登录；返回账号信息与展示字段。"""
+    username = (payload.username or "").strip()
+    rec = db.get_auth_user(username)
+    if rec is None or not db.verify_password(payload.password, rec["password_hash"]):
+        raise HTTPException(status_code=401, detail="用户名或密码错误")
+    display_name = rec.get("display_name") or username
+    persona = ""
+    avatar = None
+    try:
+        p = db.get_user_profile(username)
+        if p:
+            display_name = p.display_name or display_name
+            persona = p.persona or ""
+            avatar = p.avatar
+    except Exception:
+        pass
+    return {
+        "username": username,
+        "is_test": rec["is_test"],
+        "display_name": display_name,
+        "persona": persona,
+        "avatar": avatar,
+    }
+
+
+@app.get("/api/student-types", tags=["认证"])
+def student_types() -> list[dict]:
+    """测试账号可切换的学生类型（取自演示画像库，用于预览「千人千面」）。"""
+    users = db.list_user_profiles()
+    return [
+        {
+            "user_id": u.user_id,
+            "display_name": u.display_name or u.user_id,
+            "persona": u.persona or "",
+            "avatar": u.avatar or "🙂",
+            "education_level": u.education_level.value,
+            "grade": u.grade.value,
+            "major": u.major,
+            "skills": u.skills,
+            "experiences": u.experiences,
+            "weekly_available_hours": u.weekly_available_hours,
+            "expected_team_size": u.expected_team_size,
+        }
+        for u in users
+    ]
+
+
+# ---------------------------------------------------------------------------
 # 我的项目：任务计划、材料清单、完成状态、ICS
 # ---------------------------------------------------------------------------
 @app.get("/api/users/{user_id}/projects", response_model=list[UserProject], tags=["我的项目"])
@@ -429,13 +505,16 @@ def agent_ask(
 
 @app.get("/api/agent/llm-status", tags=["Agent"])
 def agent_llm_status() -> dict:
-    """返回 LLM 润色层启用状态，供前端展示『智能润色是否已连接』。"""
+    """返回 LLM 润色层 + 联网搜索层的启用状态，供前端展示能力指示。"""
     from agent.llm import is_llm_enabled
+    from agent.web_search import is_web_search_enabled
 
     return {
         "enabled": is_llm_enabled(),
         "model": os.getenv("AGENT_LLM_MODEL") or "gpt-4o-mini",
         "provider": os.getenv("AGENT_LLM_PROVIDER") or "",
+        "web_search_enabled": is_web_search_enabled(),
+        "web_search_provider": (os.getenv("WEB_SEARCH_PROVIDER") or "tavily") if is_web_search_enabled() else "",
     }
 
 
@@ -451,6 +530,17 @@ def _require_admin_token(token: str | None = Depends(_ADMIN_API_KEY)) -> None:
         raise HTTPException(status_code=503, detail="数据维护接口未启用")
     if not token or not secrets.compare_digest(token, _ADMIN_API_TOKEN):
         raise HTTPException(status_code=401, detail="管理员令牌无效")
+
+
+@app.post("/api/admin/verify", tags=["数据维护"])
+def admin_verify(payload: dict) -> dict:
+    """校验管理员令牌；前端据此决定是否显示「数据维护」入口。"""
+    token = (payload or {}).get("token")
+    if not _ADMIN_API_TOKEN:
+        raise HTTPException(status_code=503, detail="数据维护接口未启用")
+    if not token or not secrets.compare_digest(token, _ADMIN_API_TOKEN):
+        raise HTTPException(status_code=401, detail="管理员令牌无效")
+    return {"ok": True}
 
 
 def _classify_submitted_competition(comp: Competition) -> tuple[Competition, list[str]]:

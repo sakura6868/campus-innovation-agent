@@ -60,6 +60,14 @@ async function apiDelete(path) {
 // ---------------------------------------------------------------------------
 // 状态（本地会话模拟）
 // ---------------------------------------------------------------------------
+// 每次进入都强制重新登录：启动即清空登录态，不记住（演示更可控）
+(function clearLoginStateOnBoot() {
+  ["cia_uid", "cia_logged", "cia_is_test", "cia_is_admin", "cia_user_meta"].forEach((k) =>
+    localStorage.removeItem(k)
+  );
+  sessionStorage.removeItem("cia_admin_token");
+})();
+
 function _loadUserMeta() {
   try { return JSON.parse(localStorage.getItem("cia_user_meta") || "null"); }
   catch (_) { return null; }
@@ -75,6 +83,8 @@ const state = {
   currentEvidence: [], // 引用证据索引（供弹窗 / 角标定位）
   detailReturn: "#/hall", // 详情页返回目标视图（默认大厅；从推荐进入时为 #/recommend）
   hallReadiness: "all",
+  isTest: localStorage.getItem("cia_is_test") === "1",
+  isAdmin: localStorage.getItem("cia_is_admin") === "1",
 };
 
 const CAT_LABEL = {
@@ -157,6 +167,11 @@ function router() {
     return;
   }
   if (parts[0] === "admin") {
+    if (!state.isAdmin) {
+      toast("无权限访问该页面");
+      location.hash = "#/hall";
+      return;
+    }
     showView("admin");
     renderAdminView();
     return;
@@ -186,6 +201,7 @@ function router() {
 // ---------------------------------------------------------------------------
 async function renderProfile() {
   updateUserChip();
+  renderTestPanel();
   if (!state.consent) { openConsentModal(); return; }
   try {
     const p = await apiGet(`/api/users/${state.uid}/profile`);
@@ -291,6 +307,7 @@ function updateUserChip() {
     `<span class="chip-name">${escapeHtml(name)}</span>`;
   chip.title = m.persona || "";
   if (switchBtn) switchBtn.classList.remove("hidden");
+  revealAdminNav();
 }
 
 function monogram(name) {
@@ -659,6 +676,7 @@ async function renderRecommend() {
     const tags = [
       `<span class="tag ${statusCls}">${STATUS_LABEL[r.recommendation_status] || r.recommendation_status}</span>`,
       r.urgent ? `<span class="tag urgent">临近截止</span>` : "",
+      r.pending_review ? `<span class="tag pending">来源待核实</span>` : "",
     ].join("");
     return `<article class="card rec-card rec-${escapeHtml(r.recommendation_status)}" data-id="${escapeHtml(r.competition_id)}">
       <div class="rec-head">
@@ -960,6 +978,21 @@ async function agentAsk() {
       </details></div>`
     : "";
   const traceHtml = "";
+  // 联网信息补充（与官方 [n] 引用区隔，明确标注仅供参考）
+  const webResults = data.web_results || [];
+  const webHtml = webResults.length
+    ? `<div class="web-results">
+        <div class="web-results-head">🌐 联网信息补充<span>仅供参考，请以官方 / 官网最新通知为准</span></div>
+        <ul class="web-list">
+          ${webResults.slice(0, 5).map((r) => `
+            <li class="web-item">
+              <a href="${escapeHtml(r.url || "#")}" target="_blank" rel="noopener" class="web-title">${escapeHtml(r.title || "相关网页")} ↗</a>
+              ${r.snippet ? `<div class="web-snippet">${escapeHtml(r.snippet)}</div>` : ""}
+              <div class="web-url muted">${escapeHtml(r.url || "")}</div>
+            </li>`).join("")}
+        </ul>
+      </div>`
+    : "";
   // 暂存本轮队友数据，供「邀 TA 组队」按钮取用
   currentTeammates = data.teammate_matches || [];
   const teammateHtml = (currentTeammates.length)
@@ -992,6 +1025,7 @@ async function agentAsk() {
     <div class="${bodyClass}">${answerHtml}</div>
     ${expandBtn}
     ${refsHtml}
+    ${webHtml}
     ${teammateHtml}
     ${traceHtml}
     <div class="agent-meta"><span>处理耗时 ${elapsed}s</span><span>${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span></div>
@@ -1072,6 +1106,7 @@ $("#agent-q").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.s
 // 读取后端 LLM 启用状态，更新输入框顶部状态点（解决"看不出是否接入模型"）
 async function refreshLlmStatus() {
   const el = document.getElementById("agent-llm-status");
+  const webEl = document.getElementById("agent-web-status");
   if (!el) return;
   const txt = el.querySelector(".agent-llm-text");
   try {
@@ -1082,9 +1117,22 @@ async function refreshLlmStatus() {
     txt.textContent = on
       ? `智能润色已连接 · ${mdl || r.model || "LLM"}`
       : "未启用智能润色（标准答复）";
+    // 联网搜索状态
+    if (webEl) {
+      const won = !!r.web_search_enabled;
+      webEl.dataset.on = won ? "1" : "0";
+      webEl.classList.toggle("web-off", !won);
+      webEl.querySelector(".agent-llm-text").textContent = won
+        ? `联网搜索已开启 · ${r.web_search_provider || "web"}`
+        : "联网搜索关闭（纯本地）";
+    }
   } catch (e) {
     el.dataset.on = "0";
     txt.textContent = "智能润色状态未知";
+    if (webEl) {
+      webEl.dataset.on = "0";
+      webEl.querySelector(".agent-llm-text").textContent = "联网搜索状态未知";
+    }
   }
 }
 $("#agent-q").addEventListener("input", (e) => {
@@ -1418,130 +1466,226 @@ $("#adm-form").addEventListener("submit", async (e) => {
 });
 
 // ---------------------------------------------------------------------------
-// 登录界面（选择特色身份 / 自定义登录）—— 每个人特色不一样
+// 登录 / 注册（真密码）+ 测试账号学生类型切换 + 管理员门禁
 // ---------------------------------------------------------------------------
 function openLogin() {
   $("#login-overlay").classList.remove("hidden");
-  loadLoginUsers();
 }
 function closeLogin() {
   $("#login-overlay").classList.add("hidden");
 }
 
-async function loadLoginUsers() {
-  const box = $("#login-users");
-  let users;
-  try {
-    users = await apiGet("/api/users");
-  } catch (err) {
-    box.innerHTML = `<div class="muted" style="padding:16px;">加载身份失败：${escapeHtml(err.message)}</div>`;
-    return;
-  }
-  if (!users.length) {
-    box.innerHTML = `<div class="muted" style="padding:16px;">暂无预置身份，请在下方自定义登录。</div>`;
-    return;
-  }
-  box.innerHTML = users.map((u) => {
-    const skills = (u.skills || []).slice(0, 4).map((s) => `<span class="uc-skill">${escapeHtml(s)}</span>`).join("");
-    const team = u.expected_team_size > 1 ? `${u.expected_team_size}人队` : "个人赛";
-    const name = u.display_name || u.user_id;
-    return `<button type="button" class="user-card" data-uid="${escapeHtml(u.user_id)}"
-        data-avatar="${escapeHtml(monogram(name))}"
-        data-name="${escapeHtml(u.display_name || u.user_id)}"
-        data-persona="${escapeHtml(u.persona || "")}">
-      <div class="uc-top">
-        <span class="uc-avatar">${escapeHtml(monogram(name))}</span>
-        <div class="uc-idwrap">
-          <div class="uc-name">${escapeHtml(u.display_name || u.user_id)}</div>
-          <div class="uc-persona">${escapeHtml(u.persona || "")}</div>
-        </div>
-      </div>
-      <div class="uc-meta">
-        <span class="uc-tag">${escapeHtml(u.education_level)}·${escapeHtml(u.grade)}</span>
-        <span class="uc-tag">${escapeHtml(u.major)}</span>
-        <span class="uc-tag">${escapeHtml(team)}</span>
-        <span class="uc-tag">周${u.weekly_available_hours}h</span>
-      </div>
-      <div class="uc-skills">${skills || '<span class="muted">暂无技能标签</span>'}</div>
-    </button>`;
-  }).join("");
-
-  $$("#login-users .user-card").forEach((el) => {
-    el.addEventListener("click", () => {
-      loginAs(el.dataset.uid, {
-        display_name: el.dataset.name,
-        avatar: el.dataset.avatar,
-        persona: el.dataset.persona,
-      }, false);
-    });
-  });
+// 管理员「数据维护」入口可见性：仅管理员令牌验证通过后显示
+function revealAdminNav() {
+  const nav = document.getElementById("nav-admin");
+  if (!nav) return;
+  nav.classList.toggle("hidden", !state.isAdmin);
 }
 
-async function loginAs(uid, meta, isCustom) {
-  uid = (uid || "").trim();
-  if (!uid) { toast("请输入用户名"); return; }
-  state.uid = uid;
+async function doLogin(username, password) {
+  let data;
+  try {
+    data = await apiPost("/api/auth/login", { username, password });
+  } catch (e) {
+    const msg = $("#login-msg");
+    msg.textContent = "登录失败：" + e.message;
+    msg.className = "msg err";
+    return;
+  }
+  state.uid = data.username;
   state.loggedIn = true;
-  state.userMeta = meta || null;
+  state.isTest = !!data.is_test;
   state.profile = null;
   state.evidenceCache = {};
-  localStorage.setItem("cia_uid", uid);
+  state.userMeta = {
+    display_name: data.display_name || data.username,
+    persona: data.persona || "",
+    avatar: data.avatar || monogram(data.display_name || data.username),
+  };
+  localStorage.setItem("cia_uid", data.username);
   localStorage.setItem("cia_logged", "1");
-  localStorage.setItem("cia_user_meta", JSON.stringify(state.userMeta || {}));
+  localStorage.setItem("cia_is_test", state.isTest ? "1" : "0");
+  localStorage.setItem("cia_user_meta", JSON.stringify(state.userMeta));
+  revealAdminNav();
+  closeLogin();
+  updateUserChip();
+  toast(`已登录：${state.userMeta.display_name}`);
 
-  // 判定该用户是否已授权并有画像（决定 consent 与落地页）
+  // 拉取画像决定 consent 与落地页
   let hasProfile = false;
   try {
-    const p = await apiGet(`/api/users/${encodeURIComponent(uid)}/profile`);
+    const p = await apiGet(`/api/users/${encodeURIComponent(data.username)}/profile`);
     hasProfile = true;
     state.profile = p;
     state.consent = !!p.privacy_consent;
-    // 自定义登录但服务端已有更完整展示信息时，回填 chip
-    if (!state.userMeta || !state.userMeta.display_name) {
-      state.userMeta = { display_name: p.display_name || uid, avatar: monogram(p.display_name || uid), persona: p.persona || "" };
-      localStorage.setItem("cia_user_meta", JSON.stringify(state.userMeta));
-    }
   } catch (_) {
-    hasProfile = false;
-    state.consent = localStorage.getItem("cia_consent_" + uid) === "1";
+    state.consent = localStorage.getItem("cia_consent_" + data.username) === "1";
   }
-  if (state.consent) localStorage.setItem("cia_consent_" + uid, "1");
-
-  closeLogin();
-  updateUserChip();
-  toast(`已登录：${(state.userMeta && state.userMeta.display_name) || uid}`);
-
-  // 已有画像的示例身份 → 直达「我的推荐」直观展示千人千面；新用户 → 去填画像
-  if (hasProfile && state.consent) {
-    location.hash = "#/recommend";
-  } else {
-    location.hash = "#/profile";
-  }
+  if (state.consent) localStorage.setItem("cia_consent_" + data.username, "1");
+  if (hasProfile && state.consent) location.hash = "#/recommend";
+  else location.hash = "#/profile";
   router();
+}
+
+async function doRegister(username, password, displayName) {
+  try {
+    await apiPost("/api/auth/register", { username, password, display_name: displayName || null });
+  } catch (e) {
+    const msg = $("#register-msg");
+    msg.textContent = "注册失败：" + e.message;
+    msg.className = "msg err";
+    return;
+  }
+  toast("注册成功，正在登录…");
+  await doLogin(username, password);
+}
+
+// —— 登录 / 注册表单 ——
+$$(".login-tab").forEach((btn) => btn.addEventListener("click", () => {
+  const tab = btn.dataset.tab;
+  $$(".login-tab").forEach((b) => b.classList.toggle("active", b === btn));
+  $("#login-form").classList.toggle("hidden", tab !== "login");
+  $("#register-form").classList.toggle("hidden", tab !== "register");
+}));
+$("#login-form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const u = ($("#login-username").value || "").trim();
+  const pw = $("#login-password").value || "";
+  const msg = $("#login-msg");
+  if (!u || !pw) { msg.textContent = "请输入用户名和密码"; msg.className = "msg err"; return; }
+  msg.textContent = ""; msg.className = "msg";
+  doLogin(u, pw);
+});
+$("#register-form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const u = ($("#reg-username").value || "").trim();
+  const pw = $("#reg-password").value || "";
+  const name = ($("#reg-name").value || "").trim();
+  const msg = $("#register-msg");
+  if (!u || !pw) { msg.textContent = "请输入用户名和密码"; msg.className = "msg err"; return; }
+  msg.textContent = ""; msg.className = "msg";
+  doRegister(u, pw, name);
+});
+
+// —— 管理员入口：输入令牌验证后开放「数据维护」 ——
+$("#admin-entry-btn").addEventListener("click", async () => {
+  const token = window.prompt("请输入管理员令牌：");
+  if (!token) return;
+  try {
+    await apiPost("/api/admin/verify", { token });
+    state.isAdmin = true;
+    localStorage.setItem("cia_is_admin", "1");
+    sessionStorage.setItem("cia_admin_token", token);
+    revealAdminNav();
+    toast("管理员已验证，已开放「数据维护」");
+    location.hash = "#/admin";
+  } catch (e) {
+    toast("令牌无效：" + e.message);
+  }
+});
+
+// —— 测试账号：切换学生类型（独立面板）——
+async function renderTestPanel() {
+  const panel = $("#test-switch-panel");
+  if (!panel) return;
+  if (!state.isTest) { panel.classList.add("hidden"); return; }
+  panel.classList.remove("hidden");
+
+  let currentKey = "";
+  try {
+    const p = await apiGet(`/api/users/${encodeURIComponent(state.uid)}/profile`);
+    currentKey = (p.major || "") + "|" + (p.grade || "");
+  } catch (_) {}
+
+  let types;
+  try {
+    types = await apiGet("/api/student-types");
+  } catch (e) {
+    $("#test-types").innerHTML = `<div class="muted">加载学生类型失败</div>`;
+    return;
+  }
+  $("#test-types").innerHTML = types.map((t) => {
+    const skills = (t.skills || []).slice(0, 4).map((s) => `<span class="uc-skill">${escapeHtml(s)}</span>`).join("");
+    const team = t.expected_team_size > 1 ? `${t.expected_team_size}人队` : "个人赛";
+    const active = ((t.major || "") + "|" + (t.grade || "")) === currentKey ? " active" : "";
+    return `<button type="button" class="user-card test-type-card${active}" data-uid="${escapeHtml(t.user_id)}">
+      <div class="uc-top">
+        <span class="uc-avatar">${escapeHtml(t.avatar || "🙂")}</span>
+        <div class="uc-idwrap">
+          <div class="uc-name">${escapeHtml(t.display_name || t.user_id)}</div>
+          <div class="uc-persona">${escapeHtml(t.persona || "")}</div>
+        </div>
+      </div>
+      <div class="uc-meta">
+        <span class="uc-tag">${escapeHtml(t.education_level)}·${escapeHtml(t.grade)}</span>
+        <span class="uc-tag">${escapeHtml(t.major)}</span>
+        <span class="uc-tag">${escapeHtml(team)}</span>
+      </div>
+      <div class="uc-skills">${skills || '<span class="muted">暂无技能</span>'}</div>
+    </button>`;
+  }).join("");
+
+  $$("#test-types .test-type-card").forEach((el) => {
+    el.addEventListener("click", () => applyStudentType(el.dataset.uid));
+  });
+}
+
+async function applyStudentType(uid) {
+  let t;
+  try {
+    const all = await apiGet("/api/student-types");
+    t = all.find((x) => x.user_id === uid);
+  } catch (e) { toast("加载学生类型失败"); return; }
+  if (!t) return;
+  const payload = {
+    user_id: state.uid,
+    education_level: t.education_level,
+    grade: t.grade,
+    major: t.major,
+    skills: t.skills || [],
+    experiences: t.experiences || [],
+    weekly_available_hours: t.weekly_available_hours,
+    expected_team_size: t.expected_team_size,
+    privacy_consent: true,
+    display_name: "测试·" + (t.display_name || uid),
+    persona: t.persona,
+    avatar: t.avatar,
+  };
+  try {
+    await apiPost(`/api/users/${encodeURIComponent(state.uid)}/profile`, payload);
+    state.consent = true;
+    localStorage.setItem("cia_consent_" + state.uid, "1");
+    state.profile = payload;
+    updateUserChip();
+    toast("已切换为：" + (t.display_name || uid));
+    const h = location.hash;
+    if (h === "#/profile" || h === "#/recommend") router();
+    else location.hash = "#/recommend";
+  } catch (e) {
+    toast("切换失败：" + e.message);
+  }
 }
 
 function logout() {
   localStorage.removeItem("cia_uid");
   localStorage.removeItem("cia_logged");
   localStorage.removeItem("cia_user_meta");
+  localStorage.removeItem("cia_is_test");
+  localStorage.removeItem("cia_is_admin");
+  sessionStorage.removeItem("cia_admin_token");
   state.uid = null;
   state.loggedIn = false;
   state.userMeta = null;
   state.consent = false;
+  state.isTest = false;
+  state.isAdmin = false;
   state.profile = null;
   state.evidenceCache = {};
+  revealAdminNav();
   updateUserChip();
   openLogin();
 }
 
-$("#login-custom-btn").addEventListener("click", () => {
-  const id = ($("#login-custom-id").value || "").trim();
-  if (!id) { toast("请输入用户名"); return; }
-  loginAs(id, { display_name: id, avatar: monogram(id), persona: "自定义用户" }, true);
-});
-$("#login-custom-id").addEventListener("keydown", (e) => {
-  if (e.key === "Enter") $("#login-custom-btn").click();
-});
 $("#switch-user-btn").addEventListener("click", logout);
 
 // ---------------------------------------------------------------------------
@@ -1550,6 +1694,7 @@ $("#switch-user-btn").addEventListener("click", logout);
 window.addEventListener("hashchange", router);
 window.addEventListener("DOMContentLoaded", () => {
   updateUserChip();
+  revealAdminNav();
   if (!state.loggedIn || !state.uid) {
     openLogin();
     return; // 未登录不进入主应用

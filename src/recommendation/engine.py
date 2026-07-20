@@ -213,15 +213,43 @@ def recommend_for_user(
         # 第一层：数据有效性
         problems = data_validity_check(comp, current)
         if problems:
-            # 来源或关键字段证据不完整：仅作为目录候选，不进行资格判断或评分。
+            # 来源或关键字段证据不完整：仍按用户画像做资格门控 + 软性评分，
+            # 让「千人千面」在候选赛事上也能体现；但标记为来源待核实，
+            # 绝不冒充已核验推荐（与反幻觉原则一致）。
+            eligible, reasons = eligibility_gate(user, comp, current)
+            if not eligible:
+                results.append(
+                    RecommendationResult(
+                        competition_id=comp.competition_id,
+                        competition_name=comp.competition_name,
+                        recommendation_status="ineligible",
+                        eligible=False,
+                        gate_reasons=reasons,
+                        explanation={
+                            "资格": "不满足硬性资格或时间要求，一票否决",
+                            "原因": [r.reason for r in reasons],
+                            "数据状态": "来源待核实",
+                        },
+                        pending_review=pending,
+                    )
+                )
+                continue
+            breakdown = soft_match_score(user, comp, current)
+            status = _status_from_score(breakdown.total)
+            effective_deadline = comp.registration_deadline or comp.submission_deadline
+            urgent = effective_deadline is not None and 0 <= (effective_deadline - current).days <= 14
+            expl = _build_explanation(user, comp, breakdown, current)
+            expl["数据状态"] = "来源待核实，报名前请二次确认官网"
             results.append(
                 RecommendationResult(
                     competition_id=comp.competition_id,
                     competition_name=comp.competition_name,
-                    recommendation_status="candidate_only",
-                    eligible=False,
-                    gate_reasons=[GateReason(reason=f"候选信息：{p}") for p in problems],
-                    explanation={"数据状态": "关键证据待补充，仅在赛事目录展示"},
+                    recommendation_status=status,
+                    score=breakdown.total,
+                    eligible=True,
+                    match_breakdown=breakdown,
+                    explanation=expl,
+                    urgent=urgent,
                     pending_review=pending,
                 )
             )
@@ -265,11 +293,12 @@ def recommend_for_user(
             )
         )
 
-    # 排序原则：正式推荐 -> 候选信息 -> 不符合项；正式推荐内部按适配度排序。
+    # 排序原则：已核验推荐 -> 来源待核实候选 -> 不符合项；同档内按适配度排序。
     results.sort(
         key=lambda r: (
             0 if r.eligible else 1,
             0 if r.recommendation_status == "candidate_only" else 1,
+            0 if (not r.pending_review) else 1,
             -(r.score or 0),
             not r.urgent,
         )

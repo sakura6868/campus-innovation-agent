@@ -16,8 +16,10 @@ seed 为幂等 upsert，重复运行不会重复插入。
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
+import secrets
 from contextlib import contextmanager
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -179,6 +181,107 @@ class UserProfileModel(Base):
     avatar: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
 
+class AuthUser(Base):
+    """登录账号（与画像分离：用户名 + 密码哈希 + 是否测试账号）。"""
+
+    __tablename__ = "auth_users"
+
+    username: Mapped[str] = mapped_column(String, primary_key=True)
+    password_hash: Mapped[str] = mapped_column(String, nullable=False)
+    is_test: Mapped[bool] = mapped_column(default=False)
+    display_name: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None)
+    )
+
+
+# —— 密码哈希（仅用标准库，零外部依赖）——
+def _hash_password(password: str) -> str:
+    salt = os.urandom(16).hex()
+    dk = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), bytes.fromhex(salt), 100_000)
+    return f"pbkdf2_sha256$100000${salt}${dk.hex()}"
+
+
+def verify_password(password: str, stored: str) -> bool:
+    """校验密码与存储的 pbkdf2 哈希是否一致（恒定时间比较）。"""
+    try:
+        algo, iters, salt, hash_hex = stored.split("$")
+        if algo != "pbkdf2_sha256":
+            return False
+        dk = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), bytes.fromhex(salt), int(iters))
+        return secrets.compare_digest(dk.hex(), hash_hex)
+    except Exception:
+        return False
+
+
+def get_auth_user(username: str):
+    with session_scope() as session:
+        m = session.get(AuthUser, username)
+        if m is None:
+            return None
+        return {
+            "username": m.username,
+            "is_test": m.is_test,
+            "display_name": m.display_name,
+            "password_hash": m.password_hash,
+        }
+
+
+def create_auth_user(
+    username: str, password: str, is_test: bool = False, display_name: Optional[str] = None
+) -> bool:
+    """创建登录账号；用户名已存在返回 False。"""
+    with session_scope() as session:
+        if session.get(AuthUser, username) is not None:
+            return False
+        session.add(
+            AuthUser(
+                username=username,
+                password_hash=_hash_password(password),
+                is_test=is_test,
+                display_name=display_name,
+            )
+        )
+        return True
+
+
+# 演示测试账号（硬编码用户名；如需改密码改这里即可）
+TEST_ACCOUNT_USERNAME = "test"
+TEST_ACCOUNT_PASSWORD = "test123"
+
+
+def seed_test_account(session) -> None:
+    """幂等 seed 测试账号及其默认画像（便于登录即见推荐 / 千人千面）。"""
+    au = session.get(AuthUser, TEST_ACCOUNT_USERNAME)
+    if au is None:
+        session.add(
+            AuthUser(
+                username=TEST_ACCOUNT_USERNAME,
+                password_hash=_hash_password(TEST_ACCOUNT_PASSWORD),
+                is_test=True,
+                display_name="测试账号",
+            )
+        )
+    prof = session.get(UserProfileModel, TEST_ACCOUNT_USERNAME)
+    if prof is None:
+        session.add(
+            UserProfileModel(
+                user_id=TEST_ACCOUNT_USERNAME,
+                education_level=EducationLevel.UNDERGRADUATE.value,
+                grade=Grade.SOPHOMORE.value,
+                major="计算机科学与技术",
+                skills=_dump_json(["Python", "算法", "前端开发"]),
+                experiences=_dump_json([]),
+                weekly_available_hours=12,
+                expected_team_size=3,
+                privacy_consent=True,
+                display_name="测试账号",
+                persona="演示账号 · 可切换学生类型",
+                avatar="🧪",
+            )
+        )
+
+
 class UserProjectModel(Base):
     __tablename__ = "user_projects"
 
@@ -243,6 +346,7 @@ def init_db() -> None:
     Base.metadata.create_all(_engine)
     _migrate_user_profile_columns()
     _migrate_competition_columns()
+    _migrate_auth_user_columns()
     # 必须在 seed 之前置位，避免 seed -> session_scope -> init_db 递归
     _initialized = True
     seed_all()
@@ -298,6 +402,11 @@ def _migrate_competition_columns() -> None:
 def _migrate_user_profile_columns() -> None:
     """为 user_profiles 表补齐模型声明但库表缺失的列（跨 dialect）。"""
     _add_missing_columns(UserProfileModel.__table__, DATABASE_URL)
+
+
+def _migrate_auth_user_columns() -> None:
+    """为 auth_users 表补齐模型声明但库表缺失的列（跨 dialect）。"""
+    _add_missing_columns(AuthUser.__table__, DATABASE_URL)
 
 
 @contextmanager
@@ -672,10 +781,11 @@ def seed_demo_user(session) -> None:
 
 
 def seed_all() -> int:
-    """幂等 seed：赛事 Ground Truth + 演示用户。重复运行安全。"""
+    """幂等 seed：赛事 Ground Truth + 演示用户 + 测试账号。重复运行安全。"""
     with session_scope() as session:
         n = seed_competitions(session)
         seed_demo_user(session)
+        seed_test_account(session)
     return n
 
 
