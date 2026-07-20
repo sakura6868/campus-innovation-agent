@@ -514,7 +514,7 @@ def agent_llm_status() -> dict:
         "model": os.getenv("AGENT_LLM_MODEL") or "gpt-4o-mini",
         "provider": os.getenv("AGENT_LLM_PROVIDER") or "",
         "web_search_enabled": is_web_search_enabled(),
-        "web_search_provider": (os.getenv("WEB_SEARCH_PROVIDER") or "tavily") if is_web_search_enabled() else "",
+        "web_search_provider": (os.getenv("WEB_SEARCH_PROVIDER") or "duckduckgo") if is_web_search_enabled() else "",
     }
 
 

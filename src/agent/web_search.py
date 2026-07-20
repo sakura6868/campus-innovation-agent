@@ -40,7 +40,7 @@ def is_web_search_enabled() -> bool:
     """
     if requests is None:
         return False
-    provider = (os.getenv("WEB_SEARCH_PROVIDER") or "tavily").lower()
+    provider = (os.getenv("WEB_SEARCH_PROVIDER") or "duckduckgo").lower()
     if provider == "duckduckgo":
         return True
     return bool(os.getenv("WEB_SEARCH_API_KEY"))
@@ -53,7 +53,7 @@ def web_search(query: str, max_results: int | None = None) -> list[dict] | None:
     """
     if not is_web_search_enabled():
         return None
-    provider = (os.getenv("WEB_SEARCH_PROVIDER") or "tavily").lower()
+    provider = (os.getenv("WEB_SEARCH_PROVIDER") or "duckduckgo").lower()
     key = os.getenv("WEB_SEARCH_API_KEY") or ""
     n = int(max_results or os.getenv("WEB_SEARCH_MAX_RESULTS", "5"))
     try:
