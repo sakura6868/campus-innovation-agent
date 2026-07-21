@@ -542,7 +542,7 @@ async function renderDetail(id) {
       </div>
     </div>
 
-    ${!detail.recommendation_ready ? `<div class="verify-warn">
+    ${!detail.recommendation_ready && c.official_source_status !== 'found' ? `<div class="verify-warn">
       <strong>候选信息，不参与资格判断或匹配评分</strong>
       <div>${escapeHtml((detail.readiness_reasons || []).join("；") || "关键证据待补充")}。请访问官网核对最新通知。</div>
     </div>` : ""}
