@@ -15,7 +15,7 @@
 
 ## 数据现状
 
-仓库现包含 **178 条**按赛事、年份和赛道隔离的赛事数据，其中 **141 条已找到官方来源**，**12 条同时具备五类关键字段证据**并达到正式推荐标准（`trusted_level=A / data_status=verified`）。这里的 `verified` 表示官网来源和证据通过自动完整性规则，不表示人工替代用户作出最终资格确认。代表性赛事包括：
+仓库现包含 **182 条**按赛事、年份和赛道隔离的赛事数据，其中 **145 条已找到官方来源**，**13 条同时具备五类关键字段证据**并达到正式推荐标准（`trusted_level=A / data_status=verified`）。这里的 `verified` 表示官网来源和证据通过自动完整性规则，不表示人工替代用户作出最终资格确认。代表性赛事包括：
 
 - 2026 中国软件杯大学生软件设计大赛
 - 2026 中国大学生服务外包创新创业大赛
@@ -217,7 +217,8 @@ campus-innovation-agent/
 - [固定账号端到端验收记录](docs/DEMO_WALKTHROUGH.md)
 - [版本冻结说明](docs/RELEASE_FREEZE.md)
 - [3-5 分钟演示视频脚本](docs/DEMO_VIDEO_SCRIPT.md)
-- [4 分 59 秒演示视频](demo/campus-agent-demo.webm)
+- [演示视频（mp4，校内平台可直接打开）](demo/campus-agent-demo.mp4)
+- [演示视频（webm，备用）](demo/campus-agent-demo.webm)
 
 ## 常见问题
 
