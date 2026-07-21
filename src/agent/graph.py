@@ -829,6 +829,44 @@ _PROG_KW = (
     "Web应用", "网络安全", "软件赛", "计算机", "数据结构",
 )
 
+# 数学建模类赛事识别（category=modeling/math 或名称/技能含建模关键词）
+_MODELING_KW = (
+    "数学建模", "建模", "MathorCup", "APMCM", "MCM", "ICM", "电工杯", "深圳杯",
+    "统计建模", "五一数学", "华为杯数学", "华中杯", "华东杯", "中青杯",
+)
+_INNOV_KW = (
+    "创新创业", "创业计划", "创新大赛", "商业计划", "路演", "红旅", "互联网+",
+    "互联网＋", "三创赛", "学创杯", "微创业", "挑战杯", "大创",
+)
+
+
+def _is_math_modeling_comp(comp) -> bool:
+    if comp is None:
+        return False
+    cat = str(getattr(comp, "category", ""))
+    if cat in ("modeling", "math"):
+        return True
+    blob = " ".join(
+        [str(getattr(comp, "competition_name", ""))]
+        + list(getattr(comp, "required_skills", []) or [])
+        + list(getattr(comp, "evaluation_dimensions", []) or [])
+    )
+    return any(k in blob for k in _MODELING_KW)
+
+
+def _is_innovation_comp(comp) -> bool:
+    if comp is None:
+        return False
+    cat = str(getattr(comp, "category", ""))
+    if cat == "innovation":
+        return True
+    blob = " ".join(
+        [str(getattr(comp, "competition_name", ""))]
+        + list(getattr(comp, "required_skills", []) or [])
+        + list(getattr(comp, "evaluation_dimensions", []) or [])
+    )
+    return any(k in blob for k in _INNOV_KW)
+
 
 def _is_programming_comp(comp) -> bool:
     if comp is None:
@@ -882,7 +920,8 @@ def _build_prep_guide(comp, web_results, profile) -> str:
     """生成可执行的备赛路线图（按赛事类别 + 用户画像定制）。"""
     name = comp.competition_name
     year = comp.document_year
-    lines = [f"关于「{name}（{year}）」怎么备赛，我给你一份可直接落地的路线图（结合赛事结构 + 通用方法论）：\n"]
+    title = name if str(year) in str(name) else f"{name}（{year}）"
+    lines = [f"关于「{title}」怎么备赛，我给你一份可直接落地的路线图（结合赛事结构 + 通用方法论）：\n"]
 
     facts = []
     if comp.registration_deadline:
@@ -900,6 +939,7 @@ def _build_prep_guide(comp, web_results, profile) -> str:
         lines.append("")
 
     if _is_programming_comp(comp):
+        branch = "programming"
         lines.append("🗺️ 软件/算法类备赛四阶段（建议提前 3–6 个月启动）：")
         lines.append("  1) 打基础（第1–6周）：吃透一门主力语言（C/C++ / Java / Python），"
                      "熟练掌握数据结构与基础算法——枚举、模拟、排序、贪心、递推递归、基础 DP、简单图论、哈希、字符串。")
@@ -914,7 +954,14 @@ def _build_prep_guide(comp, web_results, profile) -> str:
                      "LeetCode 对应语言热题。")
         lines.append("💡 提分点：填空题重速度与准确性，编程大题重正确率与边界处理；"
                      "把标准库/STL 用熟能省大量赛场时间。")
+    elif _is_math_modeling_comp(comp):
+        branch = "modeling"
+        lines.append(_build_math_modeling_prep(comp, profile))
+    elif _is_innovation_comp(comp):
+        branch = "innovation"
+        lines.append(_build_innovation_prep(comp, profile))
     else:
+        branch = "generic"
         lines.append("🗺️ 通用备赛四阶段（按赛制调整）：")
         lines.append("  1) 读懂赛制：研读竞赛章程、评分标准与往年获奖作品，明确「评什么、怎么评」。")
         lines.append("  2) 积累素材：按赛项补齐知识/技能短板；组队类尽早找互补队友、定选题方向。")
@@ -923,7 +970,7 @@ def _build_prep_guide(comp, web_results, profile) -> str:
         lines.append("")
         lines.append("📚 资料与平台：竞赛官网与主办方通知、往年优秀作品集、指导老师与同好社群、相关公开课/教材。")
 
-    if profile:
+    if profile and branch in ("programming", "generic"):
         major = getattr(profile, "major", None)
         skills = getattr(profile, "skills", None) or []
         if major or skills:
@@ -940,11 +987,75 @@ def _build_prep_guide(comp, web_results, profile) -> str:
     return "\n".join(lines)
 
 
+def _build_math_modeling_prep(comp, profile) -> str:
+    """数学建模类备赛：建模流程 + 论文写作 + 常用算法/软件（按真实赛制差异化）。"""
+    lines = []
+    lines.append("🗺️ 数学建模备赛四阶段（建议提前 3–6 个月启动；团队通常 3 人分工：建模 / 编程求解 / 论文写作）：")
+    lines.append("  1) 补基础（第1–6周）：一人主攻数学模型（评价/预测/优化/分类聚类方法），"
+                 "一人主攻编程求解（MATLAB、Python 的 NumPy·SciPy·Pandas·Matplotlib），"
+                 "一人主攻论文写作与 LaTeX 排版；三人都要懂建模全流程。")
+    lines.append("  2) 方法专题（第7–12周）：刷透高频模型——评价类（AHP/模糊综合评价/TOPSIS）、"
+                 "预测类（回归/时间序列/灰色预测/神经网络）、优化类（线性·整数·多目标规划，可用 Lingo）、"
+                 "分类聚类（判别分析/K-means）、插值拟合、图论、微分方程、蒙特卡洛模拟。")
+    lines.append("  3) 真题实战（第13–18周）：限时做近 3–5 年真题（高教社杯国赛、美赛 MCM/ICM、"
+                 "华为杯、深圳杯、MathorCup 等），完整跑通「选题→假设→建模→求解→检验→写论文」全流程；每题复盘模型优劣。")
+    lines.append("  4) 冲刺模考（赛前2–4周）：全真 3–4 天连续作战模拟（国赛 3 天、美赛 4 天），"
+                 "重点练摘要写作（摘要定奖项档次）与时间分配，整理可复用代码模板。")
+    lines.append("")
+    lines.append("📝 论文结构（国赛/美赛 ICM 通用）：摘要（最关键，单独成页）→ 问题重述 → 模型假设 → "
+                 "符号说明 → 模型建立与求解 → 模型检验/灵敏度分析 → 优缺点 → 参考文献 → 附录（代码/数据）。")
+    lines.append("💡 提分点：摘要决定能否进国奖；假设要合理可解；模型重「思路清晰+结果可信」而非越复杂越好；"
+                 "赛中学校通常提供机房，提前熟悉环境。")
+    lines.append("📚 资料：司守奎《数学建模算法与应用》、清风数学建模、校苑数模；"
+                 "真题来自全国大学生数学建模竞赛官网与各赛官网。")
+    if profile:
+        major = getattr(profile, "major", None)
+        skills = getattr(profile, "skills", None) or []
+        if major or skills:
+            lines.append(
+                f"\n💡 结合你的画像（{major or '专业未填'} / 技能：{', '.join(skills) or '待补充'}）："
+                f"数学底子好可主攻建模，编程熟负责求解，文笔好负责论文；把最弱的一环（建模思路/代码/写作）排进前 6 周重点补。"
+            )
+    return "\n".join(lines)
+
+
+def _build_innovation_prep(comp, profile) -> str:
+    """创新创业类备赛：商业计划书 BP + 路演 + 赛道选择（按真实赛制差异化）。"""
+    lines = []
+    lines.append("🗺️ 创新创业备赛四阶段（建议提前半年启动；团队 3–15 人，跨专业组队更稳）：")
+    lines.append("  1) 定赛道与选题（第1–4周）：先选赛道——高教主赛道（创意组/初创组/成长组）、"
+                 "青年红色筑梦之旅（红旅，偏乡村振兴/社会治理）、职教赛道、产业赛道（企业命题）、萌芽赛道（高中）。"
+                 "选题抓真实痛点，尽量有落地数据与知识产权。")
+    lines.append("  2) 做原型与验证（第5–12周）：做出 MVP/产品原型，跑通真实用户或试点，"
+                 "攒商业数据（营收/用户/合同/专利/查新），把「创新性+商业性+社会价值」落到证据上。")
+    lines.append("  3) 写 BP 与路演（第13–18周）：商业计划书按模块打磨——痛点与机会、解决方案与产品、"
+                 "市场与竞品、商业模式、核心团队、财务预测与融资、里程碑与风险；路演 PPT 讲清「问题-方案-市场-模式-团队-数据」。")
+    lines.append("  4) 冲刺答辩（赛前2–4周）：做 1–2 轮全真路演（校赛→省赛→国赛），"
+                 "准备答辩高频问题（技术壁垒/数据来源/落地进展/知识产权/可持续性），按评审维度逐项自检。")
+    lines.append("")
+    lines.append("📊 评审维度：创新性、商业性（或社会价值/红旅）、团队能力、就业带动/落地可行。"
+                 "金奖项目往往「真问题+真数据+真落地」，空想项目很难走远。")
+    lines.append("💡 提分点：路演前 1 分钟电梯演讲最致命；BP 用数据说话、少堆形容词；"
+                 "提前对接校创业学院/指导老师，用足学校孵化资源。")
+    lines.append("📚 资料：大赛官网 cy.ncss.cn（原「互联网+」，现「中国国际大学生创新大赛」）、"
+                 "往届金奖路演视频、校创新创业学院公开课。")
+    if profile:
+        major = getattr(profile, "major", None)
+        skills = getattr(profile, "skills", None) or []
+        if major or skills:
+            lines.append(
+                f"\n💡 结合你的画像（{major or '专业未填'} / 技能：{', '.join(skills) or '待补充'}）："
+                f"用你的专业/技能做项目核心技术或产品壁垒，再补商业与路演短板；跨专业组队（技术+商科+设计）最稳。"
+            )
+    return "\n".join(lines)
+
+
 def _build_eval_answer(comp, web_results, profile) -> str:
     """对「含金量 / 难不难 / 值不值得」给出平衡研判。"""
     name = comp.competition_name
     year = comp.document_year
-    lines = [f"关于「{name}（{year}）」值不值得参加、难度如何，我给你一个平衡的判断框架：\n"]
+    title = name if str(year) in str(name) else f"{name}（{year}）"
+    lines = [f"关于「{title}」值不值得参加、难度如何，我给你一个平衡的判断框架：\n"]
     lines.append("✅ 它的价值通常在这些方面：")
     lines.append("  · 简历/综测：作为受认可的学科竞赛，获奖在保研、综测、就业简历上有实质加分；")
     lines.append("  · 能力成长：逼着自己系统补短板（算法/工程/文档/答辩），比零散自学更成体系；")
@@ -954,6 +1065,10 @@ def _build_eval_answer(comp, web_results, profile) -> str:
     lines.append("  · 越是「认可度高」的赛事，省赛以上竞争越激烈，需要持续投入（通常 3–6 个月）而非临时突击；")
     if _is_programming_comp(comp):
         lines.append("  · 软件/算法类对算法功底要求高，零基础直接冲国奖不现实，建议从省赛获奖率较高的赛项切入；")
+    elif _is_math_modeling_comp(comp):
+        lines.append("  · 数学建模重团队分工与论文表达，跨专业三人组（建模/编程/写作）比单打独斗走得更远；摘要写不好连国奖门槛都难进；")
+    elif _is_innovation_comp(comp):
+        lines.append("  · 创新创业类非常看重「真实落地数据+知识产权」，纯点子空想很难走到省赛以上；跨专业组队（技术+商科+设计）胜率明显更高；")
     lines.append("  · 投入产出比取决于你的目标：若只为综测凑数，优先选与本专业/技能最贴合的赛项，性价比最高。")
     lines.append("")
     lines.append("🎯 适合谁：")
