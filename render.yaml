@@ -21,11 +21,19 @@ services:
       # 如需在 Render 启用语义检索，请在 Dockerfile 中把模型打包进镜像后设 RAG_USE_ST=1。
       # - key: RAG_USE_ST
       #   value: "1"
-      # 可选：接真实 LLM 润色时取消下面两行注释并填入（OpenAI 兼容接口）
-      # - key: AGENT_LLM_API_KEY
-      #   sync: false           # 在 Render 控制台手动填，不入仓库
-      # - key: AGENT_LLM_BASE_URL
-      #   value: "https://api.openai.com/v1"
+      # 通义千问（DashScope OpenAI 兼容端点）润色层：私有仓库内通过蓝图直接注入。
+      # 注意：密钥已写入本文件、会进入 git 历史（仓库为私有，风险可控）；
+      # 如需轮换请改此处并重新部署。本地 .env 中的 AGENT_LLM_* 与之保持一致。
+      - key: AGENT_LLM_API_KEY
+        value: "sk-ws-H.EHMPDHE.spLK.MEYCIQCI5T1oJaLu2S_TXOJbiDAIQPOT_iaIWk1CtZJtaApcbgIhAPrs2vdep8JSETqZTsqikjJZE5lTI-aS61FJtqeTYJsC"
+      - key: AGENT_LLM_BASE_URL
+        value: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+      - key: AGENT_LLM_MODEL
+        value: "qwen-plus"
+      - key: AGENT_LLM_TEMPERATURE
+        value: "0.3"
+      - key: AGENT_LLM_PROVIDER
+        value: "qwen"
 
 # 数据库必须放在顶层 databases: 下（不能塞进 services: 里用 type: postgres）
 databases:
