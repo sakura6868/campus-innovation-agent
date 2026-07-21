@@ -76,6 +76,13 @@ DEFAULT_DB_PATH = PROJECT_ROOT / "data" / "campus_agent.db"
 _DATABASE_URL_RAW = os.getenv("DATABASE_URL", f"sqlite:///{DEFAULT_DB_PATH.as_posix()}")
 if _DATABASE_URL_RAW.startswith("postgres://"):
     DATABASE_URL = _DATABASE_URL_RAW.replace("postgres://", "postgresql://", 1)
+elif _DATABASE_URL_RAW.startswith("sqlite:///"):
+    # 相对路径（如 .env 中的 ./data/campus_agent.db）必须相对于项目根解析，
+    # 否则从不同工作目录启动（src/ 或项目根）会落到两个不同的库文件。
+    _rel = _DATABASE_URL_RAW[len("sqlite:///"):]
+    if not os.path.isabs(_rel):
+        _rel = (PROJECT_ROOT / _rel).resolve().as_posix()
+    DATABASE_URL = f"sqlite:///{_rel}"
 else:
     DATABASE_URL = _DATABASE_URL_RAW
 
