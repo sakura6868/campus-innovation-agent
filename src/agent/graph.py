@@ -162,6 +162,23 @@ def _resolve_competition_versioned(
 ) -> tuple[Optional[Competition], Optional[str], Optional[str]]:
     """锁定赛事并显式处理同名多年份版本。"""
     q = _norm(question)
+    # 建模类问法显式纠正：避免「全国大学生数学竞赛（CMC）」因名称含「数学」而被抢锁，
+    # 导致用户问「数学建模怎么备赛」时路由到数学竞赛、起手纠结「你问的是哪个」，答非所问。
+    if "数学建模" in q:
+        _model_pool = [c for c in comps if getattr(c, "category", None) == "modeling"
+                       and "数学建模" in (c.competition_name or "")]
+        if _model_pool:
+            if any(t in q for t in ["美赛", "mcm", "icm", "美国", "comap"]):
+                _us = [c for c in _model_pool if "美国" in (c.competition_name or "")
+                       or "MCM" in (c.competition_name or "").upper()]
+                if _us:
+                    return max(_us, key=lambda c: c.document_year), None, None
+            else:
+                _cn = [c for c in _model_pool if "国赛" in (c.competition_name or "")
+                       or "高教社杯" in (c.competition_name or "")]
+                if _cn:
+                    return max(_cn, key=lambda c: c.document_year), None, None
+            return max(_model_pool, key=lambda c: c.document_year), None, None
     mentioned_years = {int(y) for y in re.findall(r"20\d{2}", q)}
     scored = [(c, _competition_match_score(q, c)) for c in comps]
     scored = [(c, score) for c, score in scored if score >= 4]
