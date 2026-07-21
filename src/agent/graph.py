@@ -223,7 +223,9 @@ _KW_CHAT = [
     "规划", "计划", "建议", "怎么准备", "如何准备", "怎么选", "如何选",
     "策略", "路线", "方向", "经验", "分享", "攻略", "提升", "怎么学",
     "如何学", "怎么备", "如何备", "我该怎么", "该不该", "值不值", "怎么样",
-    "帮我", "如何冲", "怎么冲", "怎么安排", "如何安排",
+    "含金量", "值得参加", "值得报", "难不难", "难吗", "有没有用", "有用吗",
+    "前景", "优势", "评价", "靠谱吗", "好不好", "如何准备", "怎么冲刺",
+    "帮我", "如何冲", "怎么冲", "怎么安排", "如何安排", "注意什么", "避坑",
 ]
 
 
@@ -237,8 +239,13 @@ def _classify_intent(question: str, has_comp: bool) -> str:
         return "recommend"
     if has_comp and any(k in q for k in _KW_DETAIL):
         return "detail"
+    # 开放/建议/评价类问题（怎么准备、值不值得、含金量、前景…）优先走 chat：
+    # 由 LLM 基于赛事证据+通用方法论自由作答，避免被当成 qa 事实查询、因检索
+    # 不到条款而直接拒答。即便 LLM 未启用，chat 也有基于证据的兜底回答。
+    if has_comp and any(k in q for k in _KW_CHAT):
+        return "chat"
     if has_comp:
-        return "qa"          # 指向具体赛事的问题，默认走规则问答（检索带引用）
+        return "qa"          # 指向具体赛事的事实查询，走规则问答（检索带引用）
     # 无明确赛事：开放/建议/通用类问题走自由对话（chat），由 LLM 当参谋
     return "chat"
 
@@ -475,6 +482,13 @@ def node_retrieve(state: AgentState) -> AgentState:
             if extra:
                 hits = list(hits) + extra
                 trace.append(f"隔离检索：detail 补全 {len(extra)} 条关键字段证据")
+    # qa 事实查询：语义检索为空时用赛事结构化关键字段兜底，避免「未检索到相关
+    # 条款」式拒答——评价/开放类问题（已走 chat）更应如此；即便纯事实问法检索
+    # 落空，也至少能基于团队/对象/截止/材料/技能给出可溯源答复。
+    if state.get("intent") == "qa" and not hits and comp is not None:
+        hits = _detail_fallback_citations(comp)
+        if hits:
+            trace.append("隔离检索：qa 兜底返回关键字段证据")
     trace.append(f"隔离检索：collection=rag_{cid}，命中 {len(hits)} 条证据")
     return {
         **state,
@@ -844,15 +858,27 @@ def node_compose(state: AgentState) -> AgentState:
         if generated:
             answer = _finalize_grounded(generated, state, citations, "chat", trace)
             return {**state, "answer": answer, "trace": trace}
-        # LLM 未启用或生成失败：友好回退
-        answer = (
-            "（当前未启用智能模型，开放对话暂不可用。我可以回答具体赛事的事实查询，"
-            "例如「蓝桥杯报名截止日期」；启用模型后这里会由助手基于证据自由作答。）"
-        )
+        # LLM 未启用或生成失败：给出基于已检索证据的引导性回答，而非硬说"不可用"。
+        # 尽量让每一次提问都有可参考的内容（赛事概况/方向建议 + 引用）。
+        if citations:
+            lines = ["当前未启用智能模型，我先基于已知赛事信息给你方向性参考：\n"]
+            for i, c in enumerate(citations[:5]):
+                txt = (c.get("source_text") or "").strip().replace("\n", " ")
+                if len(txt) > 80:
+                    txt = txt[:80] + "…"
+                lines.append(f"· {txt}{_cite_marker(i)}")
+            lines.append("\n如需就备赛规划、能力提升等开放问题获得对话式建议，请在设置中启用智能模型。")
+            answer = "\n".join(lines)
+        else:
+            answer = (
+                "我可以帮你查询具体赛事的规则、给出个性化推荐或生成组队文案。"
+                "请告诉我具体赛事名称（例如「蓝桥杯报名截止日期」），或直接说「推荐适合我的比赛」。"
+                "启用智能模型后，这里还能就备赛规划、能力提升等开放问题给出建议。"
+            )
         answer += _citations_appendix(citations)
         if state.get("version_resolution_note"):
             answer = state["version_resolution_note"] + "\n\n" + answer
-        trace.append("组装答案：chat 回退提示")
+        trace.append("组装答案：chat 回退提示（基于证据引导）")
         return {**state, "answer": answer, "trace": trace}
 
     if intent == "teammate":
