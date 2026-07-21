@@ -218,6 +218,10 @@ _KW_DETAIL = ["介绍", "详情", "是什么", "概况", "简介", "了解一下
 _WEB_TRIGGER = [
     "最新", "2026", "2025", "2024", "新闻", "官网", "今年", "最近", "动态",
     "报名开始", "通知", "公告", "刚出", "新增", "更新", "实时", "网上", "查一下",
+    # 开放/建议类问题也主动联网，补充真实「备赛攻略 / 经验 / 含金量评价」
+    "备赛", "备考", "备战", "攻略", "经验", "怎么准备", "如何准备", "怎么学",
+    "含金量", "值得参加", "难不难", "前景", "评价", "靠谱吗", "避坑", "注意什么",
+    "复习", "冲刺", "怎么规划", "如何规划", "经验分享",
 ]
 _KW_CHAT = [
     "规划", "计划", "建议", "怎么准备", "如何准备", "怎么选", "如何选",
@@ -226,6 +230,13 @@ _KW_CHAT = [
     "含金量", "值得参加", "值得报", "难不难", "难吗", "有没有用", "有用吗",
     "前景", "优势", "评价", "靠谱吗", "好不好", "如何准备", "怎么冲刺",
     "帮我", "如何冲", "怎么冲", "怎么安排", "如何安排", "注意什么", "避坑",
+    # —— 以下扩充：覆盖「备赛 / 备考 / 备战」整类问法，避免被误判为规则问答 ——
+    "备赛", "备考", "备战", "怎么备考", "如何备考", "怎么打", "如何打",
+    "复习", "冲刺", "学习路线", "时间规划", "怎么规划", "如何规划",
+    "备考攻略", "经验分享", "备赛经验", "经验贴", "怎么提升", "如何提升",
+    "提升路径", "能力提升", "怎么练", "如何练", "该如何准备", "从零开始",
+    # 指定了具体赛事时的「选赛项 / 是否适合我」也走 chat 给针对性建议，而非全局推荐
+    "选哪个", "选什么", "报哪个", "报什么", "适合我", "适合吗", "适合打", "适合报",
 ]
 
 
@@ -235,15 +246,16 @@ def _classify_intent(question: str, has_comp: bool) -> str:
         return "teammate"
     if any(k in q for k in _KW_TEAM):
         return "team"
-    if any(k in q for k in _KW_RECOMMEND):
-        return "recommend"
     if has_comp and any(k in q for k in _KW_DETAIL):
         return "detail"
-    # 开放/建议/评价类问题（怎么准备、值不值得、含金量、前景…）优先走 chat：
-    # 由 LLM 基于赛事证据+通用方法论自由作答，避免被当成 qa 事实查询、因检索
-    # 不到条款而直接拒答。即便 LLM 未启用，chat 也有基于证据的兜底回答。
+    # 开放/建议/评价/选型类问题（怎么准备、值不值得、含金量、选赛项、是否适合我…）
+    # 优先走 chat：由 LLM 或确定性生成器基于赛事证据+通用方法论作答。即便 LLM 未启用，
+    # chat 也有基于证据的兜底回答（备赛路线/价值研判/选型建议），不再被当成 qa 拒答、
+    # 也不会因「未通过推荐门控」而答非所问。
     if has_comp and any(k in q for k in _KW_CHAT):
         return "chat"
+    if any(k in q for k in _KW_RECOMMEND):
+        return "recommend"
     if has_comp:
         return "qa"          # 指向具体赛事的事实查询，走规则问答（检索带引用）
     # 无明确赛事：开放/建议/通用类问题走自由对话（chat），由 LLM 当参谋
@@ -552,13 +564,20 @@ def node_gate(state: AgentState) -> AgentState:
     today = date.today()
     problems = data_validity_check(comp, today)
     if problems:
-        gate = {"eligible": False, "reasons": [f"数据不可用：{p}" for p in problems]}
-        trace.append("硬性门控：数据有效性未通过")
+        # 来源尚未完全核验 ≠ 「数据不可用」：事实仍会照常展示，仅提示以官网为准。
+        gate = {
+            "eligible": False,
+            "source_issues": [f"来源待核实：{p}" for p in problems],
+            "reasons": [],
+            "actions": [],
+        }
+        trace.append("硬性门控：官方来源尚待核验（不阻断信息查阅）")
         return {**state, "gate": gate, "pending_review": not assess_source_readiness(comp).ready, "trace": trace}
 
     eligible, reasons = eligibility_gate(profile, comp, today)
     gate = {
         "eligible": eligible,
+        "source_issues": [],
         "reasons": [r.reason for r in reasons],
         "actions": [r.possible_action for r in reasons if r.possible_action],
     }
@@ -740,13 +759,15 @@ def _citations_appendix(citations: list[dict]) -> str:
 _CIT_RE = re.compile(r"\[(\d+)\]")
 
 
-def _build_evidence_brief(citations: list[dict]) -> str:
+def _build_evidence_brief(citations: list[dict], web_results: Optional[list] = None) -> str:
     """把 citations 序列化成 LLM 能读懂的「编号证据清单」。
 
     每条形如：[n] （文档名｜字段｜可信等级）原文片段 官方链接
     LLM 撰写时须用 [n] 回指，从而保证所有事实可溯源。
+    ``web_results`` 作为单独「🌐 联网参考」块附在末尾，明确标注仅供参考、
+    不计入 [n] 官方引用，避免与已核验来源混淆。
     """
-    if not citations:
+    if not citations and not web_results:
         return "（无具体赛事证据，请基于通用方法论回答，不要编造任何具体赛事的事实、日期或数字）"
     lines = []
     for i, c in enumerate(citations):
@@ -759,6 +780,15 @@ def _build_evidence_brief(citations: list[dict]) -> str:
         if url:
             line += f" 官方链接:{url}"
         lines.append(line)
+    if web_results:
+        lines.append("\n🌐 联网参考（仅供参考，不得用于 [n] 引用，也不计入官方证据）：")
+        for i, w in enumerate(web_results[:4]):
+            title = " ".join((w.get("title") or "").split())
+            url = w.get("url") or ""
+            snippet = " ".join((w.get("snippet") or "").split())
+            if len(snippet) > 80:
+                snippet = snippet[:80] + "…"
+            lines.append(f"  - {title}：{snippet} {url}")
     return "\n".join(lines)
 
 
@@ -789,12 +819,200 @@ def _sanitize_citations(answer: str, n_citations: int) -> str:
     return _CIT_RE.sub(_repl, answer)
 
 
+# ---------------------------------------------------------------------------
+# 工具：开放/建议类问题的「确定性作答」（LLM 未启用时也能真正回答问题）
+# ---------------------------------------------------------------------------
+
+# 编程 / 算法类赛事识别（用于给出针对性的备赛路线）
+_PROG_KW = (
+    "算法", "程序设计", "编程", "C/C++", "C++", "Java", "Python", "软件开发",
+    "Web应用", "网络安全", "软件赛", "计算机", "数据结构",
+)
+
+
+def _is_programming_comp(comp) -> bool:
+    if comp is None:
+        return False
+    blob = " ".join(
+        [str(getattr(comp, "category", ""))]
+        + list(getattr(comp, "required_skills", []) or [])
+        + list(getattr(comp, "evaluation_dimensions", []) or [])
+    )
+    return any(k in blob for k in _PROG_KW)
+
+
+def _is_prep_question(q: str) -> bool:
+    return any(k in q for k in (
+        "备赛", "备考", "备战", "怎么准备", "如何准备", "怎么备", "如何备",
+        "怎么备考", "如何备考", "怎么打", "如何打", "复习", "冲刺", "攻略",
+        "学习路线", "时间规划", "怎么规划", "如何规划", "备考攻略", "备赛经验",
+        "经验贴", "怎么提升", "如何提升", "提升路径", "能力提升", "怎么练",
+        "如何练", "该如何准备", "从零开始", "怎么学", "如何学",
+    ))
+
+
+def _is_eval_question(q: str) -> bool:
+    return any(k in q for k in (
+        "含金量", "值得参加", "值得报", "难不难", "难吗", "有没有用", "有用吗",
+        "前景", "优势", "评价", "靠谱吗", "好不好", "该不该", "值不值", "怎么样",
+        "适合我", "适合吗", "适合打", "适合报",
+    ))
+
+
+def _is_selection_question(q: str) -> bool:
+    return any(k in q for k in ("怎么选", "如何选", "选哪个", "选什么", "报哪个", "报什么"))
+
+
+def _web_block(web_results, limit: int = 4) -> str:
+    """把联网结果序列化为「🌐 参考」块（明确标注仅供参考、不混入官方引用）。"""
+    if not web_results:
+        return ""
+    lines = ["\n🌐 联网补充参考（网友/媒体经验，仅供参考，请以官网为准）："]
+    for w in web_results[:limit]:
+        title = " ".join((w.get("title") or "").split())
+        url = w.get("url") or ""
+        snippet = " ".join((w.get("snippet") or "").split())
+        if len(snippet) > 70:
+            snippet = snippet[:70] + "…"
+        lines.append(f"  · {title}：{snippet} {url}")
+    return "\n".join(lines)
+
+
+def _build_prep_guide(comp, web_results, profile) -> str:
+    """生成可执行的备赛路线图（按赛事类别 + 用户画像定制）。"""
+    name = comp.competition_name
+    year = comp.document_year
+    lines = [f"关于「{name}（{year}）」怎么备赛，我给你一份可直接落地的路线图（结合赛事结构 + 通用方法论）：\n"]
+
+    facts = []
+    if comp.registration_deadline:
+        facts.append(f"报名/缴费截止约 {comp.registration_deadline.isoformat()}")
+    if comp.competition_start_date:
+        facts.append(f"省赛/初赛时间约 {comp.competition_start_date.isoformat()}")
+    if comp.eligible_students:
+        facts.append("参赛对象：" + "、".join(comp.eligible_students))
+    if comp.required_skills:
+        facts.append("主要赛项/方向：" + "、".join(comp.required_skills))
+    if facts:
+        lines.append("📌 先锁定几个关键事实（来自官方通知）：")
+        for f in facts:
+            lines.append(f"  · {f}")
+        lines.append("")
+
+    if _is_programming_comp(comp):
+        lines.append("🗺️ 软件/算法类备赛四阶段（建议提前 3–6 个月启动）：")
+        lines.append("  1) 打基础（第1–6周）：吃透一门主力语言（C/C++ / Java / Python），"
+                     "熟练掌握数据结构与基础算法——枚举、模拟、排序、贪心、递推递归、基础 DP、简单图论、哈希、字符串。")
+        lines.append("  2) 专项突破（第7–12周）：按高频专题刷——数组/字符串、DFS/BFS、"
+                     "动态规划、最短路、并查集、数论/组合数学、二分、前缀和/差分、单调栈/队列。")
+        lines.append("  3) 真题实战（第13–18周）：限时刷近 5 年省赛真题，先稳拿填空/简单编程题，"
+                     "再攻大题；每题复盘时间复杂度与更优解。")
+        lines.append("  4) 冲刺模考（赛前2–4周）：全真 4 小时模拟，整理易错模板"
+                     "（快读、二分、前缀和、并查集等），查漏补缺。")
+        lines.append("")
+        lines.append("📚 资料与平台：官网章程/样题/历年真题；洛谷、AcWing、蓝桥杯官方练习系统、"
+                     "LeetCode 对应语言热题。")
+        lines.append("💡 提分点：填空题重速度与准确性，编程大题重正确率与边界处理；"
+                     "把标准库/STL 用熟能省大量赛场时间。")
+    else:
+        lines.append("🗺️ 通用备赛四阶段（按赛制调整）：")
+        lines.append("  1) 读懂赛制：研读竞赛章程、评分标准与往年获奖作品，明确「评什么、怎么评」。")
+        lines.append("  2) 积累素材：按赛项补齐知识/技能短板；组队类尽早找互补队友、定选题方向。")
+        lines.append("  3) 打磨作品/演练：做 1–2 轮完整模拟（含答辩/文档），按评分标准逐项自检。")
+        lines.append("  4) 冲刺提交：预留时间做格式校对、查重/合规检查与最终提交，避免技术性失误。")
+        lines.append("")
+        lines.append("📚 资料与平台：竞赛官网与主办方通知、往年优秀作品集、指导老师与同好社群、相关公开课/教材。")
+
+    if profile:
+        major = getattr(profile, "major", None)
+        skills = getattr(profile, "skills", None) or []
+        if major or skills:
+            lines.append(
+                f"\n💡 结合你的画像（{major or '专业未填'} / 技能：{', '.join(skills) or '待补充'}）："
+                f"优先用你最熟的语言或方向做主力，把短板专题（如算法/文档/答辩）排进前 6 周重点突破。"
+            )
+
+    web = _web_block(web_results)
+    if web:
+        lines.append(web)
+    if comp.official_source_url:
+        lines.append(f"\n🔗 官方入口：{comp.official_source_url}")
+    return "\n".join(lines)
+
+
+def _build_eval_answer(comp, web_results, profile) -> str:
+    """对「含金量 / 难不难 / 值不值得」给出平衡研判。"""
+    name = comp.competition_name
+    year = comp.document_year
+    lines = [f"关于「{name}（{year}）」值不值得参加、难度如何，我给你一个平衡的判断框架：\n"]
+    lines.append("✅ 它的价值通常在这些方面：")
+    lines.append("  · 简历/综测：作为受认可的学科竞赛，获奖在保研、综测、就业简历上有实质加分；")
+    lines.append("  · 能力成长：逼着自己系统补短板（算法/工程/文档/答辩），比零散自学更成体系；")
+    lines.append("  · 圈层资源：通过校赛/省赛认识同好与指导老师，打开后续项目与实习机会。")
+    lines.append("")
+    lines.append("⚠️ 也要客观看难度与成本：")
+    lines.append("  · 越是「认可度高」的赛事，省赛以上竞争越激烈，需要持续投入（通常 3–6 个月）而非临时突击；")
+    if _is_programming_comp(comp):
+        lines.append("  · 软件/算法类对算法功底要求高，零基础直接冲国奖不现实，建议从省赛获奖率较高的赛项切入；")
+    lines.append("  · 投入产出比取决于你的目标：若只为综测凑数，优先选与本专业/技能最贴合的赛项，性价比最高。")
+    lines.append("")
+    lines.append("🎯 适合谁：")
+    lines.append("  · 想保研/刷简历、且愿意花时间系统训练的同学；")
+    if comp.eligible_students:
+        lines.append(f"  · 参赛对象覆盖：{ '、'.join(comp.eligible_students) }，先确认你在本科学段内；")
+    lines.append("  · 时间紧的同学，建议「保一门主力赛项 + 顺带了解其他」，别贪多。")
+    web = _web_block(web_results, limit=3)
+    if web:
+        lines.append(web)
+    lines.append("\nℹ️ 以上为通用研判，具体获奖比例/含金量以当年官方章程与你所在院校认定为准。")
+    return "\n".join(lines)
+
+
+def _build_selection_answer(comp, profile) -> str:
+    """对「怎么选赛项 / 报哪个」给出决策思路。"""
+    name = comp.competition_name
+    lines = [f"「{name}」怎么选赛项/方向，给你一个决策思路：\n"]
+    if comp.required_skills:
+        lines.append("· 先看赛项清单：" + "、".join(comp.required_skills)
+                     + "。挑与你当前最强技能重合度最高的，起步最快、性价比最高。")
+    if profile and getattr(profile, "skills", None):
+        lines.append(f"· 结合你的技能（{', '.join(profile.skills)}）：优先用熟的语言/方向做主力，"
+                     "把陌生但高分的专题列为「下一步突破」。")
+    lines.append("· 时间与目标：保研/简历导向 → 选认可度高、与你专业贴合的赛项；纯练手 → 选最感兴趣、能坚持下来的。")
+    lines.append("· 实在拿不准，可以说「推荐适合我的比赛」，我按你的画像帮你匹配；"
+                 "或对比多场时说「A 和 B 怎么选」让我帮你拆解。")
+    return "\n".join(lines)
+
+
+def _compose_chat_deterministic(state, comp, citations, web_results) -> Optional[str]:
+    """LLM 未启用或生成失败时的确定性兜底；按问题类型产出真正有用的回答。
+
+    返回 None 表示「无确定模板可套」（交由 compose 的通用兜底处理）。
+    """
+    if comp is None:
+        return None
+    q = state.get("question") or ""
+    profile = _load_profile(state)
+    if _is_prep_question(q):
+        body = _build_prep_guide(comp, web_results, profile)
+    elif _is_eval_question(q):
+        body = _build_eval_answer(comp, web_results, profile)
+    elif _is_selection_question(q):
+        body = _build_selection_answer(comp, profile)
+    else:
+        return None
+    answer = body + _citations_appendix(citations)
+    if state.get("version_resolution_note"):
+        answer = state["version_resolution_note"] + "\n\n" + answer
+    return answer
+
+
 def _generate_grounded(state: AgentState, intent: str, citations: list, name: str,
                        allow_empty_evidence: bool = False) -> Optional[str]:
     """调用 LLM 基于证据自由撰写；LLM 未启用/生成失败返回 None（回退确定性）。"""
     if not citations and not allow_empty_evidence:
         return None
-    brief = _build_evidence_brief(citations)
+    brief = _build_evidence_brief(citations, state.get("web_results"))
     profile = _load_profile(state)
     profile_summary = _profile_summary(profile) if profile else ""
     question = state.get("question") or ""
@@ -813,11 +1031,20 @@ def _finalize_grounded(generated: str, state: AgentState, citations: list,
                        intent: str, trace: list) -> str:
     """把 LLM 生成结果 + 确定性门控/评分结论 + 引用附录拼成最终答案。"""
     answer = generated
-    gate = state.get("gate") or {}
-    if gate.get("eligible") is False:
-        answer += f"\n\n结合你的画像，该赛事门控未通过：{'；'.join(gate.get('reasons') or [])}"
-    elif gate.get("eligible") is True and not (state.get("score") or {}).get("skipped"):
-        answer += f"\n\n你符合报名硬性条件，综合匹配度约 {(state.get('score') or {}).get('total')} 分。"
+    # chat 为开放/建议类，不追加任何「门控」结论（与备赛/研判建议无关）
+    if intent != "chat":
+        gate = state.get("gate") or {}
+        if gate.get("source_issues"):
+            # 来源待核验 ≠ 数据不可用：事实已展示，仅作软提示
+            answer += "\n\nℹ️ 说明：该赛事官方来源尚待核验（不影响以上信息查阅），报名与赛程请以官网最新通知为准。"
+        elif gate.get("eligible") is False:
+            reasons = gate.get("reasons") or []
+            if reasons:
+                answer += f"\n\n⚠️ 结合你的画像，你暂不符合该赛事硬性条件：{'；'.join(reasons)}"
+            else:
+                answer += "\n\nℹ️ 说明：该赛事官方来源尚待核验，报名与赛程请以官网最新通知为准。"
+        elif gate.get("eligible") is True and not (state.get("score") or {}).get("skipped"):
+            answer += f"\n\n✅ 你符合报名硬性条件，综合匹配度约 {(state.get('score') or {}).get('total')} 分。"
     answer += _citations_appendix(citations)
     if state.get("version_resolution_note"):
         answer = state["version_resolution_note"] + "\n\n" + answer
@@ -853,21 +1080,30 @@ def node_compose(state: AgentState) -> AgentState:
             answer = _finalize_grounded(generated, state, citations, intent, trace)
             return {**state, "answer": answer, "trace": trace}
     if intent == "chat":
-        # 不再硬拦截：由 LLM 系统提示做方向引导，自由对话优先围绕竞赛/科创作答。
+        # 优先用 LLM 当参谋；未启用/失败时回退到确定性生成器（备赛/研判/选型也能真正回答）。
         generated = _generate_grounded(state, "chat", citations, name, allow_empty_evidence=True)
         if generated:
             answer = _finalize_grounded(generated, state, citations, "chat", trace)
             return {**state, "answer": answer, "trace": trace}
-        # LLM 未启用或生成失败：给出基于已检索证据的引导性回答，而非硬说"不可用"。
-        # 尽量让每一次提问都有可参考的内容（赛事概况/方向建议 + 引用）。
+        # —— LLM 未启用或生成失败：走确定性生成，确保开放/建议类问题有实质回答 ——
+        det = _compose_chat_deterministic(
+            state,
+            db.get_competition(state.get("resolved_competition")),
+            citations,
+            state.get("web_results") or [],
+        )
+        if det:
+            trace.append("组装答案：chat 确定性生成（备赛/研判/选型）")
+            return {**state, "answer": det, "trace": trace}
+        # 完全兜底：仅当无可套用模板时，列出已知赛事事实并引导启用模型。
         if citations:
-            lines = ["当前未启用智能模型，我先基于已知赛事信息给你方向性参考：\n"]
+            lines = ["我先基于已知赛事信息给你方向性参考：\n"]
             for i, c in enumerate(citations[:5]):
                 txt = (c.get("source_text") or "").strip().replace("\n", " ")
                 if len(txt) > 80:
                     txt = txt[:80] + "…"
                 lines.append(f"· {txt}{_cite_marker(i)}")
-            lines.append("\n如需就备赛规划、能力提升等开放问题获得对话式建议，请在设置中启用智能模型。")
+            lines.append("\n如需就备赛规划、能力提升等开放问题获得更自然的对话式建议，可在设置中启用智能模型。")
             answer = "\n".join(lines)
         else:
             answer = (
@@ -942,10 +1178,16 @@ def node_compose(state: AgentState) -> AgentState:
         answer += _citations_appendix(citations)
 
         gate = state.get("gate") or {}
-        if gate.get("eligible") is False:
-            answer += f"\n\n结合你的画像，该赛事门控未通过：{'；'.join(gate.get('reasons') or [])}"
+        if gate.get("source_issues"):
+            answer += "\n\nℹ️ 说明：该赛事官方来源尚待核验（不影响以上信息查阅），报名与赛程请以官网最新通知为准。"
+        elif gate.get("eligible") is False:
+            reasons = gate.get("reasons") or []
+            if reasons:
+                answer += f"\n\n⚠️ 结合你的画像，你暂不符合该赛事硬性条件：{'；'.join(reasons)}"
+            else:
+                answer += "\n\nℹ️ 说明：该赛事官方来源尚待核验，报名与赛程请以官网最新通知为准。"
         elif gate.get("eligible") is True and not (state.get("score") or {}).get("skipped"):
-            answer += f"\n\n你符合报名硬性条件，综合匹配度约 {(state.get('score') or {}).get('total')} 分。"
+            answer += f"\n\n✅ 你符合报名硬性条件，综合匹配度约 {(state.get('score') or {}).get('total')} 分。"
 
     elif intent in ("qa", "detail"):
         if not citations:
@@ -960,8 +1202,14 @@ def node_compose(state: AgentState) -> AgentState:
                 txt = (c.get("source_text") or "").strip().replace("\n", " ")
                 lines.append(f"· {txt}{_cite_marker(i)}")
             gate = state.get("gate") or {}
-            if gate.get("eligible") is False:
-                lines.append(f"\n⚠️ 结合你的画像，该赛事门控未通过：{'；'.join(gate.get('reasons') or [])}")
+            if gate.get("source_issues"):
+                lines.append("\nℹ️ 说明：该赛事官方来源尚待核验（不影响以上信息查阅），报名与赛程请以官网最新通知为准。")
+            elif gate.get("eligible") is False:
+                reasons = gate.get("reasons") or []
+                if reasons:
+                    lines.append(f"\n⚠️ 结合你的画像，你暂不符合该赛事硬性条件：{'；'.join(reasons)}")
+                else:
+                    lines.append("\nℹ️ 说明：该赛事官方来源尚待核验，报名与赛程请以官网最新通知为准。")
             elif gate.get("eligible") is True and not (state.get("score") or {}).get("skipped"):
                 sc = state.get("score") or {}
                 lines.append(f"\n✅ 你符合报名硬性条件，综合匹配度约 {sc.get('total')} 分。")
