@@ -21,11 +21,14 @@ services:
       # 如需在 Render 启用语义检索，请在 Dockerfile 中把模型打包进镜像后设 RAG_USE_ST=1。
       # - key: RAG_USE_ST
       #   value: "1"
-      # 通义千问（DashScope OpenAI 兼容端点）润色层：私有仓库内通过蓝图直接注入。
-      # 注意：密钥已写入本文件、会进入 git 历史（仓库为私有，风险可控）；
-      # 如需轮换请改此处并重新部署。本地 .env 中的 AGENT_LLM_* 与之保持一致。
+      # 通义千问（DashScope OpenAI 兼容端点）润色层。
+      # 重要：Render 蓝图对名称含 API_KEY/SECRET/TOKEN 的变量会忽略 `value:` 且
+      # 将其标记为「蓝图托管」，导致在 dashboard 手动填的值被下次同步覆盖为空。
+      # 因此这里用 sync:false —— 密钥只由 Render 控制台 Environment 管理，蓝图不再触碰，
+      # 保证你在 dashboard 填的 key 能稳定生效。请在控制台 Environment 手动添加
+      # AGENT_LLM_API_KEY（值见本地 .env）。其余非密钥变量仍由蓝图 value: 注入。
       - key: AGENT_LLM_API_KEY
-        value: "sk-ws-H.EHMPDHE.spLK.MEYCIQCI5T1oJaLu2S_TXOJbiDAIQPOT_iaIWk1CtZJtaApcbgIhAPrs2vdep8JSETqZTsqikjJZE5lTI-aS61FJtqeTYJsC"
+        sync: false
       - key: AGENT_LLM_BASE_URL
         value: "https://dashscope.aliyuncs.com/compatible-mode/v1"
       - key: AGENT_LLM_MODEL
