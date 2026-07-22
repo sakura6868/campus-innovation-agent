@@ -179,6 +179,13 @@ def _resolve_competition_versioned(
                 if _cn:
                     return max(_cn, key=lambda c: c.document_year), None, None
             return max(_model_pool, key=lambda c: c.document_year), None, None
+    # 智能车类问法显式纠正：「智能车」不是「智能汽车」子串，易被匹配丢弃而锁不住赛事，
+    # 导致「智能车怎么备赛」走兜底、答非所问。
+    if "智能车" in q or "智能汽车" in q:
+        _car_pool = [c for c in comps
+                     if "智能汽车" in (c.competition_name or "") or "智能车" in (c.competition_name or "")]
+        if _car_pool:
+            return max(_car_pool, key=lambda c: c.document_year), None, None
     mentioned_years = {int(y) for y in re.findall(r"20\d{2}", q)}
     scored = [(c, _competition_match_score(q, c)) for c in comps]
     scored = [(c, score) for c, score in scored if score >= 4]
@@ -913,7 +920,9 @@ def _is_electronics_comp(comp) -> bool:
 def _is_engineering_comp(comp) -> bool:
     if comp is None:
         return False
-    if str(getattr(comp, "category", "")) == "engineering":
+    cat = str(getattr(comp, "category", ""))
+    # 机械/工程 + 智能车/机器人（控制+嵌入式，属硬件工程）走工程模板
+    if cat in ("engineering", "robotics_ai"):
         return True
     blob = " ".join(
         [comp.competition_name or ""]
