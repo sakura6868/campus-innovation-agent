@@ -863,6 +863,9 @@ def _is_math_modeling_comp(comp) -> bool:
     cat = str(getattr(comp, "category", ""))
     if cat in ("modeling", "math"):
         return True
+    # 工程/硬件/设计类的「建模」指产品/结构建模，非数学建模，排除避免误判
+    if cat in ("engineering", "electronics", "design", "physics"):
+        return False
     blob = " ".join(
         [str(getattr(comp, "competition_name", ""))]
         + list(getattr(comp, "required_skills", []) or [])
@@ -885,11 +888,66 @@ def _is_innovation_comp(comp) -> bool:
     return any(k in blob for k in _INNOV_KW)
 
 
+_MECH_KW = (
+    "机械", "结构", "车辆", "智能汽车", "成图", "工程训练", "工程创新", "产品信息建模",
+)
+_PHYS_KW = ("物理", "CUPT", "物理实验")
+_ENG_KW = ("英语", "外语", "演讲", "写作", "翻译", "口语", "辩论", "NECCS")
+
+# 明确的软件/算法类类别优先判真；其余学科/硬件/语言/商科类即使 skills 含「算法」也不归编程模板
+_HW_ACAD_CATS = (
+    "electronics", "engineering", "physics", "english", "chem_env", "life_science",
+    "math", "modeling", "design", "business", "data", "logistics", "robotics_ai",
+    "innovation",
+)
+
+
+def _is_electronics_comp(comp) -> bool:
+    if comp is None:
+        return False
+    if str(getattr(comp, "category", "")) == "electronics":
+        return True
+    return "电子设计" in (comp.competition_name or "")
+
+
+def _is_engineering_comp(comp) -> bool:
+    if comp is None:
+        return False
+    if str(getattr(comp, "category", "")) == "engineering":
+        return True
+    blob = " ".join(
+        [comp.competition_name or ""]
+        + list(getattr(comp, "required_skills", []) or [])
+    )
+    return any(k in blob for k in _MECH_KW)
+
+
+def _is_physics_comp(comp) -> bool:
+    if comp is None:
+        return False
+    if str(getattr(comp, "category", "")) == "physics":
+        return True
+    return "物理" in (comp.competition_name or "")
+
+
+def _is_english_comp(comp) -> bool:
+    if comp is None:
+        return False
+    if str(getattr(comp, "category", "")) == "english":
+        return True
+    return any(k in (comp.competition_name or "") for k in _ENG_KW)
+
+
 def _is_programming_comp(comp) -> bool:
     if comp is None:
         return False
+    cat = str(getattr(comp, "category", ""))
+    if cat in ("software", "programming"):
+        return True
+    if cat in _HW_ACAD_CATS:
+        return False
     blob = " ".join(
-        [str(getattr(comp, "category", ""))]
+        [cat]
         + list(getattr(comp, "required_skills", []) or [])
         + list(getattr(comp, "evaluation_dimensions", []) or [])
     )
@@ -955,7 +1013,19 @@ def _build_prep_guide(comp, web_results, profile) -> str:
             lines.append(f"  · {f}")
         lines.append("")
 
-    if _is_programming_comp(comp):
+    if _is_electronics_comp(comp):
+        branch = "electronics"
+        lines.append(_build_electronics_prep(comp, profile))
+    elif _is_engineering_comp(comp):
+        branch = "engineering"
+        lines.append(_build_engineering_prep(comp, profile))
+    elif _is_physics_comp(comp):
+        branch = "physics"
+        lines.append(_build_physics_prep(comp, profile))
+    elif _is_english_comp(comp):
+        branch = "english"
+        lines.append(_build_english_prep(comp, profile))
+    elif _is_programming_comp(comp):
         branch = "programming"
         lines.append("🗺️ 软件/算法类备赛四阶段（建议提前 3–6 个月启动）：")
         lines.append("  1) 打基础（第1–6周）：吃透一门主力语言（C/C++ / Java / Python），"
@@ -1067,6 +1137,151 @@ def _build_innovation_prep(comp, profile) -> str:
     return "\n".join(lines)
 
 
+def _build_electronics_prep(comp, profile) -> str:
+    """电子设计类备赛：硬件电路 + 嵌入式/FPGA + EDA + 真题实战（按真实赛制差异化）。"""
+    lines = []
+    lines.append("🗺️ 电子设计备赛四阶段（建议提前 3–6 个月启动；团队通常 3 人：硬件 / 软件 / 报告）：")
+    lines.append("  1) 打基础（第1–6周）：吃透模拟/数字电路、单片机（STM32/51）与 C 语言；"
+                 "练常用模块——电源、运算放大、ADC/DAC、电机驱动、显示/通信（串口/SPI/I2C）。")
+    lines.append("  2) 专项突破（第7–12周）：攻嵌入式外设（定时器/PWM/中断/捕获）、FPGA/Verilog 基础、"
+                 "传感与信号处理；用 Altium/立创 EDA 画板、焊接调试，把「模块→系统」串起来。")
+    lines.append("  3) 真题实战（第13–18周）：限时做全国大学生电子设计竞赛近 5 年赛题（四天三夜真题最贴近实战），"
+                 "完整跑通「方案→电路→代码→调试→写报告」；每题复盘指标是否达标、有没有更简方案。")
+    lines.append("  4) 冲刺模考（赛前2–4周）：全真四天三夜模拟，整理可复用模块库与代码模板，"
+                 "重点练仪器使用（示波器/信号源/电源）与现场抗压调试。")
+    lines.append("")
+    lines.append("📚 资料：TI 杯/瑞萨杯等赛题与官方培训、经典教材（童诗白《模拟电子技术基础》、"
+                 "康华光《电子技术基础》）、立创/野火/正点原子开源例程；校电子类实验室与指导老师资源最关键。")
+    lines.append("💡 提分点：省赛重「指标达成+稳定性」，报告要写清方案对比与测试数据；"
+                 "把常用电路（放大/滤波/电源）做成可靠模块，赛场能省大量调试时间。")
+    if profile:
+        major = getattr(profile, "major", None)
+        skills = getattr(profile, "skills", None) or []
+        if major or skills:
+            lines.append(
+                f"\n💡 结合你的画像（{major or '专业未填'} / 技能：{', '.join(skills) or '待补充'}）："
+                f"硬件弱就主攻电路与焊接、软件弱就补嵌入式 C 与算法；三人分工明确、互补短板最稳。"
+            )
+    return "\n".join(lines)
+
+
+def _build_engineering_prep(comp, profile) -> str:
+    """机械/工程类备赛：机构设计 + 三维建模/仿真 + 样机，或智能车控制算法（按赛项细分）。"""
+    lines = []
+    name = comp.competition_name or ""
+    is_car = any(k in name for k in ("智能汽车", "智能车", "车辆"))
+    lines.append("🗺️ 机械/工程备赛四阶段（建议提前 3–6 个月启动；团队通常 3–5 人：结构 / 控制 / 文档）：")
+    if is_car:
+        lines.append("  （智能车方向）1) 打基础（第1–6周）：吃透单片机（STM32）、C 语言与基本控制理论（PID），"
+                     "熟悉舵机/电机驱动、编码器、摄像头/电磁循迹传感器。")
+        lines.append("  （智能车方向）2) 专项突破（第7–12周）：调通循迹算法（电磁/摄像头路径识别）、"
+                     "速度环/转向环 PID、通信与调度；做最小小车跑通基础赛道。")
+        lines.append("  （智能车方向）3) 真题实战（第13–18周）：按往届赛道元素训练——弯道/坡道/障碍/返折，"
+                     "优化速度与稳定性；每轮记录参数与圈速，做对比实验。")
+        lines.append("  （智能车方向）4) 冲刺模考（赛前2–4周）：全真调车连跑，整理参数表与应急方案，"
+                     "重点练现场调度与突发状况处理。")
+    else:
+        lines.append("  （机械/结构方向）1) 打基础（第1–6周）：吃透机械原理/机械设计，熟练三维建模"
+                     "（SolidWorks/Creo/UG）与工程图；了解常用材料、标准件与加工工艺。")
+        lines.append("  （机械/结构方向）2) 专项突破（第7–12周）：做机构方案论证与仿真（ANSYS/ADAMS 静力·"
+                     "运动·模态），把「功能→结构→强度」打通；练样机/模型制作与装配。")
+        lines.append("  （机械/结构方向）3) 真题实战（第13–18周）：按赛题做 1–2 轮完整方案（含仿真报告），"
+                     "对照评分标准自检；每轮复盘机构创新点与可行性。")
+        lines.append("  （机械/结构方向）4) 冲刺模考（赛前2–4周）：做样机/模型终稿与答辩演练，"
+                     "整理加工清单与成本，重点练方案陈述与问答。")
+    lines.append("")
+    lines.append("📚 资料：赛项官网章程与往届获奖作品、机械设计手册、仿真软件官方教程、"
+                 "校工程训练中心/实验室与指导老师；智能车可参考往届技术报告与开源车模。")
+    lines.append("💡 提分点：机械类「实物/仿真占分比」通常最高，重方案创新+可落地；"
+                 "智能车重「速度与稳定兼得」，参数标定和现场调车经验决定上限。")
+    if profile:
+        major = getattr(profile, "major", None)
+        skills = getattr(profile, "skills", None) or []
+        if major or skills:
+            lines.append(
+                f"\n💡 结合你的画像（{major or '专业未填'} / 技能：{', '.join(skills) or '待补充'}）："
+                f"控制/编程熟可主攻算法与调车，机械底子好负责结构与建模；跨专业组队（机械+电控+文档）最稳。"
+            )
+    return "\n".join(lines)
+
+
+def _build_physics_prep(comp, profile) -> str:
+    """物理类备赛：实验竞赛（动手+数据处理） / 学术竞赛 CUPT（文献+对抗） / 知识赛（理论刷题）。"""
+    lines = []
+    name = comp.competition_name or ""
+    is_cupt = "CUPT" in name or "学术" in name
+    is_exp = "实验" in name
+    lines.append("🗺️ 物理备赛四阶段（建议提前 3–5 个月启动；多数以校队/小组形式备赛）：")
+    lines.append("  1) 补基础（第1–6周）：系统复习本科核心物理（力/热/电/光/原），"
+                 "补齐数学工具（微积分/线代/微分方程）；实验类同步练仪器操作与误差分析。")
+    if is_cupt:
+        lines.append("  2) 专题（第7–12周）：CUPT 以「对抗辩论」为主——挑往届赛题做文献调研、理论建模、"
+                     "实验验证，准备正反方陈述与提问；重点练物理直觉与口头交锋。")
+    elif is_exp:
+        lines.append("  2) 专题（第7–12周）：实验竞赛重「设计方案+数据处理」——练不确定度评定、"
+                     "拟合与误差分析、仪器（示波器/光电/传感）使用，做往届实验题的完整报告。")
+    else:
+        lines.append("  2) 专题（第7–12周）：知识类赛刷真题、攻典型模型（刚体/电磁/波动/量子基础），"
+                     "建立「题型→方法」映射；实验类同步补动手。")
+    lines.append("  3) 真题实战（第13–18周）：限时做近 3–5 年真题/赛题，实验类完整写报告、"
+                 "CUPT 做模拟对抗；每题复盘思路与表达。")
+    lines.append("  4) 冲刺模考（赛前2–4周）：全真模拟（实验操作 / 对抗辩论 / 笔试），"
+                 "整理常用公式与仪器清单，查漏补缺。")
+    lines.append("")
+    lines.append("📚 资料：赛事官网与章程、普通物理/理论力学/电磁学教材、往届 CUPT 赛题与对抗视频、"
+                 "校物理实验中心与指导老师；实验类参考《大学物理实验》教材。")
+    lines.append("💡 提分点：实验竞赛「数据真实+不确定度合理」最关键；CUPT 赢在「调研深+表达清+答辩稳」；"
+                 "知识赛重基础扎实与解题速度。")
+    if profile:
+        major = getattr(profile, "major", None)
+        skills = getattr(profile, "skills", None) or []
+        if major or skills:
+            lines.append(
+                f"\n💡 结合你的画像（{major or '专业未填'} / 技能：{', '.join(skills) or '待补充'}）："
+                f"理论强可主攻建模与笔试、动手强负责实验、表达强负责 CUPT 陈述；按目标赛项定向补最短木板。"
+            )
+    return "\n".join(lines)
+
+
+def _build_english_prep(comp, profile) -> str:
+    """英语类备赛：演讲/写作/阅读/辩论/综合（NECCS），按赛项定向积累（词汇+输出）。"""
+    lines = []
+    name = comp.competition_name or ""
+    is_speech = any(k in name for k in ("演讲", "口语"))
+    is_writing = "写作" in name
+    is_debate = "辩论" in name
+    lines.append("🗺️ 英语备赛四阶段（建议提前 3–5 个月启动；重日积月累，突击难见效）：")
+    lines.append("  1) 打底（第1–8周）：每天背核心词汇（按赛项难度，如专四/专八/雅思量级）+ 精听+泛读，"
+                 "把「输入量」堆起来；用 APP/词书固定每日任务。")
+    if is_speech or is_debate:
+        lines.append("  2) 专项（第9–16周）：演讲/辩论重「逻辑+发音+台风」——写定题稿并打磨发音语调，"
+                     "练即兴（抽题 3 分钟构思）；录自己回放改。")
+    elif is_writing:
+        lines.append("  2) 专项（第9–16周）：写作重「结构+语料」——背高频模板与衔接句式，按议论文/图表/书信等题型练，"
+                     "找人批改并总结常错点（时态/冠词/搭配）。")
+    else:
+        lines.append("  2) 专项（第9–16周）：综合/阅读类按题型刷真题（听力/阅读/翻译/词汇语法），"
+                     "建立错题本，针对性补弱项。")
+    lines.append("  3) 真题实战（第17–22周）：限时做近 3–5 年外研社/NECCS 等真题，全真模拟；"
+                 "每套复盘失分点。")
+    lines.append("  4) 冲刺模考（赛前2–4周）：按赛制做 1–2 轮全真演练（演讲脱稿/写作限时/辩论对抗），"
+                 "整理高频话题与模板，调整状态。")
+    lines.append("")
+    lines.append("📚 资料：赛事官网章程与样题、外研社赛事平台、历年真题、《新概念/专四专八写作》、"
+                 "TED/播客精听材料；校外语角与往年获奖选手经验最实用。")
+    lines.append("💡 提分点：演讲/辩论「内容与台风各半」，写作「结构清晰+少错」胜出；"
+                 "综合赛（NECCS）靠词汇量与熟练度，日常积累比临时突击有效得多。")
+    if profile:
+        major = getattr(profile, "major", None)
+        skills = getattr(profile, "skills", None) or []
+        if major or skills:
+            lines.append(
+                f"\n💡 结合你的画像（{major or '专业未填'} / 技能：{', '.join(skills) or '待补充'}）："
+                f"词汇弱先堆输入量、输出弱（说/写）多练限时产出；按你目标赛项（演讲/写作/综合）定向投入时间。"
+            )
+    return "\n".join(lines)
+
+
 def _build_eval_answer(comp, web_results, profile) -> str:
     """对「含金量 / 难不难 / 值不值得」给出平衡研判。"""
     name = comp.competition_name
@@ -1086,6 +1301,14 @@ def _build_eval_answer(comp, web_results, profile) -> str:
         lines.append("  · 数学建模重团队分工与论文表达，跨专业三人组（建模/编程/写作）比单打独斗走得更远；摘要写不好连国奖门槛都难进；")
     elif _is_innovation_comp(comp):
         lines.append("  · 创新创业类非常看重「真实落地数据+知识产权」，纯点子空想很难走到省赛以上；跨专业组队（技术+商科+设计）胜率明显更高；")
+    elif _is_electronics_comp(comp):
+        lines.append("  · 电子设计类软硬件结合，既考电路/嵌入式功底也考四天三夜真题实战的抗压与调试能力，建议从校赛/省赛真题入手、先搭稳常用模块库；")
+    elif _is_engineering_comp(comp):
+        lines.append("  · 机械/工程类重方案论证与样机/模型落地，跨专业组队（机械+控制+文档）更稳，实物/仿真往往占分比最高；")
+    elif _is_physics_comp(comp):
+        lines.append("  · 物理类分「实验/学术」两条线：实验竞赛重动手与数据处理，CUPT 重文献调研与对抗辩论，纯知识赛重理论刷题，路线差异大；")
+    elif _is_english_comp(comp):
+        lines.append("  · 英语类赛制差异大（演讲/写作/阅读/辩论/综合），重日积月累的词汇与输出能力，突击难见效，建议按目标赛项定向练；")
     lines.append("  · 投入产出比取决于你的目标：若只为综测凑数，优先选与本专业/技能最贴合的赛项，性价比最高。")
     lines.append("")
     lines.append("🎯 适合谁：")
