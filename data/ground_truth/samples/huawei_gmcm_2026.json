@@ -50,10 +50,7 @@
   ],
   "brief_description": "华为杯中国研究生数学建模竞赛是由中国学位与研究生教育学会主办的数学建模类赛事（第二十三届，2026），面向在读硕士研究生、博士研究生（含2026级新生及国际学生），不含本科生。以3人团队形式参赛，考察模型合理性、求解精度、创新与实用及论文表达等能力。",
   "required_materials": [
-    "建模论文",
-    "程序代码",
-    "数据附件",
-    "支撑材料"
+    "PDF格式竞赛论文"
   ],
   "evaluation_dimensions": [
     "模型合理性",
@@ -69,11 +66,11 @@
     "LaTeX"
   ],
   "official_source_url": "https://www.cmathc.org.cn/mcm/tz/465.html",
-  "source_acquired_date": "2026-07-18",
-  "trusted_level": "B",
-  "data_status": "unverified",
-  "last_verified_at": "2026-07-18",
-  "doc_version": "2026_v1",
+  "source_acquired_date": "2026-07-29",
+  "trusted_level": "A",
+  "data_status": "verified",
+  "last_verified_at": "2026-07-29",
+  "doc_version": "2026_v2",
   "evidence": [
     {
       "field": "organizer",
@@ -166,6 +163,16 @@
       "trusted_level": "A"
     },
     {
+      "field": "required_materials",
+      "page": null,
+      "source_text": "各参赛队队长使用指定的MD5码校验工具，上传PDF格式论文时间为2026年9月27日14:00至9月28日24:00。",
+      "document_name": "关于开展“华为杯”第二十三届中国研究生数学建模竞赛的通知",
+      "source_url": "https://news.dhu.edu.cn/2026/0530/c7759a426599/pagem.htm",
+      "acquired_date": "2026-07-29",
+      "last_verified_at": "2026-07-29",
+      "trusted_level": "A"
+    },
+    {
       "field": "official_source_url",
       "page": null,
       "source_text": "中国研究生数学建模竞赛官方网站：https://cpipc.acge.org.cn/cw/hp/4",
@@ -176,6 +183,6 @@
       "trusted_level": "A"
     }
   ],
-  "notes": "【2026-07-18核验】原organizer“教育部学位与研究生教育发展中心”有误，实际主办为中国学位与研究生教育学会；原eligible含“本科生”有误，本赛仅面向研究生（硕/博）。team为固定3人。result_announcement取官方“11月中下旬公示”的代表值。原“由公开赛事名录整理、尚未完成人工核验”备注已失效。",
+  "notes": "【2026-07-29复核】原organizer“教育部学位与研究生教育发展中心”有误，实际主办为中国学位与研究生教育学会；本赛仅面向研究生（硕/博），固定3人团队。官方通知明确参赛论文以PDF格式上传；结果在11月中下旬公示。",
   "official_source_status": "found"
 }

@@ -4,6 +4,7 @@ import sys
 import unittest
 from datetime import date
 from pathlib import Path
+from unittest.mock import patch
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -112,9 +113,9 @@ class SubmissionCases(unittest.TestCase):
         self.assertEqual(first.project_id, second.project_id)
         self.assertEqual(len(db.list_user_projects(self.user_id)), 1)
 
-    def test_03_unverified_competition_cannot_become_project(self) -> None:
-        with self.assertRaisesRegex(ValueError, "competition_unverified"):
-            db.create_user_project(self.user_id, "accounting_2026")
+    def test_03_unverified_competition_with_basics_can_become_project(self) -> None:
+        project = db.create_user_project(self.user_id, "accounting_2026")
+        self.assertEqual(project.competition_id, "accounting_2026")
 
     def test_04_expired_competition_cannot_become_project(self) -> None:
         with self.assertRaisesRegex(ValueError, "competition_expired"):
@@ -190,6 +191,13 @@ class SubmissionCases(unittest.TestCase):
         # 截止日期事实须来自 evidence（确定性字段），不校验 LLM 自由措辞
         self.assertTrue(any(c["field"] == "registration_deadline" for c in result["citations"]))
         self.assertTrue(result["answer"].strip())
+
+        # 礼貌前缀「帮我」不应把截止日期事实查询误分为开放闲聊。
+        with patch("agent.graph._web_enabled", return_value=False):
+            assisted = run_agent("2026蓝桥杯最新报名通知，帮我联网查")
+        self.assertEqual(assisted["intent"], "qa")
+        self.assertEqual(assisted["resolved_competition"], "lanqiao_2026")
+        self.assertTrue(assisted["answer"].strip())
 
     def test_15_missing_project_returns_none(self) -> None:
         self.assertIsNone(db.get_user_project(self.user_id, 99999999))

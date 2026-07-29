@@ -13,7 +13,7 @@
   "allowed_grades": null,
   "allowed_majors": null,
   "team_required": true,
-  "team_min": null,
+  "team_min": 1,
   "team_max": 3,
   "registration_deadline": "2026-07-31",
   "submission_deadline": "2026-07-31",
@@ -132,6 +132,6 @@
       "trusted_level": "A"
     }
   ],
-  "notes": "按启航赛道单独建档，避免与启明/启迪赛道的6月30日截止混用。规程仅明确队员上限3人，未明确下限，因此team_min保持null。报名系统在截止日前允许完善信息，故报名截止与初赛作品截止统一记录为2026-07-31。",
+  "notes": "按启航赛道单独建档，避免与启明/启迪赛道的6月30日截止混用。规程仅明确队员上限3人；依据本系统“仅公布上限即最少1人”的统一产品规则，team_min记录为1，不将其表述为官方原文。报名系统在截止日前允许完善信息，故报名截止与初赛作品截止统一记录为2026-07-31。",
   "official_source_status": "found"
 }

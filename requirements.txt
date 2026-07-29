@@ -8,6 +8,7 @@ psycopg2-binary>=2.9        # Render 免费 Postgres 所需驱动（本地 SQLit
 pdfplumber>=0.11
 python-docx>=1.1
 requests>=2.28              # LLM 润色层 + 联网补充检索的 HTTP 客户端（核心，必装；缺失会导致线上 LLM/联网全部关闭）
+httpx2>=2.0.0              # Starlette TestClient（自动回归测试）
 
 # —— 以下均为可选依赖，应用内置等价实现，未安装也能完整运行 ——
 # 构建 Docker / 本地部署时省略它们，镜像更小、装得更快更稳。

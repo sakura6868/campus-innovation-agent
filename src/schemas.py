@@ -89,6 +89,8 @@ class ProjectItemStatus(str, Enum):
     TODO = "todo"
     IN_PROGRESS = "in_progress"
     DONE = "done"
+    BLOCKED = "blocked"
+    SKIPPED = "skipped"
 
 
 class FactTag(str, Enum):
@@ -105,9 +107,19 @@ class FactTag(str, Enum):
 # ---------------------------------------------------------------------------
 
 
+class EvidenceRect(BaseModel):
+    """页面内的归一化矩形坐标，原点位于左上角，取值范围 0-1。"""
+
+    x0: float = Field(..., ge=0, le=1)
+    top: float = Field(..., ge=0, le=1)
+    x1: float = Field(..., ge=0, le=1)
+    bottom: float = Field(..., ge=0, le=1)
+
+
 class Citation(BaseModel):
     """单条字段级引用证据，用于前端角标与原文定位。"""
 
+    citation_id: Optional[int] = Field(None, description="数据库引用 ID；种子数据中可为空")
     field: str = Field(..., description="被佐证的结构化字段名，如 team_max")
     page: Optional[int] = Field(None, description="来源页码；无法定位时返回 null")
     source_text: str = Field(..., description="官方通知中的原文片段")
@@ -116,6 +128,21 @@ class Citation(BaseModel):
     acquired_date: Optional[str] = Field(None, description="数据获取日期 YYYY-MM-DD")
     last_verified_at: Optional[str] = Field(None, description="最后来源检查日期 YYYY-MM-DD")
     trusted_level: TrustedLevel = Field(TrustedLevel.A, description="本条证据可信等级")
+    document_id: Optional[int] = Field(None, description="不可变来源文档 ID")
+    document_sha256: Optional[str] = Field(None, description="来源文档内容指纹")
+    rects: list[EvidenceRect] = Field(default_factory=list, description="原文在 PDF 页内的高亮矩形")
+    anchor_quality: Literal["exact", "approximate", "page_only"] = Field(
+        "page_only", description="证据定位精度"
+    )
+    text_exact: Optional[str] = Field(None, description="用于跨版本重定位的精确文本锚点")
+    text_prefix: Optional[str] = Field(None, description="精确文本之前的上下文锚点")
+    text_suffix: Optional[str] = Field(None, description="精确文本之后的上下文锚点")
+    text_start: Optional[int] = Field(None, ge=0, description="锚点在当前页规范化文本中的起点")
+    text_end: Optional[int] = Field(None, ge=0, description="锚点在当前页规范化文本中的终点")
+    anchor_confidence: float = Field(0.0, ge=0, le=1, description="确定性锚点匹配置信度")
+    anchor_status: Literal["original", "relocated", "needs_review", "invalid"] = Field(
+        "original", description="原版有效、自动重定位、需人工确认或已失效"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -328,6 +355,103 @@ class RecommendationResult(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# 科创机会组合优化
+# ---------------------------------------------------------------------------
+
+
+class PortfolioPreferences(BaseModel):
+    """组合规划偏好；只使用完成规划所必需的非敏感信息。"""
+
+    max_competitions: int = Field(3, ge=1, le=4)
+    horizon_weeks: int = Field(12, ge=4, le=26)
+    weekly_hours_override: Optional[int] = Field(None, ge=1, le=80)
+    goal: Literal["award", "growth", "balanced"] = "balanced"
+
+
+class PortfolioItem(BaseModel):
+    competition_id: str
+    competition_name: str
+    match_score: float
+    estimated_total_hours: float
+    weekly_load: list[float] = Field(default_factory=list)
+    deadline: Optional[date] = None
+    reasons: list[str] = Field(default_factory=list)
+
+
+class RoadmapNode(BaseModel):
+    """科创作战地图节点；仅表达可审计的业务状态。"""
+
+    node_id: str
+    node_type: Literal["skill", "gap", "competition", "material", "milestone"]
+    label: str
+    status: Literal["not_ready", "in_progress", "done", "optional", "blocked"] = "not_ready"
+    competition_id: Optional[str] = None
+    due_date: Optional[date] = None
+    reason: Optional[str] = None
+
+
+class RoadmapEdge(BaseModel):
+    source: str
+    target: str
+    relation: Literal["enables", "requires", "precedes", "impacts"] = "precedes"
+
+
+class PortfolioPlan(BaseModel):
+    mode: Literal["steady", "balanced", "sprint"]
+    label: str
+    items: list[PortfolioItem] = Field(default_factory=list)
+    total_value: float = 0
+    capacity_hours: float = 0
+    peak_weekly_load: float = 0
+    utilization: float = 0
+    risk_score: float = 0
+    conflicts: list[str] = Field(default_factory=list)
+    binding_constraints: list[str] = Field(default_factory=list)
+    excluded_reasons: list[str] = Field(default_factory=list)
+    solver_method: str = "bounded_exact_enumeration"
+    roadmap_nodes: list[RoadmapNode] = Field(default_factory=list)
+    roadmap_edges: list[RoadmapEdge] = Field(default_factory=list)
+
+
+class PortfolioOptimizeResponse(BaseModel):
+    generated_at: str
+    plans: list[PortfolioPlan] = Field(default_factory=list)
+
+
+class PortfolioApplyRequest(BaseModel):
+    competition_ids: list[str] = Field(..., min_length=1, max_length=4)
+
+
+# ---------------------------------------------------------------------------
+# 动态赛事雷达
+# ---------------------------------------------------------------------------
+
+
+class RadarWatchCreate(BaseModel):
+    competition_id: str
+    source_url: str
+    source_type: Literal["html", "pdf", "docx", "auto"] = "auto"
+    css_selector: Optional[str] = None
+    include_selector: Optional[str] = Field(None, max_length=300)
+    exclude_selector: Optional[str] = Field(None, max_length=500)
+    ignore_regex: Optional[str] = Field(None, max_length=1000)
+    trigger_terms: list[str] = Field(default_factory=list, max_length=20)
+    fetch_mode: Literal["http", "browser_fallback"] = "http"
+    timezone: str = Field("Asia/Shanghai", max_length=64)
+    interval_hours: int = Field(24, ge=1, le=168)
+
+
+class RadarEventReview(BaseModel):
+    action: Literal["approve", "reject"]
+    note: Optional[str] = Field(None, max_length=500)
+
+
+class RadarAlertAction(BaseModel):
+    action: Literal["accept", "ignore", "create_task", "replan"]
+    note: Optional[str] = Field(None, max_length=500)
+
+
+# ---------------------------------------------------------------------------
 # 我的项目（只引用赛事，不复制官方截止日期）
 # ---------------------------------------------------------------------------
 
@@ -339,18 +463,35 @@ class ProjectItem(BaseModel):
     due_date: Optional[date] = None
     status: ProjectItemStatus = ProjectItemStatus.TODO
     sort_order: int = 0
+    phase: str = "execution"
+    depends_on_item_id: Optional[int] = None
+    blocked_reason: Optional[str] = None
+    source_alert_id: Optional[int] = None
+    source_citation_id: Optional[int] = None
+    estimated_hours: Optional[float] = Field(None, ge=0)
+    is_blocked: bool = False
 
 
 class ProjectItemCreate(BaseModel):
     item_type: ProjectItemType = ProjectItemType.TASK
     title: str = Field(..., min_length=1, max_length=200)
     due_date: Optional[date] = None
+    phase: str = Field("execution", min_length=1, max_length=50)
+    depends_on_item_id: Optional[int] = None
+    blocked_reason: Optional[str] = Field(None, max_length=500)
+    source_alert_id: Optional[int] = None
+    source_citation_id: Optional[int] = None
+    estimated_hours: Optional[float] = Field(None, ge=0, le=10000)
 
 
 class ProjectItemUpdate(BaseModel):
     title: Optional[str] = Field(None, min_length=1, max_length=200)
     due_date: Optional[date] = None
     status: Optional[ProjectItemStatus] = None
+    phase: Optional[str] = Field(None, min_length=1, max_length=50)
+    depends_on_item_id: Optional[int] = None
+    blocked_reason: Optional[str] = Field(None, max_length=500)
+    estimated_hours: Optional[float] = Field(None, ge=0, le=10000)
 
 
 class UserProject(BaseModel):
@@ -366,6 +507,9 @@ class UserProject(BaseModel):
     recommendation_ready: bool = True
     readiness_reasons: list[str] = Field(default_factory=list)
     items: list[ProjectItem] = Field(default_factory=list)
+    progress_percent: int = Field(0, ge=0, le=100)
+    blocked_count: int = Field(0, ge=0)
+    risk_level: Literal["low", "medium", "high"] = "low"
 
 
 class ProjectCreate(BaseModel):
@@ -374,6 +518,14 @@ class ProjectCreate(BaseModel):
 
 class ProjectUpdate(BaseModel):
     status: ProjectStatus
+
+
+class AgentTaskCreate(BaseModel):
+    competition_id: str
+    title: str = Field(..., min_length=1, max_length=200)
+    due_date: Optional[date] = None
+    source_citation_id: Optional[int] = None
+    estimated_hours: Optional[float] = Field(None, ge=0, le=10000)
 
 
 # ---------------------------------------------------------------------------
@@ -388,6 +540,8 @@ class ParsedBlock(BaseModel):
     paragraph_index: int
     text: str
     competition_id: Optional[str] = None
+    rects: list[EvidenceRect] = Field(default_factory=list)
+    anchor_quality: Literal["exact", "approximate", "page_only"] = "page_only"
 
 
 class ParseResult(BaseModel):
@@ -397,3 +551,5 @@ class ParseResult(BaseModel):
     category: CompetitionCategory
     document_year: int
     blocks: list[ParsedBlock] = Field(default_factory=list)
+    document_id: Optional[int] = None
+    document_sha256: Optional[str] = None

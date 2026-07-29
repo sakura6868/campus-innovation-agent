@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 from datetime import date, timedelta
+import re
 
 from schemas import (
     Competition,
@@ -87,21 +88,111 @@ def eligibility_gate(
 # 第三层：软性匹配评分
 # ---------------------------------------------------------------------------
 
+# 画像填写的技能名称和赛事规则中的表达并不总是完全一致。这里采用可审计的
+# 轻量词族，而不是黑箱向量：每个词族都可在代码和推荐解释中追溯。
+_SKILL_FAMILIES = (
+    frozenset({"python", "py", "数据分析", "数据处理"}),
+    frozenset({"c", "c++", "c/c++", "c语言", "程序设计"}),
+    frozenset({"java", "spring", "后端开发", "后端"}),
+    frozenset({"算法", "算法与数据结构", "数据结构", "动态规划", "程序设计"}),
+    frozenset({"前端", "前端开发", "web", "web开发", "网页开发", "交互设计"}),
+    frozenset({"机器学习", "深度学习", "pytorch", "ai", "人工智能", "nlp"}),
+    frozenset({"数学建模", "matlab", "统计分析", "数学", "建模"}),
+    frozenset({"ui设计", "figma", "photoshop", "海报设计", "品牌视觉", "视觉设计", "交互设计"}),
+    frozenset({"嵌入式", "stm32", "硬件电路", "物联网", "传感器", "电子设计"}),
+    frozenset({"商业计划书", "市场调研", "项目管理", "路演演讲", "商业分析", "创业"}),
+    frozenset({"论文写作", "报告写作", "学术写作", "ppt汇报", "路演表达"}),
+)
+
+_MAJOR_CATEGORY_HINTS = {
+    "计算机": {"programming", "software", "data", "robotics_ai", "modeling"},
+    "软件": {"programming", "software", "data", "robotics_ai"},
+    "人工智能": {"robotics_ai", "data", "programming", "modeling"},
+    "数据": {"data", "modeling", "programming", "business"},
+    "数学": {"math", "modeling", "data"},
+    "统计": {"math", "modeling", "data", "business"},
+    "电子": {"electronics", "robotics_ai", "engineering", "programming"},
+    "自动化": {"electronics", "robotics_ai", "engineering"},
+    "机械": {"engineering", "robotics_ai"},
+    "视觉": {"design", "innovation", "software"},
+    "艺术": {"design", "innovation"},
+    "设计": {"design", "innovation"},
+    "管理": {"business", "innovation", "data"},
+    "财经": {"business", "innovation", "data"},
+    "金融": {"business", "data", "innovation"},
+    "英语": {"english"},
+    "外语": {"english"},
+    "物理": {"physics", "engineering", "electronics"},
+    "化学": {"chem_env", "life_science"},
+    "环境": {"chem_env", "engineering"},
+    "生物": {"life_science"},
+    "医学": {"life_science"},
+}
+
+
+def _norm(value: str) -> str:
+    return re.sub(r"[\s\-_/（）()]+", "", value.lower())
+
+
+def _skill_family(value: str) -> frozenset[str] | None:
+    normalized = _norm(value)
+    for family in _SKILL_FAMILIES:
+        if any(_norm(term) in normalized or normalized in _norm(term) for term in family):
+            return family
+    return None
+
+
+def _major_score(user: UserProfile, comp: Competition) -> float:
+    major = _norm(user.major)
+    if not major:
+        return 50.0
+    hinted_categories = {
+        category for keyword, categories in _MAJOR_CATEGORY_HINTS.items()
+        if _norm(keyword) in major for category in categories
+    }
+    if comp.category.value in hinted_categories:
+        return 100.0
+    # 赛事显式不限专业时仍可参加，但不把它误判为“专业高度相关”。
+    if not comp.allowed_majors:
+        return 55.0
+    if any(_norm(allowed) in major or major in _norm(allowed) for allowed in comp.allowed_majors):
+        return 100.0
+    return 15.0
+
+
+def _skills_match(user_skill: str, required_skill: str) -> bool:
+    left, right = _norm(user_skill), _norm(required_skill)
+    if left == right or left in right or right in left:
+        return True
+    left_family, right_family = _skill_family(user_skill), _skill_family(required_skill)
+    return bool(left_family and left_family == right_family)
+
 
 def _skill_score(user: UserProfile, comp: Competition) -> float:
+    major_score = _major_score(user, comp)
     if not comp.required_skills:
-        return 80.0
-    matched = sum(1 for s in comp.required_skills if s in user.skills)
-    return round(min(100.0, matched / len(comp.required_skills) * 100), 1)
+        return round(0.7 * major_score + 0.3 * 60.0, 1)
+    matched = sum(
+        1 for required in comp.required_skills
+        if any(_skills_match(skill, required) for skill in user.skills)
+    )
+    skill_score = matched / len(comp.required_skills) * 100
+    # 专业相关性不取代具体技能，而是防止“技能词不完全相同”造成系统性误判。
+    return round(0.72 * skill_score + 0.28 * major_score, 1)
 
 
 def _experience_score(user: UserProfile, comp: Competition) -> float:
+    major_score = _major_score(user, comp)
     if not user.experiences:
-        return 40.0
-    # 同类别或含关键词的经历视为有效
-    kw = comp.category.value
-    hit = sum(1 for e in user.experiences if kw in e or comp.competition_name[:2] in e)
-    return round(min(100.0, 40.0 + hit * 30.0), 1)
+        return round(25.0 + 0.35 * major_score, 1)
+    # 过往赛事同名、同赛道关键词和专业相关性共同决定经历分，避免只识别英文类别码。
+    corpus = " ".join(user.experiences + user.skills + [user.major])
+    title_terms = [term for term in re.split(r"[·—－（）()\s]+", comp.competition_name) if len(term) >= 2]
+    title_hit = any(term in corpus for term in title_terms[:4])
+    category_hit = _major_score(user, comp) >= 100 or any(
+        _skills_match(skill, required) for skill in user.skills for required in comp.required_skills
+    )
+    return round(min(100.0, 25.0 + 0.40 * major_score + (25.0 if category_hit else 0.0) + (10.0 if title_hit else 0.0)), 1)
 
 
 def _resource_score(user: UserProfile, comp: Competition) -> float:
@@ -209,13 +300,12 @@ def recommend_for_user(
             )
             continue
         source_readiness = assess_source_readiness(comp)
-        pending = not source_readiness.ready
-        # 第一层：数据有效性
+        # 核验标识保留为透明提示，但不再作为是否评分的门槛。
+        pending = comp.data_status != DataStatus.VERIFIED
+        # 第一层：基础字段完整性；来源核验状态仅作为透明提示，不阻断推荐。
         problems = data_validity_check(comp, current)
         if problems:
-            # 来源或关键字段证据不完整：仍按用户画像做资格门控 + 软性评分，
-            # 让「千人千面」在候选赛事上也能体现；但标记为来源待核实，
-            # 绝不冒充已核验推荐（与反幻觉原则一致）。
+            # 基础字段不足时只展示候选信息，避免在资格或时间未知时误导用户。
             eligible, reasons = eligibility_gate(user, comp, current)
             if not eligible:
                 results.append(
@@ -234,21 +324,20 @@ def recommend_for_user(
                     )
                 )
                 continue
-            breakdown = soft_match_score(user, comp, current)
-            status = _status_from_score(breakdown.total)
             effective_deadline = comp.registration_deadline or comp.submission_deadline
             urgent = effective_deadline is not None and 0 <= (effective_deadline - current).days <= 14
-            expl = _build_explanation(user, comp, breakdown, current)
-            expl["数据状态"] = "来源待核实，报名前请二次确认官网"
             results.append(
                 RecommendationResult(
                     competition_id=comp.competition_id,
                     competition_name=comp.competition_name,
-                    recommendation_status=status,
-                    score=breakdown.total,
-                    eligible=True,
-                    match_breakdown=breakdown,
-                    explanation=expl,
+                    recommendation_status="candidate_only",
+                    score=None,
+                    eligible=False,
+                    match_breakdown=None,
+                    explanation={
+                        "数据状态": "来源或关键证据待核实，仅作为候选信息展示",
+                        "待补充": problems,
+                    },
                     urgent=urgent,
                     pending_review=pending,
                 )
@@ -293,13 +382,13 @@ def recommend_for_user(
             )
         )
 
-    # 排序原则：已核验推荐 -> 来源待核实候选 -> 不符合项；同档内按适配度排序。
+    # 排序原则：资格与匹配度优先；来源待复核仅是提示，不能压过画像匹配结果。
     results.sort(
         key=lambda r: (
             0 if r.eligible else 1,
             0 if r.recommendation_status == "candidate_only" else 1,
-            0 if (not r.pending_review) else 1,
             -(r.score or 0),
+            0 if (not r.pending_review) else 1,
             not r.urgent,
         )
     )

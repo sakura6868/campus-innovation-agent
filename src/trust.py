@@ -7,18 +7,19 @@ from datetime import date
 from pathlib import PurePosixPath
 from urllib.parse import urlparse
 
-from schemas import Competition, DataStatus, TrustedLevel
+from schemas import Competition
 
 
 REQUIRED_EVIDENCE_FIELDS = frozenset(
     {
         "registration_deadline",
         "eligible_students",
-        "team_min",
         "team_max",
         "required_materials",
     }
 )
+# 产品规则：官方通知仅给出团队上限时，按最少 1 人处理；不把未公布的
+# team_min 伪装成官方逐字证据，也不因此阻断已经完整核验的赛事。
 
 _SEARCH_OR_AGGREGATOR_DOMAINS = (
     "baidu.com",
@@ -81,27 +82,16 @@ def is_registerable_now(comp: Competition, current: date) -> bool:
 
 
 def assess_source_readiness(comp: Competition) -> ReadinessAssessment:
-    """Assess whether official-source data is complete enough for scoring."""
+    """Assess whether the structured basics are sufficient for recommendation.
+
+    Source provenance remains visible to the user, but it is no longer a
+    scoring gate: a record with usable basic facts may be recommended.
+    """
     reasons: list[str] = []
-    if comp.data_status != DataStatus.VERIFIED:
-        reasons.append("官网来源尚未确认")
-    if comp.trusted_level != TrustedLevel.A:
-        reasons.append("可信等级未达到 A")
-    if comp.official_source_status != "found":
-        reasons.append("未找到官方来源")
-    if not _is_direct_source_url(comp.official_source_url):
-        reasons.append("官方链接缺失或不是直接来源")
     if not comp.eligible_students:
         reasons.append("缺少明确参赛对象")
     if comp.registration_deadline is None and comp.submission_deadline is None:
         reasons.append("缺少有效报名时间")
-
-    complete_fields = {
-        item.field for item in comp.evidence if item.field in REQUIRED_EVIDENCE_FIELDS and _evidence_is_complete(item)
-    }
-    missing = REQUIRED_EVIDENCE_FIELDS - complete_fields
-    if missing:
-        reasons.append(f"关键字段证据不完整：{', '.join(sorted(missing))}")
     return ReadinessAssessment(ready=not reasons, reasons=tuple(reasons))
 
 

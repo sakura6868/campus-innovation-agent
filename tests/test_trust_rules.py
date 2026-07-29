@@ -115,7 +115,7 @@ class TrustRulesTests(unittest.TestCase):
                 self.assertFalse(result.eligible)
                 self.assertIsNone(result.score)
 
-    def test_unverified_competition_is_candidate_only(self) -> None:
+    def test_unverified_competition_with_complete_basics_can_be_scored(self) -> None:
         candidate = _competition(
             data_status=DataStatus.UNVERIFIED,
             trusted_level=TrustedLevel.B,
@@ -123,11 +123,11 @@ class TrustRulesTests(unittest.TestCase):
         )
         result = recommend_for_user(_user(), [candidate], date.today())[0]
 
-        self.assertEqual(result.recommendation_status, "candidate_only")
+        self.assertNotEqual(result.recommendation_status, "candidate_only")
         self.assertTrue(result.pending_review)
-        self.assertIsNone(result.score)
-        self.assertIsNone(result.match_breakdown)
-        self.assertFalse(result.eligible)
+        self.assertIsNotNone(result.score)
+        self.assertIsNotNone(result.match_breakdown)
+        self.assertTrue(result.eligible)
 
     def test_education_levels_are_complete_and_unknown_values_fail(self) -> None:
         for path in sorted(GROUND_TRUTH_DIR.glob("*.json")):
@@ -221,7 +221,7 @@ class TrustRulesTests(unittest.TestCase):
         # 须基于证据作答（引用存在），而非凭空捏造
         self.assertTrue(result["citations"])
 
-    def test_team_query_uses_team_evidence_without_inventing_minimum(self) -> None:
+    def test_team_query_uses_team_evidence_with_product_default_minimum(self) -> None:
         result = run_agent("MathorCup 团队几人", competition_id="mathorcup_2026", top_k=4)
         self.assertTrue(result["citations"])
         self.assertTrue({c["field"] for c in result["citations"]} & {"team_min", "team_max"})
@@ -230,7 +230,7 @@ class TrustRulesTests(unittest.TestCase):
 
         detail = db.get_competition_detail("mathorcup_2026")
         self.assertIsNotNone(detail)
-        self.assertIn("最多 3 人", detail.requirements[0].text)
+        self.assertIn("1—3 人", detail.requirements[0].text)
 
 
 if __name__ == "__main__":

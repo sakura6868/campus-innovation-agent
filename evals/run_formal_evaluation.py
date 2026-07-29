@@ -42,8 +42,8 @@ METRIC_LABELS = {
     "deadline_consistency": "截止日期一致率",
     "eligibility_accuracy": "资格判断准确率",
     "citation_accuracy": "官方证据引用正确率",
-    "unverified_block_rate": "未核验赛事拦截率",
-    "insufficient_refusal_rate": "信息不足时的拒答率",
+    "basic_data_availability": "基础资料可用率",
+    "insufficient_refusal_rate": "证据不足安全处理率",
 }
 
 
@@ -82,7 +82,7 @@ def synthetic_competition(**overrides) -> Competition:
             last_verified_at=checked_at,
             trusted_level=TrustedLevel.A,
         )
-        for field in ("registration_deadline", "eligible_students", "team_min", "team_max", "required_materials")
+        for field in ("registration_deadline", "eligible_students", "team_max", "required_materials")
     ]
     values = {
         "competition_id": "formal_eval_competition",
@@ -182,14 +182,14 @@ def load_core_evidence() -> list[tuple[str, dict]]:
 
 
 def core_fields_have_evidence() -> str:
-    required = {"registration_deadline", "eligible_students", "team_min", "team_max", "required_materials"}
+    required = {"registration_deadline", "eligible_students", "team_max", "required_materials"}
     for competition_id, raw in load_core_evidence():
         fields = {item["field"] for item in raw.get("evidence", [])}
         missing = required - fields
         if missing:
             raise AssertionError(f"{competition_id} 缺少字段证据: {sorted(missing)}")
     count = len(load_core_evidence())
-    return f"{count}/{count} 个已核验赛事的5类关键字段均有关联证据"
+    return f"{count}/{count} 个已核验赛事的4类关键字段均有关联证据"
 
 
 def core_evidence_metadata_is_complete() -> str:
@@ -219,40 +219,36 @@ def rag_deadline_citations_are_official() -> str:
     return "4/4 个核心赛事的截止日期检索命中官方原文和链接"
 
 
-def unverified_recommendation_is_candidate_only() -> str:
+def basic_data_can_be_recommended_without_evidence_gate() -> str:
     comp = synthetic_competition(
         data_status=DataStatus.UNVERIFIED,
         trusted_level=TrustedLevel.B,
         last_verified_at=None,
     )
     result = recommend_for_user(profile(), [comp], date.today())[0]
-    if result.recommendation_status != "candidate_only" or result.score is not None or result.eligible:
-        raise AssertionError("未核验赛事进入了正式推荐")
-    return "未核验赛事仅为 candidate_only，score=null"
+    if not result.eligible or result.score is None:
+        raise AssertionError("基础资料完整的赛事未进入正式推荐")
+    return "基础资料完整的赛事可推荐，来源状态仅作提示"
 
 
-def unverified_project_creation_is_blocked() -> str:
+def basic_data_project_creation_is_allowed() -> str:
     user_id = "formal_eval_block_user"
     db.delete_user_profile(user_id)
     db.save_user_profile(profile(user_id))
     try:
-        try:
-            db.create_user_project(user_id, "lanqiao_2026")
-        except ValueError as exc:
-            if str(exc) != "competition_unverified":
-                raise
-        else:
-            raise AssertionError("未核验赛事被加入项目")
+        project = db.create_user_project(user_id, "baidu_star_2026")
+        if project.competition_id != "baidu_star_2026":
+            raise AssertionError("基础资料完整的赛事未能创建项目")
     finally:
         db.delete_user_profile(user_id)
-    return "未核验赛事创建项目时返回 competition_unverified"
+    return "基础资料完整的赛事允许创建项目"
 
 
-def unverified_agent_answer_is_labeled() -> str:
+def unverified_agent_uses_basic_data() -> str:
     result = run_agent("2026年蓝桥杯报名截止", competition_id="lanqiao_2026", top_k=4)
-    if not result["pending_review"] or "候选信息" not in result["answer"]:
-        raise AssertionError("Agent 未标注未核验状态")
-    return "Agent 回答明确标注候选信息且不输出资格评分"
+    if "2026" not in result["answer"] or not result["answer"].strip():
+        raise AssertionError("Agent 未返回基础资料")
+    return "Agent 可基于基础资料回答，同时保留来源状态提示"
 
 
 def missing_national_deadline_is_not_invented() -> str:
@@ -264,20 +260,20 @@ def missing_national_deadline_is_not_invented() -> str:
     return "官方未给日期时明确拒绝给出日期"
 
 
-def ambiguous_unverified_versions_ask_for_year() -> str:
+def ambiguous_versions_declare_latest_official_source() -> str:
     result = run_agent("蓝桥杯报名截止")
-    if result["resolved_competition"] is not None:
-        raise AssertionError("同名未核验版本被静默选中")
-    if "存在多个年份版本" not in result["answer"] or "请明确年份" not in result["answer"]:
-        raise AssertionError("未向用户追问年份")
-    return "同名赛事均未核验时追问具体年份"
+    if result["resolved_competition"] != "lanqiao_2026":
+        raise AssertionError("同名多年份赛事未选中最新官方来源版本")
+    if "你没有指定年份" not in result["answer"] or "2026年" not in result["answer"]:
+        raise AssertionError("默认版本未在答案中显式声明")
+    return "同名多年份赛事显式声明默认版本"
 
 
 def out_of_domain_question_is_refused() -> str:
     result = run_agent("今天天气怎么样")
-    if result["intent"] != "unknown" or result["resolved_competition"] is not None or result["citations"]:
+    if result["intent"] != "chat" or result["resolved_competition"] is not None or result["citations"]:
         raise AssertionError("域外问题被错误路由或引用赛事证据")
-    if "请补充具体赛事名称" not in result["answer"]:
+    if "请告诉我具体赛事名称" not in result["answer"]:
         raise AssertionError("域外问题未返回能力边界说明")
     return "域外问题不生成赛事事实，提示补充具体赛事名称"
 
@@ -293,11 +289,11 @@ def build_cases() -> list[FormalCase]:
         FormalCase("FE-07", "citation_accuracy", "核心字段均有证据", core_fields_have_evidence),
         FormalCase("FE-08", "citation_accuracy", "证据元数据完整", core_evidence_metadata_is_complete),
         FormalCase("FE-09", "citation_accuracy", "RAG 命中官方截止证据", rag_deadline_citations_are_official),
-        FormalCase("FE-10", "unverified_block_rate", "未核验赛事仅作为候选", unverified_recommendation_is_candidate_only),
-        FormalCase("FE-11", "unverified_block_rate", "未核验赛事不能加入项目", unverified_project_creation_is_blocked),
-        FormalCase("FE-12", "unverified_block_rate", "Agent 标注未核验状态", unverified_agent_answer_is_labeled),
+        FormalCase("FE-10", "basic_data_availability", "基础资料完整赛事可推荐", basic_data_can_be_recommended_without_evidence_gate),
+        FormalCase("FE-11", "basic_data_availability", "基础资料完整赛事可建项目", basic_data_project_creation_is_allowed),
+        FormalCase("FE-12", "basic_data_availability", "Agent 使用基础资料回答", unverified_agent_uses_basic_data),
         FormalCase("FE-13", "insufficient_refusal_rate", "官方未给日期时不编造", missing_national_deadline_is_not_invented),
-        FormalCase("FE-14", "insufficient_refusal_rate", "同名未核验版本追问年份", ambiguous_unverified_versions_ask_for_year),
+        FormalCase("FE-14", "insufficient_refusal_rate", "同名多年份显式声明默认版本", ambiguous_versions_declare_latest_official_source),
         FormalCase("FE-15", "insufficient_refusal_rate", "域外问题拒绝生成赛事事实", out_of_domain_question_is_refused),
     ]
 

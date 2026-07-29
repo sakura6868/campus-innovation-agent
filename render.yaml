@@ -14,6 +14,10 @@ services:
           property: connectionString   # 自动注入免费 Postgres 的连接串
       - key: ADMIN_API_TOKEN
         generateValue: true            # 所有数据维护接口强制使用 X-Admin-Token
+      - key: AUTH_TOKEN_SECRET
+        generateValue: true            # 签发用户会话，与管理员令牌分离
+      - key: AUTH_TOKEN_TTL_SECONDS
+        value: "28800"
       - key: WEB_SEARCH_PROVIDER
         value: "duckduckgo"            # 免 key 联网搜索补充层；Render 直连公网可用。如需更稳结果改 tavily 并设 WEB_SEARCH_API_KEY
       # RAG_USE_ST 不显式设置即「自动」：本地已预热 all-MiniLM-L6-v2 时默认开启真·语义检索；

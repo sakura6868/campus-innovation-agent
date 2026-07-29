@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>校园科创导航智能体</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='10' fill='%2316181d'/%3E%3Ctext x='32' y='40' text-anchor='middle' font-family='Arial' font-size='25' font-weight='700' fill='white'%3ECI%3C/text%3E%3C/svg%3E" />
-  <link rel="stylesheet" href="/static/styles.css?v=20260720.10" />
+  <link rel="stylesheet" href="/static/styles.css?v=20260730.2" />
 </head>
 <body>
   <header class="topnav">
@@ -17,6 +17,8 @@
       <a href="#/profile" data-nav="profile">我的画像</a>
       <a href="#/hall" data-nav="hall">赛事大厅</a>
       <a href="#/recommend" data-nav="recommend">我的推荐</a>
+      <a href="#/portfolio" data-nav="portfolio">机会组合</a>
+      <a href="#/radar" data-nav="radar">赛事雷达</a>
       <a href="#/projects" data-nav="projects">我的项目</a>
       <a href="#/agent" data-nav="agent">智能问答</a>
       <a href="#/admin" data-nav="admin" id="nav-admin" class="hidden">数据维护</a>
@@ -112,7 +114,14 @@
           <h2>我的项目</h2>
           <p class="muted">任务与材料按赛事组织；官方截止日期始终取自赛事官方通知。</p>
         </div>
+        <div class="execution-view-switch" role="group" aria-label="项目执行视图">
+          <button type="button" class="active" data-project-view="list" aria-pressed="true"><span>☷</span>列表</button>
+          <button type="button" data-project-view="board" aria-pressed="false"><span>▦</span>看板</button>
+          <button type="button" data-project-view="calendar" aria-pressed="false"><span>□</span>日历</button>
+          <button type="button" data-project-view="timeline" aria-pressed="false"><span>↝</span>时间线</button>
+        </div>
       </div>
+      <div id="project-exec-summary" class="project-exec-summary" aria-live="polite"></div>
       <div id="project-list" class="project-list"></div>
     </section>
 
@@ -170,6 +179,89 @@
         <p id="recommend-hint" class="muted"></p>
       </div></div>
       <div id="recommend-list" class="cards"></div>
+    </section>
+
+    <!-- 科创机会组合优化 -->
+    <section id="view-portfolio" class="view product-view portfolio-view hidden">
+      <div class="page-head app-page-head">
+        <div>
+          <span class="page-eyebrow">PORTFOLIO OPTIMIZER / 04</span>
+          <h2>科创机会组合</h2>
+          <p class="muted">在资格、截止时间与每周精力约束下，计算最值得投入的一组赛事。</p>
+        </div>
+        <span class="page-status"><span></span> 确定性组合求解</span>
+      </div>
+      <div class="portfolio-controls card">
+        <label>最多参赛
+          <select id="portfolio-max"><option value="2">2 场</option><option value="3" selected>3 场</option><option value="4">4 场</option></select>
+        </label>
+        <label>规划周期
+          <select id="portfolio-horizon"><option value="8">8 周</option><option value="12" selected>12 周</option><option value="16">16 周</option><option value="24">24 周</option></select>
+        </label>
+        <label>主要目标
+          <select id="portfolio-goal"><option value="balanced">获奖与成长均衡</option><option value="award">优先提高获奖把握</option><option value="growth">优先扩展能力边界</option></select>
+        </label>
+        <label>组合周预算
+          <input id="portfolio-hours" type="number" min="1" max="80" placeholder="默认使用画像" />
+        </label>
+        <button id="portfolio-run" class="btn primary">重新计算最优组合</button>
+      </div>
+      <div id="portfolio-summary" class="portfolio-summary"></div>
+      <div id="portfolio-plans" class="portfolio-plans"></div>
+      <section class="mission-map-shell" aria-labelledby="mission-map-title">
+        <div class="mission-map-head">
+          <div><span>MISSION CONTROL</span><h3 id="mission-map-title">科创作战地图</h3></div>
+          <div class="mission-legend"><span><i class="ready"></i>可执行</span><span><i class="risk"></i>风险节点</span><span><i class="blocked"></i>受阻</span></div>
+        </div>
+        <div id="innovation-map" class="innovation-map"><div class="map-empty">计算组合后生成三条可执行路线</div></div>
+      </section>
+    </section>
+
+    <!-- 动态赛事雷达 -->
+    <section id="view-radar" class="view product-view radar-view hidden">
+      <div class="page-head app-page-head">
+        <div>
+          <span class="page-eyebrow">LIVE SOURCE RADAR / 05</span>
+          <h2>动态赛事雷达</h2>
+          <p class="muted">持续比对官方网页与通知版本；任何关键变化必须经过人工审核。</p>
+        </div>
+        <div class="radar-actions">
+          <button id="radar-run" class="btn ghost hidden">立即扫描</button>
+          <button id="radar-demo" class="btn primary hidden">演示截止日期变化</button>
+        </div>
+      </div>
+      <div class="radar-stats">
+        <div><span>监控来源</span><strong id="radar-watch-count">—</strong></div>
+        <div><span>运行正常</span><strong id="radar-healthy-count">—</strong></div>
+        <div><span>待人工审核</span><strong id="radar-pending-count">—</strong></div>
+        <div><span>可信原则</span><strong>不自动覆盖</strong></div>
+      </div>
+      <div class="radar-command-grid">
+        <section class="radar-command-card radar-health-card">
+          <div class="command-card-head"><div><span>SOURCE HEALTH</span><h3>来源健康总览</h3></div><b id="radar-signal">SIGNAL —</b></div>
+          <div id="radar-health-overview" class="radar-health-overview"></div>
+        </section>
+        <section class="radar-command-card radar-rules-card">
+          <div class="command-card-head"><div><span>WATCH RULES</span><h3>监控规则引擎</h3></div><b>DETERMINISTIC</b></div>
+          <div id="radar-rules" class="radar-rules"></div>
+        </section>
+        <section class="radar-command-card radar-inbox-card">
+          <div class="command-card-head"><div><span>ACTION INBOX</span><h3>待处置情报</h3></div><b id="radar-inbox-count">0 NEW</b></div>
+          <div id="radar-inbox" class="radar-inbox"></div>
+        </section>
+      </div>
+      <div class="radar-event-toolbar">
+        <div><span class="radar-pulse"></span><b>变化情报流</b><small>官方来源 → 差异识别 → 人工审核 → 项目影响</small></div>
+        <div class="radar-filter" role="group" aria-label="雷达事件筛选">
+          <button type="button" class="active" data-radar-filter="all">全部</button>
+          <button type="button" data-radar-filter="pending">待审核</button>
+          <button type="button" data-radar-filter="high">高影响</button>
+        </div>
+      </div>
+      <div class="radar-grid">
+        <section class="card"><div class="section-title"><h3>变化时间线</h3><span>新旧原文差异</span></div><div id="radar-events" class="radar-events"></div></section>
+        <section class="card"><div class="section-title"><h3>监控矩阵</h3><span>官方来源健康状态</span></div><div id="radar-watches" class="radar-watches"></div></section>
+      </div>
     </section>
 
     <!-- 智能问答 -->
@@ -415,6 +507,8 @@
           <label>用户名<input id="login-username" type="text" placeholder="用户名" autocomplete="username" maxlength="32" /></label>
           <label>密码<input id="login-password" type="password" placeholder="密码" autocomplete="current-password" /></label>
           <button type="submit" class="btn primary">登录</button>
+          <button type="button" id="dev-admin-login" class="btn ghost dev-admin-login">本地调试：管理员一键登录</button>
+          <small class="dev-admin-note">仅本地开发服务启用；部署前删除此按钮与对应接口。</small>
           <div id="login-msg" class="msg"></div>
         </form>
 
@@ -448,15 +542,6 @@
     </div>
   </div>
 
-  <!-- 引用证据弹窗 -->
-  <div id="cite-modal" class="modal hidden">
-    <div class="modal-box">
-      <h3>引用证据</h3>
-      <div id="cite-body"></div>
-      <div class="row"><button id="cite-close" class="btn">关闭</button></div>
-    </div>
-  </div>
-
   <!-- 组队邀约弹窗 -->
   <div id="invite-modal" class="modal hidden">
     <div class="modal-box">
@@ -472,6 +557,6 @@
 
   <div id="toast" class="toast hidden"></div>
 
-  <script src="/static/app.js?v=20260721.12"></script>
+  <script src="/static/app.js?v=20260730.3"></script>
 </body>
 </html>

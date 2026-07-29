@@ -21,7 +21,7 @@ import json
 import os
 import secrets
 from contextlib import contextmanager
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Iterator, Optional
 
@@ -29,7 +29,10 @@ from sqlalchemy import (
     DateTime,
     Date,
     ForeignKey,
+    Float,
+    Index,
     Integer,
+    LargeBinary,
     String,
     Text,
     create_engine,
@@ -165,8 +168,131 @@ class CitationModel(Base):
     acquired_date: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     last_verified_at: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     trusted_level: Mapped[str] = mapped_column(String, default="C")
+    document_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    document_sha256: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    page_rects: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    anchor_quality: Mapped[str] = mapped_column(String, nullable=False, default="page_only")
+    text_exact: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    text_prefix: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    text_suffix: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    text_start: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    text_end: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    anchor_confidence: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    anchor_status: Mapped[str] = mapped_column(String, nullable=False, default="original")
 
     competition: Mapped["CompetitionModel"] = relationship(back_populates="citations")
+
+
+class DocumentModel(Base):
+    """不可变官方文档；内容按 SHA-256 去重，确保引用对应历史版本。"""
+
+    __tablename__ = "documents"
+
+    document_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    sha256: Mapped[str] = mapped_column(String, nullable=False, unique=True, index=True)
+    filename: Mapped[str] = mapped_column(String, nullable=False)
+    mime_type: Mapped[str] = mapped_column(String, nullable=False)
+    byte_size: Mapped[int] = mapped_column(Integer, nullable=False)
+    content: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None)
+    )
+
+
+class SourceWatchModel(Base):
+    __tablename__ = "source_watches"
+
+    watch_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    competition_id: Mapped[str] = mapped_column(
+        String, ForeignKey("competitions.competition_id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    source_url: Mapped[str] = mapped_column(Text, nullable=False)
+    source_type: Mapped[str] = mapped_column(String, nullable=False, default="auto")
+    css_selector: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    include_selector: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    exclude_selector: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    ignore_regex: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    trigger_terms: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    fetch_mode: Mapped[str] = mapped_column(String, nullable=False, default="http")
+    timezone_name: Mapped[str] = mapped_column(String, nullable=False, default="Asia/Shanghai")
+    interval_hours: Mapped[int] = mapped_column(Integer, nullable=False, default=24)
+    enabled: Mapped[bool] = mapped_column(nullable=False, default=True)
+    last_checked_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    etag: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    last_modified: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    last_content_hash: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    last_status: Mapped[str] = mapped_column(String, nullable=False, default="new")
+    consecutive_failures: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    last_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    last_success_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    next_scan_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    last_latency_ms: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    last_content_bytes: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None)
+    )
+
+
+class SourceSnapshotModel(Base):
+    __tablename__ = "source_snapshots"
+
+    snapshot_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    watch_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("source_watches.watch_id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    fetched_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None)
+    )
+    http_status: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    content_hash: Mapped[str] = mapped_column(String, nullable=False)
+    normalized_text: Mapped[str] = mapped_column(Text, nullable=False)
+    document_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    response_etag: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    response_last_modified: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+
+
+class SourceChangeEventModel(Base):
+    __tablename__ = "source_change_events"
+
+    event_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    watch_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("source_watches.watch_id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    old_snapshot_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    new_snapshot_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    detected_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None)
+    )
+    severity: Mapped[str] = mapped_column(String, nullable=False, default="low")
+    change_type: Mapped[str] = mapped_column(String, nullable=False, default="content_changed")
+    summary: Mapped[str] = mapped_column(Text, nullable=False)
+    diff_text: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    affected_fields: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    field_changes: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    proposed_changes: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
+    status: Mapped[str] = mapped_column(String, nullable=False, default="pending")
+    review_note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    reviewed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+
+class UserAlertModel(Base):
+    __tablename__ = "user_alerts"
+
+    alert_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    event_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    competition_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    title: Mapped[str] = mapped_column(String, nullable=False)
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    is_read: Mapped[bool] = mapped_column(nullable=False, default=False)
+    status: Mapped[str] = mapped_column(String, nullable=False, default="pending")
+    action_note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    project_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    item_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None)
+    )
 
 
 class UserProfileModel(Base):
@@ -197,6 +323,24 @@ class AuthUser(Base):
     password_hash: Mapped[str] = mapped_column(String, nullable=False)
     is_test: Mapped[bool] = mapped_column(default=False)
     display_name: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None)
+    )
+
+
+class AgentRunModel(Base):
+    """可回放的业务运行摘要；不保存提示词、模型私有思维链或敏感凭证。"""
+
+    __tablename__ = "agent_runs"
+
+    run_id: Mapped[str] = mapped_column(String, primary_key=True)
+    user_id: Mapped[Optional[str]] = mapped_column(String, nullable=True, index=True)
+    question: Mapped[str] = mapped_column(Text, nullable=False)
+    intent: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    resolved_competition: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    status: Mapped[str] = mapped_column(String, nullable=False, default="completed")
+    total_duration_ms: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    summary_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
     created_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None)
     )
@@ -252,6 +396,75 @@ def create_auth_user(
         return True
 
 
+def save_agent_run(result: dict) -> str:
+    """保存一次可审计运行摘要，返回 run_id；失败不阻断问答主链。"""
+    run_id = str(result.get("run_id") or secrets.token_hex(12))
+    summary = {
+        "trace": result.get("trace") or [],
+        "trace_summary": result.get("trace_summary") or {},
+        "metrics": result.get("metrics") or {},
+        "pending_review": bool(result.get("pending_review")),
+        "citation_ids": [item.get("citation_id") for item in (result.get("citations") or []) if item.get("citation_id")],
+        "data_version": result.get("metrics", {}).get("data_version") if isinstance(result.get("metrics"), dict) else None,
+    }
+    try:
+        with session_scope() as session:
+            existing = session.get(AgentRunModel, run_id)
+            if existing is None:
+                existing = AgentRunModel(run_id=run_id)
+                session.add(existing)
+            existing.user_id = result.get("user_id")
+            existing.question = str(result.get("question") or "")[:4000]
+            existing.intent = result.get("intent")
+            existing.resolved_competition = result.get("resolved_competition")
+            existing.status = "review_required" if result.get("pending_review") else "completed"
+            existing.total_duration_ms = (result.get("metrics") or {}).get("total_duration_ms")
+            existing.summary_json = _dump_json(summary)
+        return run_id
+    except Exception:
+        return run_id
+
+
+def list_agent_runs(user_id: Optional[str] = None, limit: int = 30) -> list[dict]:
+    with session_scope() as session:
+        query = session.query(AgentRunModel)
+        if user_id:
+            query = query.filter(AgentRunModel.user_id == user_id)
+        rows = query.order_by(AgentRunModel.created_at.desc()).limit(limit).all()
+        return [
+            {
+                "run_id": row.run_id,
+                "user_id": row.user_id,
+                "question": row.question,
+                "intent": row.intent,
+                "resolved_competition": row.resolved_competition,
+                "status": row.status,
+                "total_duration_ms": row.total_duration_ms,
+                "created_at": row.created_at.isoformat(),
+                **(_load_json(row.summary_json) if row.summary_json else {}),
+            }
+            for row in rows
+        ]
+
+
+def get_agent_run(run_id: str) -> Optional[dict]:
+    with session_scope() as session:
+        row = session.get(AgentRunModel, run_id)
+        if row is None:
+            return None
+        return {
+            "run_id": row.run_id,
+            "user_id": row.user_id,
+            "question": row.question,
+            "intent": row.intent,
+            "resolved_competition": row.resolved_competition,
+            "status": row.status,
+            "total_duration_ms": row.total_duration_ms,
+            "created_at": row.created_at.isoformat(),
+            **(_load_json(row.summary_json) if row.summary_json else {}),
+        }
+
+
 # 演示测试账号（硬编码用户名；如需改密码改这里即可）
 TEST_ACCOUNT_USERNAME = "test"
 TEST_ACCOUNT_PASSWORD = "test123"
@@ -291,6 +504,14 @@ def seed_test_account(session) -> None:
 
 class UserProjectModel(Base):
     __tablename__ = "user_projects"
+    __table_args__ = (
+        Index(
+            "ux_user_projects_user_competition",
+            "user_id",
+            "competition_id",
+            unique=True,
+        ),
+    )
 
     project_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
@@ -320,6 +541,12 @@ class ProjectItemModel(Base):
     due_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     status: Mapped[str] = mapped_column(String, nullable=False, default="todo")
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    phase: Mapped[str] = mapped_column(String, nullable=False, default="execution")
+    depends_on_item_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    blocked_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    source_alert_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    source_citation_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    estimated_hours: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
 
     project: Mapped["UserProjectModel"] = relationship(back_populates="items")
 
@@ -353,7 +580,10 @@ def init_db() -> None:
     Base.metadata.create_all(_engine)
     _migrate_user_profile_columns()
     _migrate_competition_columns()
+    _migrate_citation_columns()
+    _migrate_innovation_columns()
     _migrate_auth_user_columns()
+    _migrate_user_project_unique_index()
     # 必须在 seed 之前置位，避免 seed -> session_scope -> init_db 递归
     _initialized = True
     seed_all()
@@ -406,6 +636,22 @@ def _migrate_competition_columns() -> None:
     _add_missing_columns(CompetitionModel.__table__, DATABASE_URL)
 
 
+def _migrate_citation_columns() -> None:
+    """为历史 citations 表补齐证据坐标与不可变文档字段。"""
+    _add_missing_columns(CitationModel.__table__, DATABASE_URL)
+
+
+def _migrate_innovation_columns() -> None:
+    """为雷达控制塔、收件箱和执行任务补齐新增列。"""
+    for table in (
+        SourceWatchModel.__table__,
+        SourceChangeEventModel.__table__,
+        UserAlertModel.__table__,
+        ProjectItemModel.__table__,
+    ):
+        _add_missing_columns(table, DATABASE_URL)
+
+
 def _migrate_user_profile_columns() -> None:
     """为 user_profiles 表补齐模型声明但库表缺失的列（跨 dialect）。"""
     _add_missing_columns(UserProfileModel.__table__, DATABASE_URL)
@@ -414,6 +660,26 @@ def _migrate_user_profile_columns() -> None:
 def _migrate_auth_user_columns() -> None:
     """为 auth_users 表补齐模型声明但库表缺失的列（跨 dialect）。"""
     _add_missing_columns(AuthUser.__table__, DATABASE_URL)
+
+
+def _migrate_user_project_unique_index() -> None:
+    """为旧库补上项目幂等约束；发现历史重复数据时保守跳过。"""
+    from sqlalchemy import text
+
+    with _engine.begin() as conn:
+        duplicate = conn.execute(
+            text(
+                "SELECT user_id, competition_id FROM user_projects "
+                "GROUP BY user_id, competition_id HAVING COUNT(*) > 1 LIMIT 1"
+            )
+        ).first()
+        if duplicate is None:
+            conn.execute(
+                text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS ux_user_projects_user_competition "
+                    "ON user_projects (user_id, competition_id)"
+                )
+            )
 
 
 @contextmanager
@@ -471,7 +737,16 @@ def _to_enum(cls, v, default=None):
 
 
 def _citation_to_pydantic(m: CitationModel) -> Citation:
+    rects = _load_json(m.page_rects)
+    confidence = float(m.anchor_confidence or 0.0)
+    if rects and m.anchor_quality == "exact":
+        confidence = max(confidence, 0.95)
+    elif rects and m.anchor_quality == "approximate":
+        confidence = max(confidence, 0.72)
+    elif m.page:
+        confidence = max(confidence, 0.45)
     return Citation(
+        citation_id=m.id,
         field=m.field,
         page=m.page,
         source_text=m.source_text,
@@ -480,6 +755,17 @@ def _citation_to_pydantic(m: CitationModel) -> Citation:
         acquired_date=m.acquired_date,
         last_verified_at=m.last_verified_at,
         trusted_level=_to_enum(TrustedLevel, m.trusted_level, TrustedLevel.C),
+        document_id=m.document_id,
+        document_sha256=m.document_sha256,
+        rects=rects,
+        anchor_quality=m.anchor_quality or "page_only",
+        text_exact=m.text_exact or m.source_text or None,
+        text_prefix=m.text_prefix,
+        text_suffix=m.text_suffix,
+        text_start=m.text_start,
+        text_end=m.text_end,
+        anchor_confidence=confidence,
+        anchor_status=m.anchor_status or "original",
     )
 
 
@@ -500,7 +786,7 @@ def _competition_to_pydantic(m: CompetitionModel) -> Competition:
         allowed_grades=allowed_grades,
         allowed_majors=allowed_majors,
         team_required=m.team_required,
-        team_min=m.team_min,
+        team_min=m.team_min if m.team_min is not None else (1 if (m.team_required or m.team_max is not None) else None),
         team_max=m.team_max,
         registration_deadline=m.registration_deadline,
         submission_deadline=m.submission_deadline,
@@ -691,7 +977,7 @@ def _upsert_competition_from_raw(raw: dict, session) -> None:
         "allowed_grades": None if raw.get("allowed_grades") is None else _dump_json(raw["allowed_grades"]),
         "allowed_majors": None if raw.get("allowed_majors") is None else _dump_json(raw["allowed_majors"]),
         "team_required": bool(raw.get("team_required", False)),
-        "team_min": raw.get("team_min"),
+        "team_min": raw.get("team_min") if raw.get("team_min") is not None else (1 if (raw.get("team_required") or raw.get("team_max") is not None) else None),
         "team_max": raw.get("team_max"),
         "registration_deadline": _to_date(raw.get("registration_deadline")),
         "submission_deadline": _to_date(raw.get("submission_deadline")),
@@ -722,24 +1008,70 @@ def _upsert_competition_from_raw(raw: dict, session) -> None:
     for k, v in cols.items():
         setattr(existing, k, v)
 
-    # 证据：先删后插，保证与最新 JSON 一致
-    for old in list(existing.citations):
-        session.delete(old)
-    session.flush()
+    # 证据按稳定内容键原位更新：既与最新 JSON 保持一致，也保留雷达运行后
+    # 补充的 citation_id、不可变文档指纹和 X 光坐标，避免应用重启后丢失。
+    old_citations = list(existing.citations)
+    old_by_key = {
+        (item.field, item.page, item.source_text, item.source_url): item
+        for item in old_citations
+    }
+    retained_ids: set[int] = set()
     for e in raw.get("evidence", []):
-        session.add(
-            CitationModel(
-                competition_id=cid,
-                field=e.get("field", ""),
-                page=e.get("page"),
-                source_text=e.get("source_text", ""),
-                document_name=e.get("document_name"),
-                source_url=e.get("source_url"),
-                acquired_date=e.get("acquired_date"),
-                last_verified_at=e.get("last_verified_at"),
-                trusted_level=e.get("trusted_level") or "C",
-            )
+        key = (
+            e.get("field", ""),
+            e.get("page"),
+            e.get("source_text", ""),
+            e.get("source_url"),
         )
+        citation = old_by_key.get(key)
+        if citation is None:
+            citation = CitationModel(competition_id=cid)
+            session.add(citation)
+        elif citation.id is not None:
+            retained_ids.add(citation.id)
+
+        citation.field = e.get("field", "")
+        citation.page = e.get("page")
+        citation.source_text = e.get("source_text", "")
+        citation.document_name = e.get("document_name")
+        citation.source_url = e.get("source_url")
+        citation.acquired_date = e.get("acquired_date")
+        citation.last_verified_at = e.get("last_verified_at")
+        citation.trusted_level = e.get("trusted_level") or "C"
+        # ground-truth 文件通常不含运行时定位字段；只有显式提供非空值时才覆盖。
+        if e.get("document_id") is not None:
+            citation.document_id = e["document_id"]
+        if e.get("document_sha256"):
+            citation.document_sha256 = e["document_sha256"]
+        if e.get("rects"):
+            citation.page_rects = _dump_json(e["rects"])
+        elif citation.page_rects is None:
+            citation.page_rects = "[]"
+        if e.get("anchor_quality"):
+            citation.anchor_quality = e["anchor_quality"]
+        elif not citation.anchor_quality:
+            citation.anchor_quality = "page_only"
+        citation.text_exact = e.get("text_exact") or citation.text_exact or citation.source_text
+        if e.get("text_prefix") is not None:
+            citation.text_prefix = e.get("text_prefix")
+        if e.get("text_suffix") is not None:
+            citation.text_suffix = e.get("text_suffix")
+        if e.get("text_start") is not None:
+            citation.text_start = e.get("text_start")
+        if e.get("text_end") is not None:
+            citation.text_end = e.get("text_end")
+        if e.get("anchor_confidence") is not None:
+            citation.anchor_confidence = float(e.get("anchor_confidence"))
+        elif not citation.anchor_confidence:
+            citation.anchor_confidence = 1.0 if citation.anchor_quality == "exact" else 0.45
+        if e.get("anchor_status"):
+            citation.anchor_status = e.get("anchor_status")
+        elif not citation.anchor_status:
+            citation.anchor_status = "original"
+
+    for old in old_citations:
+        if old.id not in retained_ids:
+            session.delete(old)
 
 
 def seed_competitions(session) -> int:
@@ -787,12 +1119,48 @@ def seed_demo_user(session) -> None:
                 existing.avatar = u.avatar
 
 
+def seed_source_watches(session) -> None:
+    """为已核验赛事创建少量幂等监控项；首次扫描只建立基线。"""
+    rows = (
+        session.query(CompetitionModel)
+        .filter(
+            CompetitionModel.data_status == DataStatus.VERIFIED.value,
+            CompetitionModel.trusted_level == TrustedLevel.A.value,
+            CompetitionModel.official_source_status == "found",
+            CompetitionModel.official_source_url.is_not(None),
+        )
+        .order_by(CompetitionModel.competition_id)
+        .limit(12)
+        .all()
+    )
+    for comp in rows:
+        exists = (
+            session.query(SourceWatchModel)
+            .filter(
+                SourceWatchModel.competition_id == comp.competition_id,
+                SourceWatchModel.source_url == comp.official_source_url,
+            )
+            .first()
+        )
+        if exists is None:
+            source_type = "pdf" if ".pdf" in (comp.official_source_url or "").lower() else "auto"
+            session.add(
+                SourceWatchModel(
+                    competition_id=comp.competition_id,
+                    source_url=comp.official_source_url,
+                    source_type=source_type,
+                    interval_hours=24,
+                )
+            )
+
+
 def seed_all() -> int:
     """幂等 seed：赛事 Ground Truth + 演示用户 + 测试账号。重复运行安全。"""
     with session_scope() as session:
         n = seed_competitions(session)
         seed_demo_user(session)
         seed_test_account(session)
+        seed_source_watches(session)
     return n
 
 
@@ -970,6 +1338,50 @@ def delete_user_profile(user_id: str) -> dict:
 def _project_to_pydantic(m: UserProjectModel) -> UserProject:
     comp = m.competition
     readiness = assess_recommendation_readiness(_competition_to_pydantic(comp), date.today())
+    ordered = sorted(m.items, key=lambda item: (item.sort_order, item.item_id))
+    statuses = {item.item_id: item.status for item in ordered}
+    payload_items: list[ProjectItem] = []
+    for item in ordered:
+        dependency_open = bool(
+            item.depends_on_item_id
+            and statuses.get(item.depends_on_item_id) not in {
+                ProjectItemStatus.DONE.value,
+                ProjectItemStatus.SKIPPED.value,
+            }
+        )
+        is_blocked = bool(item.blocked_reason) or dependency_open or item.status == ProjectItemStatus.BLOCKED.value
+        payload_items.append(
+            ProjectItem(
+                item_id=item.item_id,
+                item_type=ProjectItemType(item.item_type),
+                title=item.title,
+                due_date=item.due_date,
+                status=ProjectItemStatus(item.status),
+                sort_order=item.sort_order,
+                phase=item.phase or "execution",
+                depends_on_item_id=item.depends_on_item_id,
+                blocked_reason=(
+                    item.blocked_reason
+                    or ("前置任务尚未完成" if dependency_open else None)
+                ),
+                source_alert_id=item.source_alert_id,
+                source_citation_id=item.source_citation_id,
+                estimated_hours=item.estimated_hours,
+                is_blocked=is_blocked,
+            )
+        )
+    completed = sum(
+        1 for item in payload_items if item.status in {ProjectItemStatus.DONE, ProjectItemStatus.SKIPPED}
+    )
+    progress = round(completed / len(payload_items) * 100) if payload_items else 0
+    blocked_count = sum(1 for item in payload_items if item.is_blocked)
+    overdue = sum(
+        1 for item in payload_items
+        if item.due_date and item.due_date < date.today() and item.status not in {ProjectItemStatus.DONE, ProjectItemStatus.SKIPPED}
+    )
+    risk_level = "high" if overdue or blocked_count >= 2 or not readiness.ready else (
+        "medium" if blocked_count or (comp.registration_deadline and (comp.registration_deadline - date.today()).days <= 14) else "low"
+    )
     return UserProject(
         project_id=m.project_id,
         user_id=m.user_id,
@@ -983,17 +1395,10 @@ def _project_to_pydantic(m: UserProjectModel) -> UserProject:
         created_at=m.created_at.isoformat(),
         recommendation_ready=readiness.ready,
         readiness_reasons=list(readiness.reasons),
-        items=[
-            ProjectItem(
-                item_id=i.item_id,
-                item_type=ProjectItemType(i.item_type),
-                title=i.title,
-                due_date=i.due_date,
-                status=ProjectItemStatus(i.status),
-                sort_order=i.sort_order,
-            )
-            for i in sorted(m.items, key=lambda item: (item.sort_order, item.item_id))
-        ],
+        items=payload_items,
+        progress_percent=progress,
+        blocked_count=blocked_count,
+        risk_level=risk_level,
     )
 
 
@@ -1005,6 +1410,11 @@ def list_user_projects(user_id: str) -> list[UserProject]:
             .order_by(UserProjectModel.created_at.desc())
             .all()
         )
+        for row in rows:
+            _ensure_project_template(session, row, row.competition)
+        session.flush()
+        for row in rows:
+            session.expire(row, ["items"])
         return [_project_to_pydantic(row) for row in rows]
 
 
@@ -1013,7 +1423,216 @@ def get_user_project(user_id: str, project_id: int) -> Optional[UserProject]:
         row = session.get(UserProjectModel, project_id)
         if row is None or row.user_id != user_id:
             return None
+        _ensure_project_template(session, row, row.competition)
+        session.flush()
+        session.expire(row, ["items"])
         return _project_to_pydantic(row)
+
+
+def _get_or_create_project_model(session, user_id: str, comp: CompetitionModel) -> UserProjectModel:
+    """在调用方事务中幂等创建项目及默认任务。"""
+    existing = (
+        session.query(UserProjectModel)
+        .filter(
+            UserProjectModel.user_id == user_id,
+            UserProjectModel.competition_id == comp.competition_id,
+        )
+        .first()
+    )
+    if existing is not None:
+        _ensure_project_template(session, existing, comp)
+        return existing
+
+    project = UserProjectModel(
+        user_id=user_id,
+        competition_id=comp.competition_id,
+        status=ProjectStatus.PLANNED.value,
+    )
+    session.add(project)
+    session.flush()
+
+    _ensure_project_template(session, project, comp)
+    return project
+
+
+def _safe_due(base: Optional[date], days_before: int = 0) -> Optional[date]:
+    return base - timedelta(days=days_before) if base else None
+
+
+def _defense_due(comp: CompetitionModel) -> Optional[date]:
+    """答辩/证据包节点必须晚于提交节点，避免赛程字段倒置时出现反向流程。"""
+    submission = comp.submission_deadline or comp.registration_deadline
+    stated = [item for item in (comp.competition_start_date, comp.competition_end_date) if item]
+    if submission is None:
+        return min(stated) if stated else None
+    later = [item for item in stated if item > submission]
+    return min(later) if later else submission + timedelta(days=7)
+
+
+def _ensure_project_template(session, project: UserProjectModel, comp: CompetitionModel) -> None:
+    """幂等补齐七阶段参赛模板，并建立可解释的线性依赖。"""
+    # 兼容旧版项目默认条目：先把已有条目归入阶段，再补缺，不制造重复任务。
+    legacy_aliases = (
+        ("qualification", ("核对", "资格", "官方证据")),
+        ("team_topic", ("团队", "分工", "组队")),
+        ("registration", ("报名",)),
+    )
+    used_legacy_phases: set[str] = set()
+    for item in list(project.items):
+        if item.item_type != ProjectItemType.TASK.value or (item.phase and item.phase != "execution"):
+            continue
+        for phase, keywords in legacy_aliases:
+            if phase in used_legacy_phases:
+                continue
+            if any(keyword in item.title for keyword in keywords):
+                item.phase = phase
+                used_legacy_phases.add(phase)
+                break
+    template = [
+        ("qualification", "01 · 资格核对与官方证据确认", _safe_due(comp.registration_deadline, 21), 2.0),
+        ("team_topic", "02 · 组队分工与选题冻结", _safe_due(comp.registration_deadline, 14), 6.0),
+        ("registration", "03 · 完成报名与队伍信息确认", comp.registration_deadline, 2.0),
+        ("solution", "04 · 方案设计与评审指标映射", _safe_due(comp.submission_deadline, 42), 12.0),
+        ("production", "05 · 作品制作与中期验收", _safe_due(comp.submission_deadline, 14), 36.0),
+        ("submission", "06 · 提交前合规检查", comp.submission_deadline or comp.registration_deadline, 4.0),
+        ("defense", "07 · 答辩演练与证据包准备", _defense_due(comp), 8.0),
+    ]
+    canonical_titles = {title for _phase, title, _due, _hours in template}
+    all_items = session.query(ProjectItemModel).filter(ProjectItemModel.project_id == project.project_id).all()
+    # 若旧版已有同一阶段任务，删除本次自动补齐的重复模板条目，保留用户原任务。
+    replaced_ids: dict[int, int] = {}
+    for phase, _title, _due, _hours in template:
+        # 材料也可能标为 submission phase，但它们不是可替换的阶段任务。
+        phase_items = [
+            item for item in all_items
+            if item.item_type == ProjectItemType.TASK.value and item.phase == phase
+        ]
+        legacy = [item for item in phase_items if item.title not in canonical_titles]
+        if legacy:
+            keep = legacy[0]
+            for duplicate in phase_items:
+                if duplicate is not keep and duplicate.title in canonical_titles:
+                    replaced_ids[duplicate.item_id] = keep.item_id
+                    session.delete(duplicate)
+            keep.phase = phase
+    session.flush()
+    all_items = [
+        item for item in session.query(ProjectItemModel).filter(ProjectItemModel.project_id == project.project_id).all()
+        if item not in session.deleted
+    ]
+    if replaced_ids:
+        for item in all_items:
+            if item.depends_on_item_id in replaced_ids:
+                item.depends_on_item_id = replaced_ids[item.depends_on_item_id]
+        session.flush()
+    # 阶段锚点只能是任务，材料同样带有 submission phase 时绝不能覆盖“提交前检查”任务。
+    existing_by_phase = {
+        item.phase: item for item in all_items
+        if item.item_type == ProjectItemType.TASK.value and item.phase and item.phase != "execution"
+    }
+    valid_item_ids = {item.item_id for item in all_items}
+    previous: Optional[ProjectItemModel] = None
+    next_order = max((item.sort_order for item in all_items), default=-1) + 1
+    for phase, title, due_date, hours in template:
+        item = existing_by_phase.get(phase)
+        if item is None:
+            item = ProjectItemModel(
+                project_id=project.project_id,
+                item_type=ProjectItemType.TASK.value,
+                title=title,
+                due_date=due_date,
+                status=ProjectItemStatus.TODO.value,
+                sort_order=next_order,
+                phase=phase,
+                estimated_hours=hours,
+            )
+            session.add(item)
+            session.flush()
+            next_order += 1
+        elif item.title == title:
+            # 同步修复既有系统模板的日期；用户自行新增的任务不覆盖。
+            item.due_date = due_date
+        if previous is not None and (
+            item.depends_on_item_id is None or item.depends_on_item_id not in valid_item_ids
+        ):
+            item.depends_on_item_id = previous.item_id
+        previous = item
+    # 新任务已 flush，重新读取后按阶段重建锚点，避免旧字典缺少新建的 submission
+    # 而错误回退到 defense，造成“答辩 ↔ 材料”的反向阻塞。
+    session.flush()
+    all_items = session.query(ProjectItemModel).filter(ProjectItemModel.project_id == project.project_id).all()
+    task_by_phase = {
+        item.phase: item for item in all_items
+        if item.item_type == ProjectItemType.TASK.value and item.phase
+    }
+    phase_order = ("qualification", "team_topic", "registration", "solution", "production", "submission", "defense")
+    for index, phase in enumerate(phase_order):
+        task = task_by_phase.get(phase)
+        if task is None:
+            continue
+        expected = task_by_phase.get(phase_order[index - 1]) if index else None
+        # 系统模板任务只能依赖前一阶段任务，不允许引用材料或后续阶段。
+        task.depends_on_item_id = expected.item_id if expected else None
+
+    material_due = comp.submission_deadline or comp.registration_deadline
+    existing_materials = {item.title for item in all_items if item.item_type == ProjectItemType.MATERIAL.value}
+    material_dependency = task_by_phase.get("production")
+    for material in _load_json(comp.required_materials):
+        if material in existing_materials:
+            continue
+        session.add(
+            ProjectItemModel(
+                project_id=project.project_id,
+                item_type=ProjectItemType.MATERIAL.value,
+                title=material,
+                due_date=material_due,
+                status=ProjectItemStatus.TODO.value,
+                sort_order=next_order,
+                phase="submission",
+                depends_on_item_id=material_dependency.item_id if material_dependency else None,
+            )
+        )
+        next_order += 1
+    # 迁移已存在项目：材料统一在制作阶段后准备，不能把答辩作为前置。
+    session.flush()
+    for item in session.query(ProjectItemModel).filter(
+        ProjectItemModel.project_id == project.project_id,
+        ProjectItemModel.item_type == ProjectItemType.MATERIAL.value,
+    ):
+        item.depends_on_item_id = material_dependency.item_id if material_dependency else None
+    _repair_project_dependency_cycles(session, project.project_id)
+
+
+def _repair_project_dependency_cycles(session, project_id: int) -> None:
+    """修复旧数据或人工编辑留下的循环依赖，确保项目始终存在可开始的节点。"""
+    items = session.query(ProjectItemModel).filter(ProjectItemModel.project_id == project_id).all()
+    by_id = {item.item_id: item for item in items}
+    for start in items:
+        path: list[int] = []
+        seen_at: dict[int, int] = {}
+        cursor = start
+        while cursor and cursor.depends_on_item_id:
+            if cursor.item_id in seen_at:
+                cycle_ids = path[seen_at[cursor.item_id]:]
+                cycle_items = [by_id[item_id] for item_id in cycle_ids if item_id in by_id]
+                # 优先断开材料节点；否则断开排序最靠后的节点，保留前序工作链。
+                victim = next((item for item in cycle_items if item.item_type == ProjectItemType.MATERIAL.value), None)
+                victim = victim or max(cycle_items, key=lambda item: (item.sort_order, item.item_id))
+                victim.depends_on_item_id = None
+                break
+            seen_at[cursor.item_id] = len(path)
+            path.append(cursor.item_id)
+            cursor = by_id.get(cursor.depends_on_item_id)
+
+
+def _hydrate_projects(session, projects: list[UserProjectModel]) -> list[UserProject]:
+    session.flush()
+    result: list[UserProject] = []
+    for project in projects:
+        session.refresh(project)
+        session.expire(project, ["items"])
+        result.append(_project_to_pydantic(project))
+    return result
 
 
 def create_user_project(user_id: str, competition_id: str) -> UserProject:
@@ -1024,56 +1643,66 @@ def create_user_project(user_id: str, competition_id: str) -> UserProject:
         if comp is None:
             raise ValueError("competition_not_found")
         competition = _competition_to_pydantic(comp)
+        # 来源核验状态是提示信息，不再阻止用户基于已有基础资料创建项目。
         if not assess_source_readiness(competition).ready:
-            raise ValueError("competition_unverified")
+            raise ValueError("competition_basic_info_incomplete")
         if not is_registerable_now(competition, date.today()):
             raise ValueError("competition_expired")
-        existing = (
-            session.query(UserProjectModel)
-            .filter(
-                UserProjectModel.user_id == user_id,
-                UserProjectModel.competition_id == competition_id,
-            )
+        return _hydrate_projects(
+            session, [_get_or_create_project_model(session, user_id, comp)]
+        )[0]
+
+
+def create_user_projects_atomic(
+    user_id: str,
+    competition_ids: list[str],
+    current: Optional[date] = None,
+) -> tuple[list[UserProject], list[dict]]:
+    """在一个事务内重新校验并采用整个组合；任一项失败则不写入任何项目。"""
+    current = current or date.today()
+    with session_scope() as session:
+        profile = (
+            session.query(UserProfileModel)
+            .filter(UserProfileModel.user_id == user_id)
+            .with_for_update()
             .first()
         )
-        if existing is not None:
-            return _project_to_pydantic(existing)
+        if profile is None:
+            raise ValueError("profile_required")
 
-        project = UserProjectModel(
-            user_id=user_id,
-            competition_id=competition_id,
-            status=ProjectStatus.PLANNED.value,
+        rows = (
+            session.query(CompetitionModel)
+            .filter(CompetitionModel.competition_id.in_(competition_ids))
+            .with_for_update()
+            .all()
         )
-        session.add(project)
-        session.flush()
-
-        defaults: list[tuple[str, str, Optional[date]]] = [
-            (ProjectItemType.TASK.value, "核对参赛资格与官方证据", None),
-        ]
-        if comp.team_required:
-            defaults.append((ProjectItemType.TASK.value, "确认团队成员与分工", comp.registration_deadline))
-        if comp.registration_deadline:
-            defaults.append((ProjectItemType.TASK.value, "完成赛事报名", comp.registration_deadline))
-        material_due = comp.submission_deadline or comp.registration_deadline
-        defaults.extend(
-            (ProjectItemType.MATERIAL.value, material, material_due)
-            for material in _load_json(comp.required_materials)
-        )
-        for order, (item_type, title, due_date) in enumerate(defaults):
-            session.add(
-                ProjectItemModel(
-                    project_id=project.project_id,
-                    item_type=item_type,
-                    title=title,
-                    due_date=due_date,
-                    status=ProjectItemStatus.TODO.value,
-                    sort_order=order,
+        competitions = {row.competition_id: row for row in rows}
+        failures: list[dict] = []
+        for competition_id in competition_ids:
+            comp = competitions.get(competition_id)
+            if comp is None:
+                failures.append(
+                    {"competition_id": competition_id, "reason": "competition_not_found"}
                 )
+                continue
+            readiness = assess_recommendation_readiness(
+                _competition_to_pydantic(comp), current
             )
-        session.flush()
-        session.refresh(project)
-        session.expire(project, ["items"])
-        return _project_to_pydantic(project)
+            if not readiness.ready:
+                failures.append(
+                    {
+                        "competition_id": competition_id,
+                        "reason": "；".join(readiness.reasons),
+                    }
+                )
+        if failures:
+            return [], failures
+
+        projects = [
+            _get_or_create_project_model(session, user_id, competitions[competition_id])
+            for competition_id in competition_ids
+        ]
+        return _hydrate_projects(session, projects), []
 
 
 def update_user_project(user_id: str, project_id: int, status: ProjectStatus) -> Optional[UserProject]:
@@ -1095,12 +1724,77 @@ def delete_user_project(user_id: str, project_id: int) -> bool:
         return True
 
 
-def add_project_item(user_id: str, project_id: int, item_type: ProjectItemType, title: str,
-                     due_date: Optional[date]) -> Optional[ProjectItem]:
+def _project_item_to_pydantic(item: ProjectItemModel, session) -> ProjectItem:
+    dependency_open = False
+    if item.depends_on_item_id:
+        dependency = session.get(ProjectItemModel, item.depends_on_item_id)
+        dependency_open = bool(
+            dependency is None
+            or dependency.status not in {ProjectItemStatus.DONE.value, ProjectItemStatus.SKIPPED.value}
+        )
+    return ProjectItem(
+        item_id=item.item_id,
+        item_type=ProjectItemType(item.item_type),
+        title=item.title,
+        due_date=item.due_date,
+        status=ProjectItemStatus(item.status),
+        sort_order=item.sort_order,
+        phase=item.phase or "execution",
+        depends_on_item_id=item.depends_on_item_id,
+        blocked_reason=item.blocked_reason or ("前置任务尚未完成" if dependency_open else None),
+        source_alert_id=item.source_alert_id,
+        source_citation_id=item.source_citation_id,
+        estimated_hours=item.estimated_hours,
+        is_blocked=bool(item.blocked_reason) or dependency_open or item.status == ProjectItemStatus.BLOCKED.value,
+    )
+
+
+def _validate_dependency(session, project_id: int, item_id: Optional[int], depends_on_item_id: Optional[int]) -> None:
+    if depends_on_item_id is None:
+        return
+    dependency = session.get(ProjectItemModel, depends_on_item_id)
+    if dependency is None or dependency.project_id != project_id:
+        raise ValueError("dependency_not_in_project")
+    if item_id is not None and item_id == depends_on_item_id:
+        raise ValueError("dependency_cycle")
+    cursor = dependency
+    seen = {depends_on_item_id}
+    for _ in range(100):
+        parent_id = cursor.depends_on_item_id
+        if parent_id is None:
+            return
+        if parent_id == item_id or parent_id in seen:
+            raise ValueError("dependency_cycle")
+        seen.add(parent_id)
+        cursor = session.get(ProjectItemModel, parent_id)
+        if cursor is None or cursor.project_id != project_id:
+            raise ValueError("dependency_not_in_project")
+    raise ValueError("dependency_cycle")
+
+
+def add_project_item(
+    user_id: str,
+    project_id: int,
+    item_type: ProjectItemType,
+    title: str,
+    due_date: Optional[date],
+    *,
+    phase: str = "execution",
+    depends_on_item_id: Optional[int] = None,
+    blocked_reason: Optional[str] = None,
+    source_alert_id: Optional[int] = None,
+    source_citation_id: Optional[int] = None,
+    estimated_hours: Optional[float] = None,
+) -> Optional[ProjectItem]:
     with session_scope() as session:
         project = session.get(UserProjectModel, project_id)
         if project is None or project.user_id != user_id:
             return None
+        _validate_dependency(session, project_id, None, depends_on_item_id)
+        if source_citation_id is not None:
+            citation = session.get(CitationModel, source_citation_id)
+            if citation is None or citation.competition_id != project.competition_id:
+                raise ValueError("citation_not_in_project_competition")
         max_order = max((item.sort_order for item in project.items), default=-1)
         item = ProjectItemModel(
             project_id=project_id,
@@ -1109,17 +1803,31 @@ def add_project_item(user_id: str, project_id: int, item_type: ProjectItemType, 
             due_date=due_date,
             status=ProjectItemStatus.TODO.value,
             sort_order=max_order + 1,
+            phase=phase.strip() or "execution",
+            depends_on_item_id=depends_on_item_id,
+            blocked_reason=blocked_reason,
+            source_alert_id=source_alert_id,
+            source_citation_id=source_citation_id,
+            estimated_hours=estimated_hours,
         )
         session.add(item)
         session.flush()
-        return ProjectItem(
-            item_id=item.item_id, item_type=item_type, title=item.title,
-            due_date=item.due_date, status=ProjectItemStatus.TODO, sort_order=item.sort_order,
-        )
+        return _project_item_to_pydantic(item, session)
 
 
-def update_project_item(user_id: str, project_id: int, item_id: int, *, title: Optional[str],
-                        due_date: Optional[date], status: Optional[ProjectItemStatus]) -> Optional[ProjectItem]:
+def update_project_item(
+    user_id: str,
+    project_id: int,
+    item_id: int,
+    *,
+    title: Optional[str],
+    due_date: Optional[date],
+    status: Optional[ProjectItemStatus],
+    phase: Optional[str] = None,
+    depends_on_item_id: Optional[int] = None,
+    blocked_reason: Optional[str] = None,
+    estimated_hours: Optional[float] = None,
+) -> Optional[ProjectItem]:
     with session_scope() as session:
         project = session.get(UserProjectModel, project_id)
         item = session.get(ProjectItemModel, item_id)
@@ -1129,13 +1837,26 @@ def update_project_item(user_id: str, project_id: int, item_id: int, *, title: O
             item.title = title.strip()
         if due_date is not None:
             item.due_date = due_date
+        if phase is not None:
+            item.phase = phase.strip() or item.phase
+        if depends_on_item_id is not None:
+            _validate_dependency(session, project_id, item_id, depends_on_item_id)
+            item.depends_on_item_id = depends_on_item_id
+        if blocked_reason is not None:
+            item.blocked_reason = blocked_reason.strip() or None
+        if estimated_hours is not None:
+            item.estimated_hours = estimated_hours
         if status is not None:
+            if status in {ProjectItemStatus.IN_PROGRESS, ProjectItemStatus.DONE} and item.depends_on_item_id:
+                dependency = session.get(ProjectItemModel, item.depends_on_item_id)
+                if dependency and dependency.status not in {
+                    ProjectItemStatus.DONE.value,
+                    ProjectItemStatus.SKIPPED.value,
+                }:
+                    raise ValueError("dependency_open")
             item.status = status.value
         session.flush()
-        return ProjectItem(
-            item_id=item.item_id, item_type=ProjectItemType(item.item_type), title=item.title,
-            due_date=item.due_date, status=ProjectItemStatus(item.status), sort_order=item.sort_order,
-        )
+        return _project_item_to_pydantic(item, session)
 
 
 def delete_project_item(user_id: str, project_id: int, item_id: int) -> bool:
@@ -1221,9 +1942,641 @@ def upsert_competition(comp: Competition) -> Competition:
                         if isinstance(e.trusted_level, TrustedLevel)
                         else e.trusted_level
                     ),
+                    document_id=e.document_id,
+                    document_sha256=e.document_sha256,
+                    page_rects=_dump_json([r.model_dump() for r in e.rects]),
+                    anchor_quality=e.anchor_quality,
+                    text_exact=e.text_exact or e.source_text,
+                    text_prefix=e.text_prefix,
+                    text_suffix=e.text_suffix,
+                    text_start=e.text_start,
+                    text_end=e.text_end,
+                    anchor_confidence=e.anchor_confidence or (1.0 if e.anchor_quality == "exact" else 0.45),
+                    anchor_status=e.anchor_status,
                 )
             )
     return comp
+
+
+# ---------------------------------------------------------------------------
+# 不可变文档与证据预览
+# ---------------------------------------------------------------------------
+
+
+def store_document(filename: str, mime_type: str, content: bytes) -> dict:
+    """按内容指纹保存官方文档；重复上传返回同一文档记录。"""
+    digest = hashlib.sha256(content).hexdigest()
+    with session_scope() as session:
+        existing = session.query(DocumentModel).filter(DocumentModel.sha256 == digest).first()
+        if existing is None:
+            existing = DocumentModel(
+                sha256=digest,
+                filename=filename,
+                mime_type=mime_type,
+                byte_size=len(content),
+                content=content,
+            )
+            session.add(existing)
+            session.flush()
+        return {
+            "document_id": existing.document_id,
+            "sha256": existing.sha256,
+            "filename": existing.filename,
+            "mime_type": existing.mime_type,
+            "byte_size": existing.byte_size,
+        }
+
+
+def get_document(document_id: int, include_content: bool = False) -> Optional[dict]:
+    with session_scope() as session:
+        item = session.get(DocumentModel, document_id)
+        if item is None:
+            return None
+        payload = {
+            "document_id": item.document_id,
+            "sha256": item.sha256,
+            "filename": item.filename,
+            "mime_type": item.mime_type,
+            "byte_size": item.byte_size,
+            "created_at": item.created_at.isoformat(),
+        }
+        if include_content:
+            payload["content"] = bytes(item.content)
+        return payload
+
+
+def get_citation(citation_id: int) -> Optional[Citation]:
+    with session_scope() as session:
+        item = session.get(CitationModel, citation_id)
+        return _citation_to_pydantic(item) if item is not None else None
+
+
+def get_citation_competition_id(citation_id: int) -> Optional[str]:
+    with session_scope() as session:
+        item = session.get(CitationModel, citation_id)
+        return item.competition_id if item is not None else None
+
+
+def update_citation_locator(
+    citation_id: int,
+    document_id: int,
+    document_sha256: str,
+    rects: list[dict],
+    anchor_quality: str = "exact",
+    *,
+    page: Optional[int] = None,
+    text_exact: Optional[str] = None,
+    text_prefix: Optional[str] = None,
+    text_suffix: Optional[str] = None,
+    text_start: Optional[int] = None,
+    text_end: Optional[int] = None,
+    anchor_confidence: Optional[float] = None,
+    anchor_status: Optional[str] = None,
+) -> bool:
+    with session_scope() as session:
+        item = session.get(CitationModel, citation_id)
+        if item is None:
+            return False
+        item.document_id = document_id
+        item.document_sha256 = document_sha256
+        item.page_rects = _dump_json(rects)
+        item.anchor_quality = anchor_quality
+        if page is not None:
+            item.page = page
+        item.text_exact = text_exact or item.text_exact or item.source_text
+        if text_prefix is not None:
+            item.text_prefix = text_prefix
+        if text_suffix is not None:
+            item.text_suffix = text_suffix
+        if text_start is not None:
+            item.text_start = text_start
+        if text_end is not None:
+            item.text_end = text_end
+        if anchor_confidence is not None:
+            item.anchor_confidence = max(0.0, min(1.0, float(anchor_confidence)))
+        item.anchor_status = anchor_status or item.anchor_status or "original"
+        return True
+
+
+def mark_citation_anchor_status(citation_id: int, status: str, confidence: float = 0.0) -> bool:
+    """只更新定位状态，不改变事实、原文或其来源版本。"""
+    if status not in {"original", "relocated", "needs_review", "invalid"}:
+        raise ValueError("invalid_anchor_status")
+    with session_scope() as session:
+        item = session.get(CitationModel, citation_id)
+        if item is None:
+            return False
+        item.anchor_status = status
+        item.anchor_confidence = max(0.0, min(1.0, confidence))
+        return True
+
+
+# ---------------------------------------------------------------------------
+# 动态赛事雷达持久化
+# ---------------------------------------------------------------------------
+
+
+def _watch_dict(item: SourceWatchModel, competition_name: Optional[str] = None) -> dict:
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    age_hours = None
+    if item.last_success_at:
+        age_hours = round(max(0.0, (now - item.last_success_at).total_seconds() / 3600), 1)
+    if item.last_status in {"new", "ok"} and item.consecutive_failures == 0:
+        health_score = 100 if item.last_success_at else 80
+    else:
+        health_score = max(0, 80 - item.consecutive_failures * 22)
+    return {
+        "watch_id": item.watch_id,
+        "competition_id": item.competition_id,
+        "competition_name": competition_name,
+        "source_url": item.source_url,
+        "source_type": item.source_type,
+        "css_selector": item.css_selector,
+        "include_selector": item.include_selector or item.css_selector,
+        "exclude_selector": item.exclude_selector,
+        "ignore_regex": item.ignore_regex,
+        "trigger_terms": _load_json(item.trigger_terms),
+        "fetch_mode": item.fetch_mode,
+        "timezone": item.timezone_name,
+        "interval_hours": item.interval_hours,
+        "enabled": item.enabled,
+        "last_checked_at": item.last_checked_at.isoformat() if item.last_checked_at else None,
+        "etag": item.etag,
+        "last_modified": item.last_modified,
+        "last_content_hash": item.last_content_hash,
+        "last_status": item.last_status,
+        "consecutive_failures": item.consecutive_failures,
+        "last_error": item.last_error,
+        "last_success_at": item.last_success_at.isoformat() if item.last_success_at else None,
+        "next_scan_at": item.next_scan_at.isoformat() if item.next_scan_at else None,
+        "last_latency_ms": item.last_latency_ms,
+        "last_content_bytes": item.last_content_bytes,
+        "age_hours": age_hours,
+        "health_score": health_score,
+        "health_status": "healthy" if health_score >= 80 else ("degraded" if health_score >= 45 else "critical"),
+        "connector_pipeline": ["discover", "fetch", "normalize", "snapshot", "diff", "review"],
+    }
+
+
+def create_source_watch(
+    competition_id: str,
+    source_url: str,
+    source_type: str = "auto",
+    css_selector: Optional[str] = None,
+    include_selector: Optional[str] = None,
+    exclude_selector: Optional[str] = None,
+    ignore_regex: Optional[str] = None,
+    trigger_terms: Optional[list[str]] = None,
+    fetch_mode: str = "http",
+    timezone: str = "Asia/Shanghai",
+    interval_hours: int = 24,
+) -> dict:
+    with session_scope() as session:
+        comp = session.get(CompetitionModel, competition_id)
+        if comp is None:
+            raise ValueError("competition_not_found")
+        existing = (
+            session.query(SourceWatchModel)
+            .filter(
+                SourceWatchModel.competition_id == competition_id,
+                SourceWatchModel.source_url == source_url,
+            )
+            .first()
+        )
+        if existing is None:
+            existing = SourceWatchModel(
+                competition_id=competition_id,
+                source_url=source_url,
+                source_type=source_type,
+                css_selector=css_selector or include_selector,
+                include_selector=include_selector or css_selector,
+                exclude_selector=exclude_selector,
+                ignore_regex=ignore_regex,
+                trigger_terms=_dump_json(trigger_terms or []),
+                fetch_mode=fetch_mode,
+                timezone_name=timezone,
+                interval_hours=interval_hours,
+            )
+            session.add(existing)
+            session.flush()
+        else:
+            existing.source_type = source_type
+            existing.css_selector = css_selector or include_selector or existing.css_selector
+            existing.include_selector = include_selector or css_selector or existing.include_selector
+            existing.exclude_selector = exclude_selector
+            existing.ignore_regex = ignore_regex
+            existing.trigger_terms = _dump_json(trigger_terms or [])
+            existing.fetch_mode = fetch_mode
+            existing.timezone_name = timezone
+            existing.interval_hours = interval_hours
+        return _watch_dict(existing, comp.competition_name)
+
+
+def list_source_watches(enabled_only: bool = False) -> list[dict]:
+    with session_scope() as session:
+        query = session.query(SourceWatchModel, CompetitionModel.competition_name).join(
+            CompetitionModel, CompetitionModel.competition_id == SourceWatchModel.competition_id
+        )
+        if enabled_only:
+            query = query.filter(SourceWatchModel.enabled.is_(True))
+        return [_watch_dict(w, name) for w, name in query.order_by(SourceWatchModel.watch_id).all()]
+
+
+def get_source_watch(watch_id: int) -> Optional[dict]:
+    with session_scope() as session:
+        row = (
+            session.query(SourceWatchModel, CompetitionModel.competition_name)
+            .join(CompetitionModel, CompetitionModel.competition_id == SourceWatchModel.competition_id)
+            .filter(SourceWatchModel.watch_id == watch_id)
+            .first()
+        )
+        return _watch_dict(row[0], row[1]) if row else None
+
+
+def latest_source_snapshot(watch_id: int) -> Optional[dict]:
+    with session_scope() as session:
+        item = (
+            session.query(SourceSnapshotModel)
+            .filter(SourceSnapshotModel.watch_id == watch_id)
+            .order_by(SourceSnapshotModel.snapshot_id.desc())
+            .first()
+        )
+        if item is None:
+            return None
+        return {
+            "snapshot_id": item.snapshot_id,
+            "watch_id": item.watch_id,
+            "fetched_at": item.fetched_at.isoformat(),
+            "http_status": item.http_status,
+            "content_hash": item.content_hash,
+            "normalized_text": item.normalized_text,
+            "document_id": item.document_id,
+            "response_etag": item.response_etag,
+            "response_last_modified": item.response_last_modified,
+        }
+
+
+def save_source_snapshot(
+    watch_id: int,
+    http_status: int,
+    content_hash: str,
+    normalized_text: str,
+    document_id: Optional[int] = None,
+    response_etag: Optional[str] = None,
+    response_last_modified: Optional[str] = None,
+    latency_ms: Optional[int] = None,
+    content_bytes: Optional[int] = None,
+) -> dict:
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    with session_scope() as session:
+        item = SourceSnapshotModel(
+            watch_id=watch_id,
+            fetched_at=now,
+            http_status=http_status,
+            content_hash=content_hash,
+            normalized_text=normalized_text,
+            document_id=document_id,
+            response_etag=response_etag,
+            response_last_modified=response_last_modified,
+        )
+        session.add(item)
+        watch = session.get(SourceWatchModel, watch_id)
+        if watch is None:
+            raise ValueError("watch_not_found")
+        watch.last_checked_at = now
+        watch.etag = response_etag
+        watch.last_modified = response_last_modified
+        watch.last_content_hash = content_hash
+        watch.last_status = "ok"
+        watch.consecutive_failures = 0
+        watch.last_error = None
+        watch.last_success_at = now
+        watch.next_scan_at = now + timedelta(hours=watch.interval_hours)
+        watch.last_latency_ms = latency_ms
+        watch.last_content_bytes = content_bytes
+        session.flush()
+        return {"snapshot_id": item.snapshot_id, "content_hash": item.content_hash}
+
+
+def record_watch_failure(watch_id: int, error: str) -> None:
+    with session_scope() as session:
+        watch = session.get(SourceWatchModel, watch_id)
+        if watch is None:
+            return
+        watch.last_checked_at = datetime.now(timezone.utc).replace(tzinfo=None)
+        watch.next_scan_at = watch.last_checked_at + timedelta(hours=watch.interval_hours)
+        watch.consecutive_failures += 1
+        watch.last_error = error[:1000]
+        watch.last_status = "stale" if watch.consecutive_failures >= 3 else "error"
+
+
+def create_change_event(
+    watch_id: int,
+    old_snapshot_id: Optional[int],
+    new_snapshot_id: int,
+    severity: str,
+    change_type: str,
+    summary: str,
+    diff_text: str,
+    affected_fields: list[str],
+    field_changes: Optional[list[dict]] = None,
+    proposed_changes: Optional[dict] = None,
+) -> dict:
+    with session_scope() as session:
+        item = SourceChangeEventModel(
+            watch_id=watch_id,
+            old_snapshot_id=old_snapshot_id,
+            new_snapshot_id=new_snapshot_id,
+            severity=severity,
+            change_type=change_type,
+            summary=summary,
+            diff_text=diff_text[:30000],
+            affected_fields=_dump_json(affected_fields),
+            field_changes=_dump_json(field_changes or []),
+            proposed_changes=_dump_json(proposed_changes or {}),
+        )
+        session.add(item)
+        session.flush()
+        return {"event_id": item.event_id, "status": item.status}
+
+
+def _event_dict(
+    event: SourceChangeEventModel,
+    watch: SourceWatchModel,
+    name: str,
+    session=None,
+) -> dict:
+    project_count = 0
+    task_count = 0
+    if session is not None:
+        project_ids = [
+            row[0]
+            for row in session.query(UserProjectModel.project_id)
+            .filter(UserProjectModel.competition_id == watch.competition_id)
+            .all()
+        ]
+        project_count = len(project_ids)
+        if project_ids:
+            task_count = session.query(ProjectItemModel).filter(
+                ProjectItemModel.project_id.in_(project_ids),
+                ProjectItemModel.status.notin_([ProjectItemStatus.DONE.value, ProjectItemStatus.SKIPPED.value]),
+            ).count()
+    return {
+        "event_id": event.event_id,
+        "watch_id": event.watch_id,
+        "competition_id": watch.competition_id,
+        "competition_name": name,
+        "source_url": watch.source_url,
+        "detected_at": event.detected_at.isoformat(),
+        "severity": event.severity,
+        "change_type": event.change_type,
+        "summary": event.summary,
+        "diff_text": event.diff_text,
+        "affected_fields": _load_json(event.affected_fields),
+        "field_changes": _load_json(event.field_changes),
+        "proposed_changes": json.loads(event.proposed_changes or "{}"),
+        "affected_project_count": project_count,
+        "affected_task_count": task_count,
+        "impact_summary": (
+            f"影响 {project_count} 个参赛项目、{task_count} 个未完成任务"
+            if project_count else "当前没有已采用项目受影响"
+        ),
+        "status": event.status,
+        "review_note": event.review_note,
+        "reviewed_at": event.reviewed_at.isoformat() if event.reviewed_at else None,
+    }
+
+
+def list_change_events(status: Optional[str] = None, limit: int = 100) -> list[dict]:
+    with session_scope() as session:
+        query = (
+            session.query(SourceChangeEventModel, SourceWatchModel, CompetitionModel.competition_name)
+            .join(SourceWatchModel, SourceWatchModel.watch_id == SourceChangeEventModel.watch_id)
+            .join(CompetitionModel, CompetitionModel.competition_id == SourceWatchModel.competition_id)
+        )
+        if status:
+            query = query.filter(SourceChangeEventModel.status == status)
+        rows = query.order_by(SourceChangeEventModel.event_id.desc()).limit(limit).all()
+        return [_event_dict(event, watch, name, session) for event, watch, name in rows]
+
+
+def review_change_event(event_id: int, action: str, note: Optional[str] = None) -> Optional[dict]:
+    """审核变化；仅把确定性解析出的字段写回，并为受影响项目创建提醒。"""
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    with session_scope() as session:
+        event = session.get(SourceChangeEventModel, event_id)
+        if event is None:
+            return None
+        if event.status != "pending":
+            watch = session.get(SourceWatchModel, event.watch_id)
+            comp = session.get(CompetitionModel, watch.competition_id)
+            return _event_dict(event, watch, comp.competition_name, session)
+        event.status = "approved" if action == "approve" else "rejected"
+        event.review_note = note
+        event.reviewed_at = now
+        watch = session.get(SourceWatchModel, event.watch_id)
+        comp = session.get(CompetitionModel, watch.competition_id)
+        if action == "approve":
+            proposed = json.loads(event.proposed_changes or "{}")
+            checked_at = date.today().isoformat()
+            for field, change in proposed.items():
+                if field not in {"registration_deadline", "submission_deadline"}:
+                    continue
+                try:
+                    value = date.fromisoformat(str(change.get("value")))
+                except (ValueError, TypeError):
+                    continue
+                setattr(comp, field, value)
+                citation = next((c for c in comp.citations if c.field == field), None)
+                if citation is None:
+                    citation = CitationModel(competition_id=comp.competition_id, field=field)
+                    session.add(citation)
+                citation.page = None
+                citation.source_text = change.get("source_text") or event.summary
+                citation.document_name = "官网变更快照"
+                citation.source_url = watch.source_url
+                citation.acquired_date = checked_at
+                citation.last_verified_at = checked_at
+                citation.trusted_level = comp.trusted_level
+                citation.anchor_quality = "approximate"
+            comp.last_verified_at = checked_at
+            comp.doc_version = f"{comp.document_year}_radar_{event.event_id}"
+            project_users = (
+                session.query(UserProjectModel.project_id, UserProjectModel.user_id)
+                .filter(UserProjectModel.competition_id == comp.competition_id)
+                .all()
+            )
+            affected_fields = set(_load_json(event.affected_fields))
+            for project_id, user_id in project_users:
+                alert = UserAlertModel(
+                    user_id=user_id,
+                    event_id=event.event_id,
+                    competition_id=comp.competition_id,
+                    title=f"{comp.competition_name} 官方信息发生变化",
+                    message=event.summary,
+                    project_id=project_id,
+                )
+                session.add(alert)
+                session.flush()
+                phases = {"qualification", "team_topic"} if "registration_deadline" in affected_fields else set()
+                if "submission_deadline" in affected_fields:
+                    phases.update({"solution", "production", "submission"})
+                if phases:
+                    for task in session.query(ProjectItemModel).filter(
+                        ProjectItemModel.project_id == project_id,
+                        ProjectItemModel.phase.in_(phases),
+                        ProjectItemModel.status.notin_([ProjectItemStatus.DONE.value, ProjectItemStatus.SKIPPED.value]),
+                    ):
+                        task.source_alert_id = alert.alert_id
+                        task.blocked_reason = "官方关键信息已更新，请先处理雷达收件箱"
+        session.flush()
+        return _event_dict(event, watch, comp.competition_name, session)
+
+
+def list_user_alerts(user_id: str, limit: int = 50) -> list[dict]:
+    with session_scope() as session:
+        items = (
+            session.query(UserAlertModel)
+            .filter(UserAlertModel.user_id == user_id)
+            .order_by(UserAlertModel.alert_id.desc())
+            .limit(limit)
+            .all()
+        )
+        return [
+            {
+                "alert_id": item.alert_id,
+                "event_id": item.event_id,
+                "competition_id": item.competition_id,
+                "title": item.title,
+                "message": item.message,
+                "is_read": item.is_read,
+                "status": item.status or "pending",
+                "action_note": item.action_note,
+                "resolved_at": item.resolved_at.isoformat() if item.resolved_at else None,
+                "project_id": item.project_id,
+                "item_id": item.item_id,
+                "actions_available": (
+                    ["accept", "ignore", "create_task", "replan"]
+                    if (item.status or "pending") == "pending" else []
+                ),
+                "created_at": item.created_at.isoformat(),
+            }
+            for item in items
+        ]
+
+
+def act_on_user_alert(
+    user_id: str,
+    alert_id: int,
+    action: str,
+    note: Optional[str] = None,
+) -> Optional[dict]:
+    """处理雷达收件箱；转任务时保留事件与项目来源链。"""
+    if action not in {"accept", "ignore", "create_task", "replan"}:
+        raise ValueError("invalid_alert_action")
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    with session_scope() as session:
+        alert = session.get(UserAlertModel, alert_id)
+        if alert is None or alert.user_id != user_id:
+            return None
+        task_payload = None
+        if action == "create_task":
+            project = (
+                session.query(UserProjectModel)
+                .filter(
+                    UserProjectModel.user_id == user_id,
+                    UserProjectModel.competition_id == alert.competition_id,
+                )
+                .first()
+            )
+            if project is None:
+                raise ValueError("project_not_found")
+            item = session.get(ProjectItemModel, alert.item_id) if alert.item_id else None
+            if item is None:
+                comp = project.competition
+                due = comp.registration_deadline or comp.submission_deadline
+                item = ProjectItemModel(
+                    project_id=project.project_id,
+                    item_type=ProjectItemType.TASK.value,
+                    title=f"雷达响应 · {alert.title}",
+                    due_date=due,
+                    status=ProjectItemStatus.TODO.value,
+                    sort_order=max((i.sort_order for i in project.items), default=-1) + 1,
+                    phase="risk_response",
+                    blocked_reason=None,
+                    source_alert_id=alert.alert_id,
+                    estimated_hours=1.0,
+                )
+                session.add(item)
+                session.flush()
+            alert.project_id = project.project_id
+            alert.item_id = item.item_id
+            alert.status = "task_created"
+            task_payload = _project_item_to_pydantic(item, session).model_dump(mode="json")
+        elif action == "replan":
+            alert.status = "replan_requested"
+        else:
+            alert.status = "accepted" if action == "accept" else "ignored"
+        alert.is_read = True
+        alert.action_note = note
+        alert.resolved_at = now
+        session.query(ProjectItemModel).filter(
+            ProjectItemModel.source_alert_id == alert.alert_id,
+            ProjectItemModel.blocked_reason == "官方关键信息已更新，请先处理雷达收件箱",
+        ).update({ProjectItemModel.blocked_reason: None}, synchronize_session=False)
+        session.flush()
+        payload = {
+            "alert_id": alert.alert_id,
+            "event_id": alert.event_id,
+            "competition_id": alert.competition_id,
+            "status": alert.status,
+            "project_id": alert.project_id,
+            "item_id": alert.item_id,
+            "replan_required": action == "replan",
+        }
+        if task_payload:
+            payload["task"] = task_payload
+        return payload
+
+
+def create_task_from_agent(
+    user_id: str,
+    competition_id: str,
+    title: str,
+    due_date: Optional[date] = None,
+    source_citation_id: Optional[int] = None,
+    estimated_hours: Optional[float] = None,
+) -> ProjectItem:
+    """把 Agent 建议转为可执行任务，并保留所用引用。"""
+    with session_scope() as session:
+        if session.get(UserProfileModel, user_id) is None:
+            raise ValueError("profile_required")
+        comp = session.get(CompetitionModel, competition_id)
+        if comp is None:
+            raise ValueError("competition_not_found")
+        competition = _competition_to_pydantic(comp)
+        if not assess_recommendation_readiness(competition, date.today()).ready:
+            raise ValueError("competition_not_ready")
+        if source_citation_id is not None:
+            citation = session.get(CitationModel, source_citation_id)
+            if citation is None or citation.competition_id != competition_id:
+                raise ValueError("citation_not_in_project_competition")
+        project = _get_or_create_project_model(session, user_id, comp)
+        session.flush()
+        item = ProjectItemModel(
+            project_id=project.project_id,
+            item_type=ProjectItemType.TASK.value,
+            title=title.strip(),
+            due_date=due_date,
+            status=ProjectItemStatus.TODO.value,
+            sort_order=max((i.sort_order for i in project.items), default=-1) + 1,
+            phase="agent_action",
+            source_citation_id=source_citation_id,
+            estimated_hours=estimated_hours,
+        )
+        session.add(item)
+        session.flush()
+        return _project_item_to_pydantic(item, session)
 
 
 if __name__ == "__main__":

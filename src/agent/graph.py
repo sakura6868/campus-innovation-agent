@@ -21,7 +21,8 @@
       * recommend / team：保持确定性逻辑（列表/文案），team 文案做轻量润色。
     门控结论与引用编号始终来自本地可信数据，模型无法改写；生成失败自动回退模板。
 
-执行轨迹：state["trace"] 记录每个节点，前端可展示「意图→检索→门控→评分→文案」。
+执行轨迹：state["trace"] 记录结构化、可审计的业务步骤，前端可展示
+「意图→检索→门控→评分→文案」；不记录提示词或模型隐藏思维过程。
 """
 
 from __future__ import annotations
@@ -31,7 +32,9 @@ import re
 import sys
 from datetime import date
 from pathlib import Path
-from typing import Any, Optional, TypedDict
+from time import perf_counter
+from typing import Any, Callable, Optional, TypedDict
+from uuid import uuid4
 
 # 允许脚本直接运行（python agent/graph.py）或模块运行
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -66,9 +69,23 @@ from agent.web_search import web_search as _web_search, is_web_search_enabled as
 # ---------------------------------------------------------------------------
 
 
+class AuditTraceStep(TypedDict):
+    """可公开展示的业务审计步骤，不包含模型隐藏思维过程。"""
+
+    node: str
+    label: str
+    status: str
+    duration_ms: float
+    evidence_count: int
+    data_version: str
+    detail: str
+    fallback: bool
+
+
 class AgentState(TypedDict, total=False):
     # 输入
     question: str
+    run_id: str
     user_id: Optional[str]
     competition_id: Optional[str]     # 可由前端直接指定，否则路由自动锁定
     top_k: int
@@ -89,11 +106,218 @@ class AgentState(TypedDict, total=False):
     recommendations: list[dict]
     team_copy: str
     teammate_matches: list[dict]      # 基于画像的互补队友推荐
+    web_results: list[dict]
 
     # 输出
     answer: str
     pending_review: bool
-    trace: list[str]
+    error: Optional[str]
+    data_version: str
+    # 节点内部仍可临时追加旧版字符串；节点包装器会在每步结束时统一收敛成
+    # AuditTraceStep。这样既兼容现有节点实现，也保证 API 最终只返回结构化轨迹。
+    trace: list[AuditTraceStep | str]
+
+
+_TRACE_NODE_LABELS = {
+    "route_intent": "意图识别与赛事锁定",
+    "retrieve": "可信证据检索",
+    "web_augment": "联网信息补充",
+    "gate": "资格与来源门控",
+    "score": "适配度评分",
+    "team_copy": "组队文案生成",
+    "teammate_match": "互补队友匹配",
+    "recommend_all": "全库赛事推荐",
+    "compose": "答案组装与引用校验",
+}
+
+_TRACE_DEFAULT_DETAILS = {
+    "route_intent": "已完成意图识别与赛事版本解析",
+    "retrieve": "已完成可信证据检索",
+    "web_augment": "联网补充未触发或按当前策略跳过",
+    "gate": "已完成资格与来源门控",
+    "score": "已完成适配度评分",
+    "team_copy": "已完成组队文案处理",
+    "teammate_match": "已完成互补队友匹配",
+    "recommend_all": "已完成全库赛事推荐",
+    "compose": "已完成答案组装与引用校验",
+}
+
+_TRACE_FALLBACK_TERMS = (
+    "兜底",
+    "回退",
+    "降级",
+    "节点执行异常",
+    "关键证据待补充",
+    "官方来源尚待核验",
+    "未启用或检索无结果",
+    "歧义澄清",
+)
+
+
+def _catalog_data_version() -> str:
+    """生成可复核但不泄露数据内容的赛事目录版本标识。"""
+    try:
+        competitions = db.get_all_competitions()
+    except Exception:  # noqa: BLE001 - 版本标识失败不应阻断主链路
+        return "catalog:unavailable"
+    verified_values = [
+        str(value)
+        for comp in competitions
+        for value in (getattr(comp, "last_verified_at", None),)
+        if value
+    ]
+    latest = max(verified_values) if verified_values else "unverified"
+    return f"catalog:{len(competitions)}@{latest}"
+
+
+def _state_data_version(state: dict) -> str:
+    """优先返回当前赛事文档版本，否则返回目录版本。"""
+    competition_id = state.get("resolved_competition") or state.get("competition_id")
+    if competition_id:
+        try:
+            comp = db.get_competition(competition_id)
+        except Exception:  # noqa: BLE001 - 审计元数据不可影响业务结果
+            comp = None
+        if comp is not None:
+            doc_version = getattr(comp, "doc_version", None) or str(comp.document_year)
+            verified_at = (
+                getattr(comp, "last_verified_at", None)
+                or getattr(comp, "source_acquired_date", None)
+                or "unverified"
+            )
+            return f"{comp.competition_id}:{doc_version}@{verified_at}"
+    return str(state.get("data_version") or _catalog_data_version())
+
+
+def _trace_detail(item: Any) -> str:
+    if isinstance(item, dict):
+        return str(item.get("detail") or item.get("label") or item.get("node") or "")
+    return str(item or "")
+
+
+def _normalize_existing_trace(items: list[Any], state: dict) -> list[AuditTraceStep]:
+    """把外部传入的旧版字符串轨迹同步适配为结构化步骤。"""
+    normalized: list[AuditTraceStep] = []
+    data_version = _state_data_version(state)
+    for index, item in enumerate(items):
+        if isinstance(item, dict) and all(
+            key in item
+            for key in (
+                "node",
+                "label",
+                "status",
+                "duration_ms",
+                "evidence_count",
+                "data_version",
+                "detail",
+                "fallback",
+            )
+        ):
+            normalized.append(dict(item))  # type: ignore[arg-type]
+            continue
+        detail = _trace_detail(item).strip() or "旧版轨迹记录"
+        normalized.append(
+            {
+                "node": f"legacy_{index + 1}",
+                "label": "兼容轨迹",
+                "status": "succeeded",
+                "duration_ms": 0.0,
+                "evidence_count": len(state.get("citations") or []),
+                "data_version": data_version,
+                "detail": detail[:1200],
+                "fallback": any(term in detail for term in _TRACE_FALLBACK_TERMS),
+            }
+        )
+    return normalized
+
+
+def _safe_node_fallback(node_name: str, state: AgentState, exc: Exception) -> AgentState:
+    """节点异常时返回最小、保守且可继续编排的状态。"""
+    error_code = f"{node_name}:{exc.__class__.__name__}"
+    update: AgentState = {**state, "error": error_code, "pending_review": True}
+    if node_name == "route_intent":
+        update.update(
+            intent="unknown",
+            resolved_competition=None,
+            resolved_name=None,
+            clarification=None,
+        )
+    elif node_name == "retrieve":
+        update["citations"] = []
+    elif node_name == "web_augment":
+        update["web_results"] = []
+    elif node_name == "gate":
+        update["gate"] = {"skipped": True, "reason": "节点异常，已保守跳过"}
+    elif node_name == "score":
+        update["score"] = {"skipped": True, "reason": "节点异常，已保守跳过"}
+    elif node_name == "team_copy":
+        update["team_copy"] = ""
+    elif node_name == "teammate_match":
+        update["teammate_matches"] = []
+    elif node_name == "recommend_all":
+        update["recommendations"] = []
+    elif node_name == "compose":
+        update["answer"] = "本次处理未能完整完成，系统已进入保守兜底；请稍后重试或查看官方来源。"
+    return update
+
+
+def _instrument_node(
+    node_name: str,
+    func: Callable[[AgentState], AgentState],
+) -> Callable[[AgentState], AgentState]:
+    """为业务节点补充结构化审计轨迹和异常兜底。
+
+    ``detail`` 只汇总节点本来就会公开的业务结果，例如“命中 3 条证据”或
+    “资格门控通过”；不会采集提示词、隐藏推理或模型思维链。
+    """
+
+    label = _TRACE_NODE_LABELS[node_name]
+
+    def wrapped(state: AgentState) -> AgentState:
+        started = perf_counter()
+        before_raw = list(state.get("trace") or [])
+        before = _normalize_existing_trace(before_raw, state)
+        try:
+            result = func({**state, "trace": before})
+            if not isinstance(result, dict):
+                result = dict(state)
+            raw_trace = list(result.get("trace") or before)
+            emitted = raw_trace[len(before):] if len(raw_trace) >= len(before) else raw_trace
+            messages = [message for message in (_trace_detail(item).strip() for item in emitted) if message]
+            detail = "；".join(messages) or _TRACE_DEFAULT_DETAILS[node_name]
+            fallback = any(term in detail for term in _TRACE_FALLBACK_TERMS)
+            if "跳过" in detail or (node_name == "web_augment" and not messages):
+                status = "skipped"
+            elif fallback or "待核验" in detail or "待确认" in detail:
+                status = "degraded"
+            else:
+                status = "succeeded"
+        except Exception as exc:  # noqa: BLE001 - 节点级保守兜底，错误码会返回调用方
+            result = _safe_node_fallback(node_name, state, exc)
+            detail = f"{label}：节点执行异常，已进入保守兜底（{exc.__class__.__name__}）"
+            fallback = True
+            status = "failed"
+
+        data_version = _state_data_version(result)
+        step: AuditTraceStep = {
+            "node": node_name,
+            "label": label,
+            "status": status,
+            "duration_ms": round(max(0.0, (perf_counter() - started) * 1000), 3),
+            "evidence_count": len(result.get("citations") or []),
+            "data_version": data_version,
+            "detail": detail[:1200],
+            "fallback": fallback,
+        }
+        return {
+            **result,
+            "data_version": data_version,
+            "trace": [*before, step],
+        }
+
+    wrapped.__name__ = f"audited_{node_name}"
+    wrapped.__doc__ = func.__doc__
+    return wrapped
 
 
 # ---------------------------------------------------------------------------
@@ -162,6 +386,12 @@ def _resolve_competition_versioned(
 ) -> tuple[Optional[Competition], Optional[str], Optional[str]]:
     """锁定赛事并显式处理同名多年份版本。"""
     q = _norm(question)
+    def _implicit_version_result(selected: Competition, pool: list[Competition]):
+        years = {item.document_year for item in pool}
+        if not re.search(r"20\d{2}", q) and len(years) > 1:
+            note = f"你没有指定年份，以下使用最新官网来源已确认版本：{selected.document_year}年（{selected.doc_version}）。"
+            return selected, note, None
+        return selected, None, None
     # 建模类问法显式纠正：避免「全国大学生数学竞赛（CMC）」因名称含「数学」而被抢锁，
     # 导致用户问「数学建模怎么备赛」时路由到数学竞赛、起手纠结「你问的是哪个」，答非所问。
     if "数学建模" in q:
@@ -172,20 +402,24 @@ def _resolve_competition_versioned(
                 _us = [c for c in _model_pool if "美国" in (c.competition_name or "")
                        or "MCM" in (c.competition_name or "").upper()]
                 if _us:
-                    return max(_us, key=lambda c: c.document_year), None, None
+                    selected = max(_us, key=lambda c: c.document_year)
+                    return _implicit_version_result(selected, _us)
             else:
                 _cn = [c for c in _model_pool if "国赛" in (c.competition_name or "")
                        or "高教社杯" in (c.competition_name or "")]
                 if _cn:
-                    return max(_cn, key=lambda c: c.document_year), None, None
-            return max(_model_pool, key=lambda c: c.document_year), None, None
+                    selected = max(_cn, key=lambda c: c.document_year)
+                    return _implicit_version_result(selected, _cn)
+            selected = max(_model_pool, key=lambda c: c.document_year)
+            return _implicit_version_result(selected, _model_pool)
     # 智能车类问法显式纠正：「智能车」不是「智能汽车」子串，易被匹配丢弃而锁不住赛事，
     # 导致「智能车怎么备赛」走兜底、答非所问。
     if "智能车" in q or "智能汽车" in q:
         _car_pool = [c for c in comps
                      if "智能汽车" in (c.competition_name or "") or "智能车" in (c.competition_name or "")]
         if _car_pool:
-            return max(_car_pool, key=lambda c: c.document_year), None, None
+            selected = max(_car_pool, key=lambda c: c.document_year)
+            return _implicit_version_result(selected, _car_pool)
     mentioned_years = {int(y) for y in re.findall(r"20\d{2}", q)}
     scored = [(c, _competition_match_score(q, c)) for c in comps]
     scored = [(c, score) for c, score in scored if score >= 4]
@@ -253,7 +487,7 @@ _KW_CHAT = [
     "如何学", "怎么备", "如何备", "我该怎么", "该不该", "值不值", "怎么样",
     "含金量", "值得参加", "值得报", "难不难", "难吗", "有没有用", "有用吗",
     "前景", "优势", "评价", "靠谱吗", "好不好", "如何准备", "怎么冲刺",
-    "帮我", "如何冲", "怎么冲", "怎么安排", "如何安排", "注意什么", "避坑",
+    "如何冲", "怎么冲", "怎么安排", "如何安排", "注意什么", "避坑",
     # —— 以下扩充：覆盖「备赛 / 备考 / 备战」整类问法，避免被误判为规则问答 ——
     "备赛", "备考", "备战", "怎么备考", "如何备考", "怎么打", "如何打",
     "复习", "冲刺", "学习路线", "时间规划", "怎么规划", "如何规划",
@@ -1391,6 +1625,41 @@ def _generate_grounded(state: AgentState, intent: str, citations: list, name: st
     return _sanitize_citations(out, len(citations))
 
 
+def _pending_review_notice(state: AgentState, intent: str) -> str:
+    """把内部待审核状态转成用户可见的可信边界。
+
+    「单个事实已有官方原文」与「整体赛事证据已达推荐门槛」是两件事：
+    前者可以照常展示引用，后者未满足时仍必须禁止资格结论与推荐评分。
+    """
+    if not state.get("pending_review") or intent not in ("qa", "detail"):
+        return ""
+    resolved_id = state.get("resolved_competition")
+    comp = db.get_competition(resolved_id) if resolved_id else None
+    if comp is not None and comp.official_source_status == "found":
+        return (
+            "\n\nℹ️ 可信边界：上述事实已关联官方原文，但该赛事的关键字段证据尚未齐全，"
+            "目前仅作为候选信息；不构成资格判断或推荐评分，请以官网最新通知为准。"
+        )
+    return (
+        "\n\n该赛事目前仅作为候选信息展示，关键字段证据尚不完整；"
+        "以上内容不构成资格判断或匹配评分，请以官网最新通知为准。"
+    )
+
+
+def _insert_notice_before_citations(answer: str, notice: str) -> str:
+    """让可信边界出现在引用附录之前。
+
+    前端会隐藏文本引用附录并改用可交互证据卡；如果把风险提示放在附录之后，
+    提示也会被一起隐藏。
+    """
+    if not notice:
+        return answer
+    marker = "\n\n——— 引用来源 ———"
+    if marker in answer:
+        return answer.replace(marker, notice + marker, 1)
+    return answer + notice
+
+
 def _finalize_grounded(generated: str, state: AgentState, citations: list,
                        intent: str, trace: list) -> str:
     """把 LLM 生成结果 + 确定性门控/评分结论 + 引用附录拼成最终答案。"""
@@ -1399,8 +1668,8 @@ def _finalize_grounded(generated: str, state: AgentState, citations: list,
     if intent != "chat":
         gate = state.get("gate") or {}
         if gate.get("source_issues"):
-            # 来源待核验 ≠ 数据不可用：事实已展示，仅作软提示
-            answer += "\n\nℹ️ 说明：该赛事官方来源尚待核验（不影响以上信息查阅），报名与赛程请以官网最新通知为准。"
+            # 由 _pending_review_notice 统一说明「单个事实可引用，整体不评分」的边界。
+            pass
         elif gate.get("eligible") is False:
             reasons = gate.get("reasons") or []
             if reasons:
@@ -1409,13 +1678,10 @@ def _finalize_grounded(generated: str, state: AgentState, citations: list,
                 answer += "\n\nℹ️ 说明：该赛事官方来源尚待核验，报名与赛程请以官网最新通知为准。"
         elif gate.get("eligible") is True and not (state.get("score") or {}).get("skipped"):
             answer += f"\n\n✅ 你符合报名硬性条件，综合匹配度约 {(state.get('score') or {}).get('total')} 分。"
+    answer += _pending_review_notice(state, intent)
     answer += _citations_appendix(citations)
     if state.get("version_resolution_note"):
         answer = state["version_resolution_note"] + "\n\n" + answer
-    if state.get("pending_review") and intent in ("qa", "detail"):
-        comp = db.get_competition(state.get("resolved_competition")) if state.get("resolved_competition") else None
-        if comp is None or comp.official_source_status != "found":
-            answer += "\n\n该赛事目前仅作为候选信息展示，关键字段证据尚不完整；以上内容不构成资格判断或匹配评分，请以官网最新通知为准。"
     trace.append("组装答案：LLM 基于证据自由撰写（带 [n] 引用）")
     return answer
 
@@ -1450,9 +1716,10 @@ def node_compose(state: AgentState) -> AgentState:
             answer = _finalize_grounded(generated, state, citations, "chat", trace)
             return {**state, "answer": answer, "trace": trace}
         # —— LLM 未启用或生成失败：走确定性生成，确保开放/建议类问题有实质回答 ——
+        resolved_id = state.get("resolved_competition")
         det = _compose_chat_deterministic(
             state,
-            db.get_competition(state.get("resolved_competition")),
+            db.get_competition(resolved_id) if resolved_id else None,
             citations,
             state.get("web_results") or [],
         )
@@ -1543,7 +1810,7 @@ def node_compose(state: AgentState) -> AgentState:
 
         gate = state.get("gate") or {}
         if gate.get("source_issues"):
-            answer += "\n\nℹ️ 说明：该赛事官方来源尚待核验（不影响以上信息查阅），报名与赛程请以官网最新通知为准。"
+            pass
         elif gate.get("eligible") is False:
             reasons = gate.get("reasons") or []
             if reasons:
@@ -1567,7 +1834,7 @@ def node_compose(state: AgentState) -> AgentState:
                 lines.append(f"· {txt}{_cite_marker(i)}")
             gate = state.get("gate") or {}
             if gate.get("source_issues"):
-                lines.append("\nℹ️ 说明：该赛事官方来源尚待核验（不影响以上信息查阅），报名与赛程请以官网最新通知为准。")
+                pass
             elif gate.get("eligible") is False:
                 reasons = gate.get("reasons") or []
                 if reasons:
@@ -1587,12 +1854,7 @@ def node_compose(state: AgentState) -> AgentState:
 
     if state.get("version_resolution_note"):
         answer = state["version_resolution_note"] + "\n\n" + answer
-    if state.get("pending_review") and intent in ("qa", "detail"):
-        comp = db.get_competition(state.get("resolved_competition")) if state.get("resolved_competition") else None
-        # 仅对「无官方来源 / 待核验」赛事显示候选免责；已锚定官方来源（found）的
-        # A/B 级赛事不再套用，避免对已核验信息给出误导性的「候选」措辞。
-        if comp is None or comp.official_source_status != "found":
-            answer += "\n\n该赛事目前仅作为候选信息展示，关键字段证据尚不完整；以上内容不构成资格判断或匹配评分，请以官网最新通知为准。"
+    answer = _insert_notice_before_citations(answer, _pending_review_notice(state, intent))
 
     # 联网补充：结果存于 state["web_results"]，由前端明确标注为「🌐 联网信息（仅供参考）」
     # 并附可点击来源链接；不混入答案正文的官方 [n] 引用，保持证据一致性。
@@ -1615,15 +1877,17 @@ def build_graph():
     global _USING_LANGGRAPH
     g = StateGraph(AgentState)
 
-    g.add_node("route_intent", node_route_intent)
-    g.add_node("retrieve", node_retrieve)
-    g.add_node("gate", node_gate)
-    g.add_node("score", node_score)
-    g.add_node("team_copy", node_team_copy)
-    g.add_node("teammate_match", node_teammate_match)
-    g.add_node("recommend_all", node_recommend_all)
-    g.add_node("web_augment", node_web_augment)
-    g.add_node("compose", node_compose)
+    # 节点包装器统一记录耗时、证据数量、数据版本、业务摘要与兜底状态。
+    # 原节点继续只负责业务逻辑，避免可观测性代码侵入推荐与证据规则。
+    g.add_node("route_intent", _instrument_node("route_intent", node_route_intent))
+    g.add_node("retrieve", _instrument_node("retrieve", node_retrieve))
+    g.add_node("gate", _instrument_node("gate", node_gate))
+    g.add_node("score", _instrument_node("score", node_score))
+    g.add_node("team_copy", _instrument_node("team_copy", node_team_copy))
+    g.add_node("teammate_match", _instrument_node("teammate_match", node_teammate_match))
+    g.add_node("recommend_all", _instrument_node("recommend_all", node_recommend_all))
+    g.add_node("web_augment", _instrument_node("web_augment", node_web_augment))
+    g.add_node("compose", _instrument_node("compose", node_compose))
 
     g.add_edge(START, "route_intent")
 
@@ -1674,6 +1938,57 @@ def get_graph():
     return _GRAPH
 
 
+def _summarize_trace(
+    trace: list[AuditTraceStep],
+    *,
+    total_duration_ms: float,
+    citations: list[dict],
+    pending_review: bool,
+    error: Optional[str],
+    data_version: str,
+) -> tuple[dict, dict]:
+    """生成适合前端概览与工程指标面板的审计摘要。"""
+    status_counts = {
+        status: sum(1 for step in trace if step["status"] == status)
+        for status in ("succeeded", "skipped", "degraded", "failed")
+    }
+    fallback_count = sum(1 for step in trace if step["fallback"])
+    if status_counts["failed"] or error:
+        overall_status = "failed"
+    elif status_counts["degraded"] or fallback_count or pending_review:
+        overall_status = "degraded"
+    else:
+        overall_status = "succeeded"
+
+    trace_summary = {
+        "status": overall_status,
+        "total_steps": len(trace),
+        "succeeded_steps": status_counts["succeeded"],
+        "skipped_steps": status_counts["skipped"],
+        "degraded_steps": status_counts["degraded"],
+        "failed_steps": status_counts["failed"],
+        "fallback_steps": fallback_count,
+        "evidence_count": len(citations),
+        "path": [step["node"] for step in trace],
+        "labels": [step["label"] for step in trace],
+    }
+    metrics = {
+        "status": overall_status,
+        "total_duration_ms": round(max(0.0, total_duration_ms), 3),
+        "node_duration_ms": round(sum(step["duration_ms"] for step in trace), 3),
+        "step_count": len(trace),
+        "evidence_count": len(citations),
+        "evidence_fields": sorted(
+            {str(citation.get("field")) for citation in citations if citation.get("field")}
+        ),
+        "fallback_count": fallback_count,
+        "pending_review": pending_review,
+        "data_version": data_version,
+        "engine": "langgraph" if _USING_LANGGRAPH else "shim",
+    }
+    return trace_summary, metrics
+
+
 def run_agent(
     question: str,
     user_id: Optional[str] = None,
@@ -1686,31 +2001,75 @@ def run_agent(
     ``model`` 可选：请求级覆盖默认 LLM 模型（前端模型选择器透传），
     仅在已配置 LLM key 时生效；未配置或调用失败自动回退确定性模板。
     """
+    run_id = f"agent_{uuid4().hex}"
+    started = perf_counter()
     init: AgentState = {
         "question": question,
+        "run_id": run_id,
         "user_id": user_id,
         "competition_id": competition_id,
         "top_k": top_k,
         "model": model,
+        "data_version": _catalog_data_version(),
         "trace": [],
         "citations": [],
         "web_results": [],
         "pending_review": False,
     }
-    final = get_graph().invoke(init)
+    try:
+        final = get_graph().invoke(init)
+    except Exception as exc:  # noqa: BLE001 - 图级最后一道保守兜底
+        data_version = _state_data_version(init)
+        final = {
+            **init,
+            "answer": "本次处理未能完整完成，系统已进入保守兜底；请稍后重试或查看官方来源。",
+            "error": f"orchestrator:{exc.__class__.__name__}",
+            "pending_review": True,
+            "trace": [
+                {
+                    "node": "orchestrator",
+                    "label": "Agent 流程编排",
+                    "status": "failed",
+                    "duration_ms": round(max(0.0, (perf_counter() - started) * 1000), 3),
+                    "evidence_count": 0,
+                    "data_version": data_version,
+                    "detail": f"流程编排异常，已进入保守兜底（{exc.__class__.__name__}）",
+                    "fallback": True,
+                }
+            ],
+        }
+
+    trace = _normalize_existing_trace(list(final.get("trace") or []), final)
+    citations = final.get("citations") or []
+    pending_review = bool(final.get("pending_review"))
+    data_version = _state_data_version(final)
+    trace_summary, metrics = _summarize_trace(
+        trace,
+        total_duration_ms=(perf_counter() - started) * 1000,
+        citations=citations,
+        pending_review=pending_review,
+        error=final.get("error"),
+        data_version=data_version,
+    )
     return {
+        "run_id": run_id,
         "question": question,
         "intent": final.get("intent"),
         "resolved_competition": final.get("resolved_competition"),
         "resolved_name": final.get("resolved_name"),
         "answer": final.get("answer"),
-        "citations": final.get("citations") or [],
+        "citations": citations,
         "gate": final.get("gate") or {},
         "score": final.get("score") or {},
         "recommendations": final.get("recommendations") or [],
         "teammate_matches": final.get("teammate_matches") or [],
-        "pending_review": bool(final.get("pending_review")),
-        "trace": final.get("trace") or [],
+        "pending_review": pending_review,
+        "data_version": data_version,
+        "trace": trace,
+        # 同步保留旧版字符串轨迹，供脚本或尚未升级的调用方平滑迁移。
+        "trace_legacy": [step["detail"] for step in trace],
+        "trace_summary": trace_summary,
+        "metrics": metrics,
         "web_results": final.get("web_results") or [],
         "error": final.get("error"),
     }
@@ -1730,6 +2089,6 @@ if __name__ == "__main__":
         r = run_agent(q, user_id=uid, competition_id=cid)
         print(f"\n【问】{q}  (user={uid})")
         print(f"意图={r['intent']}  赛事={r['resolved_name']}  引用={len(r['citations'])} 条  待确认={r['pending_review']}")
-        print("轨迹：" + " → ".join(r["trace"]))
+        print("轨迹：" + " → ".join(r["trace_legacy"]))
         print("答：\n" + (r["answer"] or ""))
         print("-" * 70)

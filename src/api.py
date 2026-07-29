@@ -11,12 +11,17 @@
 from __future__ import annotations
 
 import base64
+import hashlib
+import hmac
+import json
 import os
 import re
 import secrets
+import time
 from contextlib import asynccontextmanager
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
+from urllib.parse import unquote
 from uuid import uuid4
 
 
@@ -47,9 +52,9 @@ def _load_dotenv() -> None:
 
 _load_dotenv()
 
-from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.security import APIKeyHeader
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -60,9 +65,16 @@ from recommendation.engine import recommend_for_user, recommend_teammates
 from trust import assess_recommendation_readiness, assess_source_readiness
 from schemas import (
     Citation,
+    AgentTaskCreate,
     Competition,
     CompetitionCategory,
     DataStatus,
+    PortfolioApplyRequest,
+    PortfolioOptimizeResponse,
+    PortfolioPreferences,
+    RadarEventReview,
+    RadarAlertAction,
+    RadarWatchCreate,
     RecommendationResult,
     ProjectCreate,
     ProjectItem,
@@ -78,6 +90,8 @@ import parsing.pdf_extractor as pdf_extractor
 from admin import suggest as extract_suggest
 from agent.graph import run_agent  # LangGraph 闭环：意图路由→隔离检索→门控→评分→组队文案
 from agent.llm import is_llm_enabled  # 可选 LLM 润色开关（无 key 自动关闭）
+from portfolio.optimizer import optimize_portfolios
+from radar.service import run_all as run_radar, validate_public_url, validate_watch_configuration
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 FRONTEND_DIR = PROJECT_ROOT / "frontend"
@@ -98,7 +112,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="校园科创导航智能体", version="0.2.0", lifespan=lifespan)
+app = FastAPI(title="校园科创导航智能体", version="0.3.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -106,6 +120,93 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# ---------------------------------------------------------------------------
+# 用户级签名会话：绑定 /api/users/{user_id} 资源所有权
+# ---------------------------------------------------------------------------
+_AUTH_TOKEN_TTL_SECONDS = max(900, min(86400, int(os.getenv("AUTH_TOKEN_TTL_SECONDS", "28800"))))
+_AUTH_TOKEN_SECRET = (os.getenv("AUTH_TOKEN_SECRET") or secrets.token_urlsafe(48)).encode("utf-8")
+_USER_API_RE = re.compile(r"^/api/users(?:/([^/]+))?(?:/|$)")
+
+
+def _token_b64encode(value: bytes) -> str:
+    return base64.urlsafe_b64encode(value).rstrip(b"=").decode("ascii")
+
+
+def _token_b64decode(value: str) -> bytes:
+    return base64.urlsafe_b64decode(value + "=" * (-len(value) % 4))
+
+
+def _issue_access_token(username: str) -> str:
+    now = int(time.time())
+    payload = json.dumps(
+        {"sub": username, "iat": now, "exp": now + _AUTH_TOKEN_TTL_SECONDS, "v": 1},
+        ensure_ascii=True,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("utf-8")
+    signature = hmac.new(_AUTH_TOKEN_SECRET, payload, hashlib.sha256).digest()
+    return f"{_token_b64encode(payload)}.{_token_b64encode(signature)}"
+
+
+def _access_token_subject(header: str | None) -> str | None:
+    if not header or not header.startswith("Bearer "):
+        return None
+    token = header[7:].strip()
+    try:
+        encoded_payload, encoded_signature = token.split(".", 1)
+        payload = _token_b64decode(encoded_payload)
+        supplied_signature = _token_b64decode(encoded_signature)
+        expected_signature = hmac.new(_AUTH_TOKEN_SECRET, payload, hashlib.sha256).digest()
+        if not hmac.compare_digest(supplied_signature, expected_signature):
+            return None
+        data = json.loads(payload.decode("utf-8"))
+        subject = str(data.get("sub") or "")
+        if int(data.get("exp") or 0) <= int(time.time()):
+            return None
+        if not re.fullmatch(r"[A-Za-z0-9_]{3,32}", subject):
+            return None
+        return subject
+    except Exception:
+        return None
+
+
+@app.middleware("http")
+async def enforce_user_resource_scope(request: Request, call_next):
+    """保护用户画像、项目、组合、运行历史和情报收件箱。
+
+    公开赛事、官方证据、健康检查与不带 user_id 的通用问答仍可访问；
+    带用户画像的 Agent 问答必须与会话主体一致。
+    """
+    if request.method == "OPTIONS":
+        return await call_next(request)
+
+    path = request.url.path
+    user_match = _USER_API_RE.match(path)
+    requested_user = unquote(user_match.group(1)) if user_match and user_match.group(1) else None
+    agent_user = request.query_params.get("user_id") if path == "/api/agent/ask" else None
+    replay_run_id = None
+    replay_match = re.fullmatch(r"/api/agent/runs/([^/]+)/replay", path)
+    if replay_match:
+        replay_run_id = unquote(replay_match.group(1))
+
+    requires_session = bool(user_match or agent_user or replay_run_id)
+    if not requires_session:
+        return await call_next(request)
+
+    subject = _access_token_subject(request.headers.get("Authorization"))
+    if subject is None:
+        return JSONResponse(status_code=401, content={"detail": "请先登录或会话已过期"})
+    target_user = requested_user or agent_user
+    if target_user and not secrets.compare_digest(subject, target_user):
+        return JSONResponse(status_code=403, content={"detail": "无权访问其他用户的数据"})
+    if replay_run_id:
+        saved = db.get_agent_run(replay_run_id)
+        if saved and saved.get("user_id") and not secrets.compare_digest(subject, saved["user_id"]):
+            return JSONResponse(status_code=403, content={"detail": "无权回放其他用户的运行"})
+    request.state.user_id = subject
+    return await call_next(request)
 
 
 @app.get("/health", tags=["系统"])
@@ -124,6 +225,53 @@ def health() -> dict:
         "date": date.today().isoformat(),
         "embedding_backend": embedding_backend(),
         "llm_backend": "openai-compatible" if is_llm_enabled() else "disabled",
+    }
+
+
+@app.get("/api/system/quality", tags=["系统"])
+def quality_dashboard() -> dict:
+    """公开展示冻结评测结果与当前运行数据，便于评委核验工程质量。"""
+    def read_json(name: str) -> dict:
+        path = PROJECT_ROOT / "evals" / name
+        try:
+            import json
+
+            return json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            return {}
+
+    regression = read_json("metrics.json")
+    formal = read_json("formal_results.json")
+    regression_suite = formal.get("regression") or {}
+    watches = db.list_source_watches()
+    events = db.list_change_events(limit=200)
+    return {
+        "evaluated_at": formal.get("evaluated_at"),
+        "golden_set": {
+            "cases": regression.get("total_cases", 0),
+            "intent_accuracy": regression.get("intent_acc"),
+            "citation_recall": regression.get("citation_recall"),
+            "gate_consistency": regression.get("gate_consistency"),
+        },
+        "formal_checks": formal.get("formal_summary", {}),
+        "formal_metrics": formal.get("metrics", {}),
+        "regression": {
+            "tests_run": regression_suite.get("tests_run", 0),
+            "passed": regression_suite.get("passed", 0),
+            "failures": regression_suite.get("failures", 0),
+            "errors": regression_suite.get("errors", 0),
+            "successful": bool(regression_suite.get("successful")),
+        },
+        "environment": formal.get("environment", {}),
+        "runtime": {
+            "source_count": len(watches),
+            "healthy_sources": sum(1 for item in watches if item.get("health_score", 0) >= 80),
+            "pending_human_reviews": sum(1 for event in events if event.get("status") == "pending"),
+            "manual_review_gate": True,
+            "ssrf_protection": True,
+            "signed_user_sessions": True,
+        },
+        "note": "评测文件为冻结结果；运行态指标来自当前数据库，不将二者混算。",
     }
 
 
@@ -231,6 +379,108 @@ def recommendations(user_id: str) -> list[RecommendationResult]:
     ]
 
 
+@app.post(
+    "/api/users/{user_id}/portfolio/optimize",
+    response_model=PortfolioOptimizeResponse,
+    tags=["组合规划"],
+)
+def optimize_user_portfolio(
+    user_id: str, preferences: PortfolioPreferences
+) -> PortfolioOptimizeResponse:
+    """在可信、资格和每周时间约束下生成稳妥/均衡/冲刺三套方案。"""
+    profile = db.get_user_profile(user_id)
+    if profile is None:
+        raise HTTPException(status_code=404, detail="用户画像不存在")
+    if not profile.privacy_consent:
+        raise HTTPException(status_code=403, detail="未授权使用画像，不能进行组合规划")
+    return optimize_portfolios(
+        profile,
+        db.get_all_competitions(),
+        db.list_user_projects(user_id),
+        preferences,
+        date.today(),
+    )
+
+
+@app.get("/api/users/{user_id}/portfolio/map", tags=["组合规划"])
+def portfolio_map(user_id: str) -> dict:
+    """返回作战地图：候选路线 + 已有项目风险节点 + 雷达影响边。"""
+    profile = db.get_user_profile(user_id)
+    if profile is None:
+        raise HTTPException(status_code=404, detail="用户画像不存在")
+    if not profile.privacy_consent:
+        raise HTTPException(status_code=403, detail="未授权使用画像，不能生成作战地图")
+    preferences = PortfolioPreferences()
+    optimized = optimize_portfolios(
+        profile,
+        db.get_all_competitions(),
+        db.list_user_projects(user_id),
+        preferences,
+        date.today(),
+    )
+    projects = db.list_user_projects(user_id)
+    alerts = db.list_user_alerts(user_id)
+    project_maps = []
+    for project in projects:
+        nodes = [
+            {
+                "node_id": f"task:{item.item_id}",
+                "node_type": "milestone" if item.phase in {"qualification", "submission", "defense"} else "material" if item.item_type.value == "material" else "competition",
+                "label": item.title,
+                "status": "blocked" if item.is_blocked else "done" if item.status.value in {"done", "skipped"} else "in_progress" if item.status.value == "in_progress" else "not_ready",
+                "due_date": item.due_date.isoformat() if item.due_date else None,
+                "competition_id": project.competition_id,
+                "reason": item.blocked_reason,
+            }
+            for item in project.items
+        ]
+        edges = [
+            {"source": f"task:{item.depends_on_item_id}", "target": f"task:{item.item_id}", "relation": "precedes"}
+            for item in project.items if item.depends_on_item_id
+        ]
+        project_maps.append({
+            "project_id": project.project_id,
+            "competition_id": project.competition_id,
+            "competition_name": project.competition_name,
+            "risk_level": project.risk_level,
+            "progress_percent": project.progress_percent,
+            "nodes": nodes,
+            "edges": edges,
+        })
+    return {
+        "generated_at": optimized.generated_at,
+        "routes": [plan.model_dump(mode="json") for plan in optimized.plans],
+        "active_projects": project_maps,
+        "pending_alerts": [item for item in alerts if item.get("status") == "pending"],
+        "legend": {
+            "not_ready": "未准备",
+            "in_progress": "进行中",
+            "done": "已完成",
+            "blocked": "受官方变化或依赖阻塞",
+        },
+    }
+
+
+@app.post("/api/users/{user_id}/portfolio/apply", tags=["组合规划"])
+def apply_user_portfolio(user_id: str, payload: PortfolioApplyRequest) -> dict:
+    """在单一事务中重新校验并幂等采用组合；任一失败则全部回滚。"""
+    ids = list(dict.fromkeys(payload.competition_ids))
+    if len(ids) != len(payload.competition_ids):
+        raise HTTPException(status_code=400, detail="组合中存在重复赛事")
+    try:
+        created, failures = db.create_user_projects_atomic(user_id, ids, date.today())
+    except ValueError as exc:
+        if str(exc) == "profile_required":
+            raise HTTPException(status_code=404, detail="用户不存在") from exc
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    if failures:
+        raise HTTPException(
+            status_code=409,
+            detail={"message": "赛事状态已变化，请重新优化", "failures": failures},
+        )
+    return {"count": len(created), "projects": [item.model_dump(mode="json") for item in created]}
+
+
 @app.get("/api/users/{user_id}/teammates", tags=["队友推荐"])
 def user_teammates(user_id: str, top_k: int = Query(5, ge=1, le=20)) -> dict:
     """基于画像，从队友库中推荐互补搭档（按互补度降序）。"""
@@ -296,6 +546,9 @@ def auth_login(payload: AuthLoginPayload) -> dict:
         "display_name": display_name,
         "persona": persona,
         "avatar": avatar,
+        "access_token": _issue_access_token(username),
+        "token_type": "bearer",
+        "expires_in": _AUTH_TOKEN_TTL_SECONDS,
     }
 
 
@@ -339,7 +592,7 @@ def join_project(user_id: str, payload: ProjectCreate) -> UserProject:
         errors = {
             "profile_required": (404, "请先保存个人画像"),
             "competition_not_found": (404, "赛事不存在"),
-            "competition_unverified": (409, "未核验赛事不能加入正式项目"),
+            "competition_basic_info_incomplete": (409, "赛事缺少参赛对象或有效截止时间，暂不能新建项目"),
             "competition_expired": (409, "赛事报名已经截止，不能新建参赛项目"),
         }
         status, message = errors.get(str(exc), (400, "无法加入项目"))
@@ -367,7 +620,22 @@ def delete_project(user_id: str, project_id: int) -> dict:
     tags=["我的项目"],
 )
 def add_project_item(user_id: str, project_id: int, payload: ProjectItemCreate) -> ProjectItem:
-    item = db.add_project_item(user_id, project_id, payload.item_type, payload.title, payload.due_date)
+    try:
+        item = db.add_project_item(
+            user_id,
+            project_id,
+            payload.item_type,
+            payload.title,
+            payload.due_date,
+            phase=payload.phase,
+            depends_on_item_id=payload.depends_on_item_id,
+            blocked_reason=payload.blocked_reason,
+            source_alert_id=payload.source_alert_id,
+            source_citation_id=payload.source_citation_id,
+            estimated_hours=payload.estimated_hours,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
     if item is None:
         raise HTTPException(status_code=404, detail="项目不存在")
     return item
@@ -381,13 +649,54 @@ def add_project_item(user_id: str, project_id: int, payload: ProjectItemCreate) 
 def update_project_item(
     user_id: str, project_id: int, item_id: int, payload: ProjectItemUpdate
 ) -> ProjectItem:
-    item = db.update_project_item(
-        user_id, project_id, item_id,
-        title=payload.title, due_date=payload.due_date, status=payload.status,
-    )
+    try:
+        item = db.update_project_item(
+            user_id,
+            project_id,
+            item_id,
+            title=payload.title,
+            due_date=payload.due_date,
+            status=payload.status,
+            phase=payload.phase,
+            depends_on_item_id=payload.depends_on_item_id,
+            blocked_reason=payload.blocked_reason,
+            estimated_hours=payload.estimated_hours,
+        )
+    except ValueError as exc:
+        messages = {
+            "dependency_open": "前置任务尚未完成，当前任务仍处于阻塞状态",
+            "dependency_cycle": "任务依赖不能形成循环",
+            "dependency_not_in_project": "前置任务不属于当前项目",
+        }
+        raise HTTPException(status_code=409, detail=messages.get(str(exc), str(exc)))
     if item is None:
         raise HTTPException(status_code=404, detail="任务或材料不存在")
     return item
+
+
+@app.post(
+    "/api/users/{user_id}/tasks/from-agent",
+    response_model=ProjectItem,
+    tags=["我的项目"],
+)
+def task_from_agent(user_id: str, payload: AgentTaskCreate) -> ProjectItem:
+    try:
+        return db.create_task_from_agent(
+            user_id,
+            payload.competition_id,
+            payload.title,
+            payload.due_date,
+            payload.source_citation_id,
+            payload.estimated_hours,
+        )
+    except ValueError as exc:
+        messages = {
+            "profile_required": "请先保存个人画像",
+            "competition_not_found": "赛事不存在",
+            "competition_not_ready": "赛事当前不满足正式执行条件",
+            "citation_not_in_project_competition": "引用与目标赛事不匹配",
+        }
+        raise HTTPException(status_code=409, detail=messages.get(str(exc), str(exc)))
 
 
 @app.delete("/api/users/{user_id}/projects/{project_id}/items/{item_id}", tags=["我的项目"])
@@ -498,7 +807,10 @@ def agent_ask(
     问答自动带引用：答案文本内嵌 [1][2]… 角标，citations 提供可点击来源。
     """
     try:
-        return run_agent(question, user_id=user_id, competition_id=competition_id, top_k=top_k, model=model)
+        result = run_agent(question, user_id=user_id, competition_id=competition_id, top_k=top_k, model=model)
+        result["user_id"] = user_id
+        db.save_agent_run(result)
+        return result
     except Exception as exc:  # 闭环异常不应崩服务
         raise HTTPException(status_code=500, detail=f"Agent 执行异常：{exc}")
 
@@ -518,6 +830,30 @@ def agent_llm_status() -> dict:
     }
 
 
+@app.get("/api/users/{user_id}/agent/runs", tags=["Agent"])
+def agent_run_history(user_id: str, limit: int = Query(20, ge=1, le=100)) -> dict:
+    if db.get_user_profile(user_id) is None:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    runs = db.list_agent_runs(user_id, limit)
+    return {"count": len(runs), "runs": runs}
+
+
+@app.post("/api/agent/runs/{run_id}/replay", tags=["Agent"])
+def replay_agent_run(run_id: str) -> dict:
+    saved = db.get_agent_run(run_id)
+    if saved is None:
+        raise HTTPException(status_code=404, detail="运行记录不存在")
+    result = run_agent(
+        saved["question"],
+        user_id=saved.get("user_id"),
+        competition_id=saved.get("resolved_competition"),
+    )
+    result["replayed_from"] = run_id
+    result["user_id"] = saved.get("user_id")
+    db.save_agent_run(result)
+    return result
+
+
 # ---------------------------------------------------------------------------
 # 数据维护闭环（上传 → 解析 → 来源确认 → 入库）
 # ---------------------------------------------------------------------------
@@ -532,6 +868,72 @@ def _require_admin_token(token: str | None = Depends(_ADMIN_API_KEY)) -> None:
         raise HTTPException(status_code=401, detail="管理员令牌无效")
 
 
+
+@app.post("/api/auth/dev-admin-login", tags=["认证"], include_in_schema=False)
+def dev_admin_login(request: Request) -> dict:
+    """仅供本机调试的一键管理员入口；必须显式设置开关，线上默认不存在。"""
+    client_host = request.client.host if request.client else ""
+    local_client = client_host in {"127.0.0.1", "::1", "localhost"}
+    enabled = os.getenv("DEV_ADMIN_QUICK_LOGIN", "").strip().lower() in {"1", "true", "yes"}
+    if not enabled or not local_client:
+        raise HTTPException(status_code=404, detail="本地调试入口未启用")
+    if not _ADMIN_API_TOKEN:
+        raise HTTPException(status_code=503, detail="本地管理员令牌未配置")
+    # 演示账号由 init_db 的种子数据创建；不在此处写入或提升任意真实用户。
+    payload = AuthLoginPayload(username="test", password="test123")
+    response = auth_login(payload)
+    response["admin_token"] = _ADMIN_API_TOKEN
+    response["dev_only"] = True
+    return response
+
+@app.get("/api/radar/status", tags=["赛事雷达"])
+def radar_status() -> dict:
+    """公开展示雷达运行状态；待审核变化明确标注，不作为正式事实。"""
+    watches = db.list_source_watches()
+    events = db.list_change_events(limit=20)
+    public_watches = [
+        {key: value for key, value in item.items() if key not in {"etag", "last_modified", "last_error"}}
+        for item in watches
+    ]
+    return {
+        "watch_count": len(watches),
+        "healthy_count": sum(1 for item in watches if item["last_status"] in {"new", "ok"}),
+        "pending_count": sum(1 for item in events if item["status"] == "pending"),
+        "average_health_score": round(
+            sum(item.get("health_score", 0) for item in watches) / max(1, len(watches)), 1
+        ),
+        "next_scan_at": min(
+            (item["next_scan_at"] for item in watches if item.get("next_scan_at")),
+            default=None,
+        ),
+        "watches": public_watches,
+        "events": events,
+    }
+
+
+@app.get("/api/users/{user_id}/alerts", tags=["赛事雷达"])
+def user_alerts(user_id: str) -> dict:
+    if db.get_user_profile(user_id) is None:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    items = db.list_user_alerts(user_id)
+    return {
+        "count": len(items),
+        "pending_count": sum(1 for item in items if item.get("status") == "pending"),
+        "alerts": items,
+    }
+
+
+@app.post("/api/users/{user_id}/alerts/{alert_id}/action", tags=["赛事雷达"])
+def user_alert_action(user_id: str, alert_id: int, payload: RadarAlertAction) -> dict:
+    try:
+        result = db.act_on_user_alert(user_id, alert_id, payload.action, payload.note)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+    if result is None:
+        raise HTTPException(status_code=404, detail="收件箱事项不存在")
+    return result
+
+
 @app.post("/api/admin/verify", tags=["数据维护"])
 def admin_verify(payload: dict) -> dict:
     """校验管理员令牌；前端据此决定是否显示「数据维护」入口。"""
@@ -541,6 +943,61 @@ def admin_verify(payload: dict) -> dict:
     if not token or not secrets.compare_digest(token, _ADMIN_API_TOKEN):
         raise HTTPException(status_code=401, detail="管理员令牌无效")
     return {"ok": True}
+
+
+@app.get("/api/admin/radar/watches", tags=["赛事雷达"])
+def admin_radar_watches(_: None = Depends(_require_admin_token)) -> dict:
+    items = db.list_source_watches()
+    return {"count": len(items), "watches": items}
+
+
+@app.post("/api/admin/radar/watches", tags=["赛事雷达"])
+def admin_create_radar_watch(
+    payload: RadarWatchCreate, _: None = Depends(_require_admin_token)
+) -> dict:
+    try:
+        validate_public_url(payload.source_url)
+        validate_watch_configuration(
+            payload.include_selector or payload.css_selector,
+            payload.exclude_selector,
+            payload.ignore_regex,
+            payload.trigger_terms,
+        )
+        return db.create_source_watch(**payload.model_dump())
+    except ValueError as exc:
+        status = 404 if str(exc) == "competition_not_found" else 400
+        raise HTTPException(status_code=status, detail=str(exc))
+
+
+@app.post("/api/admin/radar/run", tags=["赛事雷达"])
+def admin_run_radar(payload: dict | None = None, _: None = Depends(_require_admin_token)) -> dict:
+    payload = payload or {}
+    watch_ids = payload.get("watch_ids")
+    demo_content = payload.get("demo_content_by_watch")
+    return run_radar(watch_ids=watch_ids, demo_content_by_watch=demo_content)
+
+
+@app.get("/api/admin/radar/events", tags=["赛事雷达"])
+def admin_radar_events(
+    status: str | None = Query(None), _: None = Depends(_require_admin_token)
+) -> dict:
+    items = db.list_change_events(status=status)
+    return {"count": len(items), "events": items}
+
+
+@app.post("/api/admin/radar/events/{event_id}/review", tags=["赛事雷达"])
+def admin_review_radar_event(
+    event_id: int, payload: RadarEventReview, _: None = Depends(_require_admin_token)
+) -> dict:
+    item = db.review_change_event(event_id, payload.action, payload.note)
+    if item is None:
+        raise HTTPException(status_code=404, detail="变化事件不存在")
+    if payload.action == "approve":
+        try:
+            get_rag().seed_from_db()
+        except Exception as exc:
+            print(f"[radar] 审核后刷新 RAG 失败（不影响事实更新）：{exc}")
+    return item
 
 
 def _classify_submitted_competition(comp: Competition) -> tuple[Competition, list[str]]:
@@ -580,10 +1037,20 @@ def admin_upload(payload: AdminUploadPayload, _: None = Depends(_require_admin_t
         raise HTTPException(status_code=400, detail="文件内容 base64 解码失败")
     if not raw:
         raise HTTPException(status_code=400, detail="文件内容为空")
+    if len(raw) > 15 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="文件超过 15MB 安全上限")
     file_id = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid4().hex[:8]}"
     save_path = UPLOAD_DIR / (file_id + ext)
     save_path.write_bytes(raw)
-    return {"file_id": file_id, "filename": payload.filename, "ext": ext, "saved_as": save_path.name}
+    mime_type = "application/pdf" if ext == ".pdf" else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    document = db.store_document(payload.filename, mime_type, raw)
+    return {
+        "file_id": file_id,
+        "filename": payload.filename,
+        "ext": ext,
+        "saved_as": save_path.name,
+        "document_id": document["document_id"],
+    }
 
 
 @app.post("/api/admin/parse", tags=["数据维护"])
@@ -601,16 +1068,28 @@ def admin_parse(payload: dict, _: None = Depends(_require_admin_token)) -> dict:
     except ValueError:
         cat_enum = CompetitionCategory.PROGRAMMING
     document_year = int(payload.get("document_year", 2026) or 2026)
+    document_id = payload.get("document_id")
+    if document_id is not None and db.get_document(int(document_id)) is None:
+        raise HTTPException(status_code=404, detail="上传文档记录不存在，请重新上传")
     ext = path.suffix.lower()
     try:
         if ext == ".pdf":
-            result = pdf_extractor.parse_pdf(path, cat_enum, document_year, competition_id=file_id)
+            result = pdf_extractor.parse_pdf(
+                path, cat_enum, document_year, competition_id=file_id, document_id=document_id
+            )
         else:
-            result = pdf_extractor.parse_docx(path, cat_enum, document_year, competition_id=file_id)
+            result = pdf_extractor.parse_docx(
+                path, cat_enum, document_year, competition_id=file_id, document_id=document_id
+            )
     except Exception as exc:
         raise HTTPException(status_code=422, detail=f"解析失败：{exc}")
     blocks = [
-        {"index": i, "page": b.page, "paragraph_index": b.paragraph_index, "text": b.text}
+        {
+            "index": i,
+            "page": b.page,
+            "paragraph_index": b.paragraph_index,
+            "text": b.text,
+        }
         for i, b in enumerate(result.blocks)
     ]
     suggestions = extract_suggest.suggest_fields(blocks)
@@ -621,6 +1100,7 @@ def admin_parse(payload: dict, _: None = Depends(_require_admin_token)) -> dict:
         "block_count": len(blocks),
         "blocks": blocks,
         "suggestions": suggestions,
+        "document_id": result.document_id,
     }
 
 

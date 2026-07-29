@@ -12,6 +12,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 import api  # noqa: E402
+import db  # noqa: E402
 from recommendation.engine import recommend_for_user  # noqa: E402
 from schemas import (  # noqa: E402
     Citation,
@@ -72,6 +73,13 @@ def profile() -> UserProfile:
     )
 
 
+def remove_security_test_competition() -> None:
+    """防止管理员接口鉴权测试污染本地演示赛事库。"""
+    with db.session_scope() as session:
+        session.query(db.CitationModel).filter_by(competition_id="security_ready_2026").delete()
+        session.query(db.CompetitionModel).filter_by(competition_id="security_ready_2026").delete()
+
+
 class SecurityAndReadinessTests(unittest.TestCase):
     def test_health_never_exposes_database_url(self) -> None:
         payload = api.health()
@@ -80,8 +88,22 @@ class SecurityAndReadinessTests(unittest.TestCase):
         self.assertNotIn("sqlite:", serialized)
         self.assertNotIn("postgres", serialized)
         self.assertNotIn("password", serialized)
+        with TestClient(api.app) as client:
+            login = client.post("/api/auth/login", json={"username": "test", "password": "test123"})
+            self.assertEqual(login.status_code, 200)
+            token = login.json()["access_token"]
+            self.assertEqual(client.get("/api/users/test/profile").status_code, 401)
+            self.assertEqual(
+                client.get("/api/users/test/profile", headers={"Authorization": f"Bearer {token}"}).status_code,
+                200,
+            )
+            self.assertEqual(
+                client.get("/api/users/stu_algo/profile", headers={"Authorization": f"Bearer {token}"}).status_code,
+                403,
+            )
 
     def test_all_admin_routes_require_a_valid_token(self) -> None:
+        self.addCleanup(remove_security_test_competition)
         competition = ready_competition().model_dump(mode="json")
         requests = (
             ("/api/admin/upload", {"filename": "invalid.txt", "content_base64": "eA=="}),
@@ -109,14 +131,14 @@ class SecurityAndReadinessTests(unittest.TestCase):
                 response = client.post("/api/admin/upload", json={})
         self.assertEqual(response.status_code, 503)
 
-    def test_not_found_source_is_candidate_only(self) -> None:
+    def test_not_found_source_with_complete_basics_can_be_scored(self) -> None:
         comp = ready_competition().model_copy(update={"official_source_status": "not_found"})
         result = recommend_for_user(profile(), [comp], date.today())[0]
-        self.assertEqual(result.recommendation_status, "candidate_only")
-        self.assertIsNone(result.score)
-        self.assertFalse(result.eligible)
+        self.assertNotEqual(result.recommendation_status, "candidate_only")
+        self.assertIsNotNone(result.score)
+        self.assertTrue(result.eligible)
 
-    def test_each_missing_critical_evidence_field_blocks_scoring(self) -> None:
+    def test_missing_evidence_field_does_not_block_scoring(self) -> None:
         base = ready_competition()
         for missing in REQUIRED_EVIDENCE_FIELDS:
             with self.subTest(field=missing):
@@ -124,8 +146,7 @@ class SecurityAndReadinessTests(unittest.TestCase):
                     update={"evidence": [item for item in base.evidence if item.field != missing]}
                 )
                 assessment = assess_source_readiness(comp)
-                self.assertFalse(assessment.ready)
-                self.assertTrue(any(missing in reason for reason in assessment.reasons))
+                self.assertTrue(assessment.ready)
 
     def test_catalog_filters_use_shared_readiness(self) -> None:
         ready = api.list_competitions(category=None, year=None, readiness="ready")

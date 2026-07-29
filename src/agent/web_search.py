@@ -99,16 +99,21 @@ def _search_duckduckgo(query: str, n: int) -> list[dict] | None:
     }
     url = "https://duckduckgo.com/html/"
     last_err: Exception | None = None
-    for _attempt in range(3):
+    # 联网补充不能拖住本地可信问答；默认只尝试一次，部署者可通过环境变量
+    # WEB_SEARCH_RETRIES=2 显式提高容错。超时后立即回退纯本地证据链。
+    retries = max(1, min(3, int(os.getenv("WEB_SEARCH_RETRIES", "1"))))
+    timeout_seconds = max(2, min(10, int(os.getenv("WEB_SEARCH_TIMEOUT_SECONDS", "4"))))
+    for _attempt in range(retries):
         try:
-            resp = requests.get(url, params={"q": query}, headers=headers, timeout=15)  # noqa: S113
+            resp = requests.get(url, params={"q": query}, headers=headers, timeout=timeout_seconds)  # noqa: S113
             resp.raise_for_status()
             out = _parse_ddg(resp.text, n)
             if out:
                 return out
         except Exception as e:  # noqa: BLE001
             last_err = e
-        _time.sleep(1.5)
+        if _attempt + 1 < retries:
+            _time.sleep(0.5)
     return None
 
 
