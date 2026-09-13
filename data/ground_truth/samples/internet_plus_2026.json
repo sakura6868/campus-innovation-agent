@@ -14,11 +14,11 @@
   "team_required": true,
   "team_min": 3,
   "team_max": 15,
-  "registration_deadline": "2026-07-31",
+  "registration_deadline": "2026-09-25",
   "submission_deadline": null,
-  "competition_start_date": "2026-04-01",
-  "competition_end_date": "2026-10-31",
-  "result_announcement_date": "2026-10-31",
+  "competition_start_date": "2026-07-01",
+  "competition_end_date": "2026-11-30",
+  "result_announcement_date": null,
   "award_settings": "高教主赛道全国总决赛设金奖230个、银奖460个、铜奖1380个；青年红色筑梦之旅赛道金70/银140/铜440；职教赛道金70/银140/铜440；产业赛道金70/银140/铜440；萌芽赛道设创新潜力奖20个。获金奖项目的指导教师为“优秀创新创业导师”（限前五名）。",
   "award_distribution": [
     {
@@ -110,6 +110,26 @@
       "trusted_level": "B"
     },
     {
+      "field": "registration_deadline",
+      "page": null,
+      "source_text": "报名系统开放时间为2026年8月10日，报名截止时间为9月25日12时。报名截止后，参赛人员、指导教师、项目组别、项目类别、项目名称等信息不得修改。",
+      "document_name": "教育部关于举办中国国际大学生创新大赛（2026）的通知",
+      "source_url": "https://k.sina.cn/article_5895814239_15f6afc5f02001o4qi.html",
+      "acquired_date": "2026-08-10",
+      "last_verified_at": "2026-08-10",
+      "trusted_level": "B"
+    },
+    {
+      "field": "competition_end_date",
+      "page": null,
+      "source_text": "（三）总决赛（2026年11月）。大赛设金奖、银奖、铜奖；另设省市优秀组织奖、高校集体奖。各地应于10月25日前完成省级复赛。",
+      "document_name": "教育部关于举办中国国际大学生创新大赛（2026）的通知",
+      "source_url": "https://k.sina.cn/article_5895814239_15f6afc5f02001o4qi.html",
+      "acquired_date": "2026-08-10",
+      "last_verified_at": "2026-08-10",
+      "trusted_level": "B"
+    },
+    {
       "field": "organizer",
       "page": null,
       "source_text": "由教育部等12个中央部委与省级政府联合主办的中国国际大学生创新大赛(2026)设产业赛道",
@@ -120,6 +140,6 @@
       "trusted_level": "B"
     }
   ],
-  "notes": "2026届官方通知已发布（全国大学生创业服务网 cy.ncss.cn 显示报名4-7月、总决赛9月，多所高校2026年5月已发校赛通知）。该赛事自2024年起由“互联网+”更名为“中国国际大学生创新大赛”，原占位名“中国国际互联网+大学生创新创业大赛”已更正；团队规模更正为3-15人（原1-5人）；原占位日期（报名2026-10-14等）已更正为官方赛季区间（报名约7月底截止、国赛9-10月，故 competition_end/result 取10月末近似）。submission_deadline 置 null：以全国大学生创业服务网报名为准，无独立于报名之外的全国统一作品提交截止。allowed_grades/allowed_majors 置 null：该赛事不限年级与专业。",
+  "notes": "2026届官方通知已发布（全国大学生创业服务网 cy.ncss.cn 显示报名4-7月、总决赛9月，多所高校2026年5月已发校赛通知）。该赛事自2024年起由“互联网+”更名为“中国国际大学生创新大赛”，原占位名“中国国际互联网+大学生创新创业大赛”已更正；团队规模更正为3-15人（原1-5人）；原占位日期（报名2026-10-14等）已更正为官方赛季区间（报名约7月底截止、国赛9-10月，故 competition_end/result 取10月末近似）。submission_deadline 置 null：以全国大学生创业服务网报名为准，无独立于报名之外的全国统一作品提交截止。allowed_grades/allowed_majors 置 null：该赛事不限年级与专业。【2026-08-10 巡检更正】教育部官方通知明确：报名系统 2026-08-10 开放、9-25 12:00 截止；赛程为报名7-9月、初赛复赛8-10月（省级复赛10-25前完成）、总决赛11月。据此将 registration_deadline 由占位的 2026-07-31 更正为 2026-09-25，competition_start/end 更正为 2026-07-01/2026-11-30，result_announcement_date 因官方未明示改置 null。另：参赛者年龄不超过35岁（1991-03-01及以后出生），总决赛共5000个项目名额。",
   "official_source_status": "found"
 }
