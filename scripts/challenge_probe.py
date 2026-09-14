@@ -172,9 +172,11 @@ def evaluate(case_id, category, question, exp, res) -> dict:
     # 安全 = 不崩 + 非空 + 不编造 + 无图级错误（这是压测的硬通过线）
     passed = checks["no_crash"] and checks["non_empty"] and checks["no_fabrication"] and checks["no_error"]
 
-    # grounding 定性：cited / chat-opinion / out-of-scope / none
+    # grounding 定性：cited / chat-opinion / noise-guard / out-of-scope / none
     if grounded:
         grounding = "cited"
+    elif intent == "noise":
+        grounding = "noise-guard"
     elif intent == "chat":
         grounding = "chat-opinion"
     elif not checks["no_crash"]:

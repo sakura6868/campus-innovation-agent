@@ -326,6 +326,30 @@ def _instrument_node(
 
 _GENERIC_TOKENS = ["大赛", "竞赛", "大学生", "全国", "中国", "比赛", "杯", "赛"]
 
+# 口语别名 → 库内正式名称。CHALLENGE_PROBE 发现「互联网+」因库名已改为
+# 「中国国际大学生创新大赛」而 LCS 抓不到，落到通用 chat 无引用（c15）。
+# 这里在做赛事锁定时把别名展开为正式名，使指定具体赛事的开放问法统一带 [n] 引用。
+_NAME_ALIASES = {
+    "互联网+": "中国国际大学生创新大赛",
+    "互联网加大赛": "中国国际大学生创新大赛",
+    "互联网+大赛": "中国国际大学生创新大赛",
+    "互联网大学生创新创业大赛": "中国国际大学生创新大赛",
+    "中国国际大学生创新大赛": "中国国际大学生创新大赛",
+}
+
+
+def _alias_expand(q: str) -> str:
+    """把口语别名并入查询串，使「互联网+」等能命中库内正式名。
+
+    赛事锁定与开放对话检索都要用，保证指定具体赛事的问法统一带 [n] 引用。
+    """
+    q = _norm(q)
+    for _alias, _canonical in _NAME_ALIASES.items():
+        if _alias in q:
+            q = (q + " " + _canonical).strip()
+            break
+    return q
+
 
 def _norm(s: str) -> str:
     """归一化：全角→半角、空白压缩，让「互联网＋」与「互联网+」可匹配。"""
@@ -386,6 +410,8 @@ def _resolve_competition_versioned(
 ) -> tuple[Optional[Competition], Optional[str], Optional[str]]:
     """锁定赛事并显式处理同名多年份版本。"""
     q = _norm(question)
+    # 别名展开：把口语别名并入匹配查询，使「互联网+」等能命中库内正式名。
+    q_match = _alias_expand(q)
     def _implicit_version_result(selected: Competition, pool: list[Competition]):
         years = {item.document_year for item in pool}
         if not re.search(r"20\d{2}", q) and len(years) > 1:
@@ -421,7 +447,7 @@ def _resolve_competition_versioned(
             selected = max(_car_pool, key=lambda c: c.document_year)
             return _implicit_version_result(selected, _car_pool)
     mentioned_years = {int(y) for y in re.findall(r"20\d{2}", q)}
-    scored = [(c, _competition_match_score(q, c)) for c in comps]
+    scored = [(c, _competition_match_score(q_match, c)) for c in comps]
     scored = [(c, score) for c, score in scored if score >= 4]
     if not scored:
         return None, None, None
@@ -549,6 +575,21 @@ def _asks_team_size(question: str) -> bool:
     return asks_team and asks_size
 
 
+# 仅含符号/空白、无任何可理解语义的输入（如纯标点、纯表情、乱敲的字符）。
+# 用于入口前置拦截，避免对垃圾输入套用画像给出无意义闲聊。
+_MEANINGFUL_RE = re.compile(
+    r"[\u4e00-\u9fff\u3400-\u4dbf0-9a-zA-Z]"  # 至少一个汉字 / 数字 / 英文字母
+)
+
+
+def _is_meaningful_question(question: str) -> bool:
+    """输入是否含可理解语义（至少一个汉字/数字/字母）。纯符号噪声返回 False。"""
+    q = (question or "").strip()
+    if len(q) < 2:
+        return False
+    return bool(_MEANINGFUL_RE.search(q))
+
+
 # ---------------------------------------------------------------------------
 # 工具：可选 LLM 润色（默认关闭，不影响引用与门控结论）
 # ---------------------------------------------------------------------------
@@ -656,8 +697,9 @@ def _broad_retrieve(question: str, top_k: int = 5) -> tuple[list, list]:
     """
     comps = db.get_all_competitions()
     scored = []
+    q = _alias_expand(question)
     for c in comps:
-        score = _competition_match_score(question, c)
+        score = _competition_match_score(q, c)
         hay_parts = [c.competition_name or ""]
         hay_parts += list(getattr(c, "required_skills", []) or [])
         hay_parts += [getattr(s, "value", str(s)) for s in (getattr(c, "eligible_students", []) or [])]
@@ -665,7 +707,7 @@ def _broad_retrieve(question: str, top_k: int = 5) -> tuple[list, list]:
         if cat:
             hay_parts.append(str(cat))
         hay = " ".join(hay_parts)
-        if any(tok in _norm(question) for tok in hay.split() if len(tok) >= 2):
+        if any(tok in q for tok in hay.split() if len(tok) >= 2):
             score += 2
         if score >= 4:
             scored.append((c, score))
@@ -759,6 +801,13 @@ def node_retrieve(state: AgentState) -> AgentState:
         hits = _detail_fallback_citations(comp)
         if hits:
             trace.append("隔离检索：qa 兜底返回关键字段证据")
+    # chat 开放/建议类（已锁定具体赛事）：RAG 命中为空时，用赛事结构化关键字段
+    # 兜底，保证「文科生能玩吗 / 怎么备赛」这类开放问法也带官方引用（团队/对象/
+    # 技能/截止），而非回退成无出处的纯观点。与 detail/qa 兜底逻辑一致。
+    if state.get("intent") == "chat" and not hits and comp is not None:
+        hits = _detail_fallback_citations(comp)
+        if hits:
+            trace.append("隔离检索：chat 兜底返回关键字段证据")
     trace.append(f"隔离检索：collection=rag_{cid}，命中 {len(hits)} 条证据")
     return {
         **state,
@@ -2003,6 +2052,46 @@ def run_agent(
     """
     run_id = f"agent_{uuid4().hex}"
     started = perf_counter()
+
+    # 入口前置拦截：纯符号/空白噪声（如 "???""、乱敲字符）无可理解语义，
+    # 直接引导重述，避免套用画像产出无意义闲聊（压测 c11 改进项）。
+    if not _is_meaningful_question(question):
+        dv = _catalog_data_version()
+        noise_trace = [{
+            "node": "input-guard",
+            "label": "无意义输入前置拦截",
+            "status": "ok",
+            "duration_ms": 0.0,
+            "evidence_count": 0,
+            "data_version": dv,
+            "detail": "输入仅含符号/空白，无可见汉字/数字/字母，引导用户重述",
+            "fallback": False,
+        }]
+        return {
+            "run_id": run_id,
+            "question": question,
+            "intent": "noise",
+            "resolved_competition": None,
+            "resolved_name": None,
+            "answer": (
+                "没太看懂你的问题～换个说法我帮你查赛事。"
+                "例如「蓝桥杯报名截止日期」或「推荐适合我的比赛」。"
+            ),
+            "citations": [],
+            "web_results": [],
+            "gate": {},
+            "score": {},
+            "recommendations": [],
+            "teammate_matches": [],
+            "pending_review": False,
+            "data_version": dv,
+            "trace": noise_trace,
+            "trace_legacy": [noise_trace[0]["detail"]],
+            "trace_summary": noise_trace,
+            "metrics": {"total_duration_ms": 0.0, "node_count": 1, "evidence_count": 0},
+            "error": None,
+        }
+
     init: AgentState = {
         "question": question,
         "run_id": run_id,

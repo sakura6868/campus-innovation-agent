@@ -1,1 +1,6 @@
-[]
+[
+  {"trial_id": "A", "question": "蓝桥杯报名什么时候截止"},
+  {"trial_id": "B", "question": "推荐适合计算机专业大二的比赛"},
+  {"trial_id": "C", "question": "互联网+ 大赛怎么组队"},
+  {"trial_id": "D", "question": "数学建模国赛难不难，零基础能冲吗"}
+]
