@@ -1154,13 +1154,44 @@ def seed_source_watches(session) -> None:
             )
 
 
+def seed_demo_project(session) -> None:
+    """为演示账号幂等准备一个七阶段项目样例。
+
+    全新 clone 后直接启动，演示路径的「我的项目 / 七阶段工作台」即可直接展示内容，
+    无需现场先创建项目。
+
+    情报收件箱**不预置伪造变更**——那会违背本项目「不编造、来源可追溯」的核心原则。
+    演示第 2 步应通过管理界面「演示截止日期变化」现场真实生成，系统会自动把情报
+    推送到本项目并标记受影响阶段，演示效果真实且可复核。
+    """
+    user_id = TEST_ACCOUNT_USERNAME
+    exists = session.query(UserProjectModel).filter(UserProjectModel.user_id == user_id).first()
+    if exists is not None:
+        return
+    comp = (
+        session.query(CompetitionModel)
+        .filter(
+            CompetitionModel.data_status == DataStatus.VERIFIED.value,
+            CompetitionModel.trusted_level == TrustedLevel.A.value,
+            CompetitionModel.official_source_status == "found",
+            CompetitionModel.registration_deadline.is_not(None),
+        )
+        .order_by(CompetitionModel.competition_id)
+        .first()
+    )
+    if comp is None:
+        return
+    _get_or_create_project_model(session, user_id, comp)
+
+
 def seed_all() -> int:
-    """幂等 seed：赛事 Ground Truth + 演示用户 + 测试账号。重复运行安全。"""
+    """幂等 seed：赛事 Ground Truth + 演示用户 + 测试账号 + 演示项目。重复运行安全。"""
     with session_scope() as session:
         n = seed_competitions(session)
         seed_demo_user(session)
         seed_test_account(session)
         seed_source_watches(session)
+        seed_demo_project(session)
     return n
 
 
