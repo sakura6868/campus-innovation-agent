@@ -65,13 +65,20 @@ function sessionAuthHeaders() {
 // ---------------------------------------------------------------------------
 // 状态（本地会话模拟）
 // ---------------------------------------------------------------------------
-// 每次进入都强制重新登录：启动即清空登录态，不记住（演示更可控）
+// 登录态默认保持：刷新 / 重开页面不再强制登出，避免评审与试用时的重复登录。
+// 需要「回到登录页」演示时有两种方式：点击界面上的「退出登录」，或在地址后加 ?fresh=1
 (function clearLoginStateOnBoot() {
-  ["cia_uid", "cia_logged", "cia_is_test", "cia_is_admin", "cia_user_meta"].forEach((k) =>
-    localStorage.removeItem(k)
-  );
-  sessionStorage.removeItem("cia_admin_token");
-  sessionStorage.removeItem("cia_access_token");
+  try {
+    if (new URLSearchParams(location.search).get("fresh") === "1") {
+      ["cia_uid", "cia_logged", "cia_is_test", "cia_is_admin", "cia_user_meta"].forEach((k) =>
+        localStorage.removeItem(k)
+      );
+      sessionStorage.removeItem("cia_admin_token");
+      sessionStorage.removeItem("cia_access_token");
+    }
+  } catch (_) {
+    /* 忽略：URL 解析异常时保持默认（不清空） */
+  }
 })();
 
 function _loadUserMeta() {
@@ -2375,6 +2382,24 @@ $("#login-form").addEventListener("submit", (e) => {
   if (!u || !pw) { msg.textContent = "请输入用户名和密码"; msg.className = "msg err"; return; }
   msg.textContent = ""; msg.className = "msg";
   doLogin(u, pw);
+});
+
+// 评审 / 试用一键体验：直接用内置演示账号登录，免去手工输入。
+// 该账号为数据库种子账号（与 README、参赛材料公布的测试账号一致），非任何真实用户。
+$("#demo-quick-login").addEventListener("click", async () => {
+  const msg = $("#login-msg");
+  const btn = $("#demo-quick-login");
+  msg.textContent = "正在以演示账号进入…";
+  msg.className = "msg";
+  btn.disabled = true;
+  try {
+    await doLogin("test", "test123");
+  } catch (error) {
+    msg.textContent = "演示账号进入失败：" + error.message;
+    msg.className = "msg err";
+  } finally {
+    btn.disabled = false;
+  }
 });
 
 // 仅本地开发：后端开关启用时返回临时管理员令牌。部署构建不设置开关，按钮会提示不可用。
