@@ -5,23 +5,24 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>校园科创导航智能体</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='10' fill='%2316181d'/%3E%3Ctext x='32' y='40' text-anchor='middle' font-family='Arial' font-size='25' font-weight='700' fill='white'%3ECI%3C/text%3E%3C/svg%3E" />
-  <link rel="stylesheet" href="/static/styles.css?v=20260730.2" />
+  <link rel="stylesheet" href="/static/styles.css?v=20260810.35" />
 </head>
-<body>
+<body class="theme-neumorphic">
   <header class="topnav">
     <div class="brand">
       <span class="brand-mark">CI</span>
       <span class="brand-copy"><strong>校园科创导航</strong><small>Competition Intelligence</small></span>
     </div>
     <nav>
-      <a href="#/profile" data-nav="profile">我的画像</a>
-      <a href="#/hall" data-nav="hall">赛事大厅</a>
-      <a href="#/recommend" data-nav="recommend">我的推荐</a>
-      <a href="#/portfolio" data-nav="portfolio">机会组合</a>
-      <a href="#/radar" data-nav="radar">赛事雷达</a>
-      <a href="#/projects" data-nav="projects">我的项目</a>
-      <a href="#/agent" data-nav="agent">智能问答</a>
-      <a href="#/admin" data-nav="admin" id="nav-admin" class="hidden">数据维护</a>
+      <a href="#/home" data-nav="home" data-icon="⌂" aria-label="首页">首页</a>
+      <a href="#/profile" data-nav="profile" data-icon="◇" aria-label="能力画像">能力画像</a>
+      <a href="#/hall" data-nav="hall" data-icon="▦" aria-label="赛事大厅">赛事大厅</a>
+      <a href="#/recommend" data-nav="recommend" data-icon="✦" aria-label="匹配建议">匹配建议</a>
+      <a href="#/portfolio" data-nav="portfolio" data-icon="↗" aria-label="行动路线">行动路线</a>
+      <a href="#/projects" data-nav="projects" data-icon="□" aria-label="我的项目">我的项目</a>
+      <a href="#/radar" data-nav="radar" data-icon="◉" aria-label="机会提醒">机会提醒</a>
+      <a href="#/agent" data-nav="agent" data-icon="✣" aria-label="智能顾问">智能顾问</a>
+      <a href="#/admin" data-nav="admin" data-icon="⚙" id="nav-admin" class="hidden" aria-label="数据维护">数据维护</a>
     </nav>
     <div class="user-area">
       <span class="user-area-label">当前身份</span>
@@ -32,11 +33,18 @@
   </header>
 
   <main class="container">
+    <!-- 用户首页：聚合画像、推荐、项目与官方变化 -->
+    <section id="view-home" class="view product-view home-view hidden">
+      <div id="home-root" class="home-root" aria-live="polite">
+        <div class="home-loading"><span></span><b>正在整理今天最重要的事项</b><small>同步画像、项目、推荐与官方变化</small></div>
+      </div>
+    </section>
+
     <!-- 画像页 -->
     <section id="view-profile" class="view product-view profile-view hidden">
       <div class="page-head app-page-head">
         <div>
-          <span class="page-eyebrow">PERSONA / 01</span>
+          <span class="page-eyebrow">PERSONA / 02</span>
           <h2>我的画像</h2>
           <p class="muted">用于资格筛选与能力匹配，仅保存完成推荐所需的最少信息。</p>
         </div>
@@ -110,7 +118,7 @@
     <section id="view-projects" class="view product-view projects-view hidden">
       <div class="page-head app-page-head">
         <div>
-          <span class="page-eyebrow">WORKSPACE / 04</span>
+          <span class="page-eyebrow">WORKSPACE / 07</span>
           <h2>我的项目</h2>
           <p class="muted">任务与材料按赛事组织；官方截止日期始终取自赛事官方通知。</p>
         </div>
@@ -129,39 +137,47 @@
     <section id="view-hall" class="view product-view hall-view hidden">
       <div class="page-head app-page-head">
         <div>
-          <span class="page-eyebrow">COMPETITIONS / 02</span>
+        <span class="page-eyebrow">COMPETITIONS / 03</span>
           <h2>赛事大厅</h2>
-          <p class="muted">浏览赛事版本与官方截止日期。</p>
+          <p class="muted">按领域、年份和报名状态，找到适合你的下一场赛事。</p>
         </div>
-        <div class="filters">
-          <select id="filter-cat">
-            <option value="">全部类别</option>
-            <option value="programming">程序设计</option>
-            <option value="modeling">数学建模</option>
-            <option value="innovation">创新创业</option>
-            <option value="software">软件作品</option>
-            <option value="english">外语竞赛</option>
-            <option value="math">数学竞技</option>
-            <option value="electronics">电子设计</option>
-            <option value="robotics_ai">机器人与AI</option>
-            <option value="data">数据科学</option>
-            <option value="design">艺术设计</option>
-            <option value="business">财经商科</option>
-            <option value="engineering">机械工程</option>
-            <option value="life_science">生科医药</option>
-            <option value="physics">物理</option>
-            <option value="chem_env">化工环境</option>
-          </select>
-          <select id="filter-year">
-            <option value="">全部年份</option>
-          </select>
+        <div class="hall-controls">
+          <div class="hall-search" role="search">
+            <span aria-hidden="true">⌕</span>
+            <input id="hall-search" type="search" autocomplete="off" placeholder="检索赛事名称，如：蓝桥杯" aria-label="检索赛事" />
+            <button id="hall-search-clear" class="hidden" type="button" aria-label="清空赛事检索" title="清空检索">×</button>
+          </div>
+          <div class="filters">
+            <select id="filter-cat" aria-label="按类别筛选">
+              <option value="">全部类别</option>
+              <option value="programming">程序设计</option>
+              <option value="modeling">数学建模</option>
+              <option value="innovation">创新创业</option>
+              <option value="software">软件作品</option>
+              <option value="english">外语竞赛</option>
+              <option value="math">数学竞技</option>
+              <option value="electronics">电子设计</option>
+              <option value="robotics_ai">机器人与AI</option>
+              <option value="data">数据科学</option>
+              <option value="design">艺术设计</option>
+              <option value="business">财经商科</option>
+              <option value="engineering">机械工程</option>
+              <option value="life_science">生科医药</option>
+              <option value="physics">物理</option>
+              <option value="chem_env">化工环境</option>
+            </select>
+            <select id="filter-year" aria-label="按年份筛选">
+              <option value="">全部年份</option>
+            </select>
+          </div>
         </div>
       </div>
       <div class="hall-trust-filter segmented" role="group" aria-label="赛事可信状态">
         <button type="button" class="active" data-readiness="all">全部赛事</button>
-        <button type="button" data-readiness="ready">可正式推荐</button>
-        <button type="button" data-readiness="candidate">待核验候选</button>
+        <button type="button" data-readiness="ready">可报名推荐</button>
+        <button type="button" data-readiness="candidate">暂不可报名</button>
       </div>
+      <div class="hall-result-meta" aria-live="polite"><span id="hall-result-count">正在加载赛事…</span><small>仅按赛事正式名称检索</small></div>
       <div id="hall-list" class="cards"></div>
     </section>
 
@@ -174,7 +190,7 @@
     <!-- 我的推荐 -->
     <section id="view-recommend" class="view product-view recommend-view hidden">
       <div class="page-head app-page-head"><div>
-        <span class="page-eyebrow">MATCHING / 03</span>
+        <span class="page-eyebrow">MATCHING / 04</span>
         <h2>我的推荐</h2>
         <p id="recommend-hint" class="muted"></p>
       </div></div>
@@ -185,7 +201,7 @@
     <section id="view-portfolio" class="view product-view portfolio-view hidden">
       <div class="page-head app-page-head">
         <div>
-          <span class="page-eyebrow">PORTFOLIO OPTIMIZER / 04</span>
+          <span class="page-eyebrow">PORTFOLIO OPTIMIZER / 05</span>
           <h2>科创机会组合</h2>
           <p class="muted">在资格、截止时间与每周精力约束下，计算最值得投入的一组赛事。</p>
         </div>
@@ -217,51 +233,61 @@
       </section>
     </section>
 
-    <!-- 动态赛事雷达 -->
-    <section id="view-radar" class="view product-view radar-view hidden">
-      <div class="page-head app-page-head">
+    <!-- 机会提醒：面向学生的赛事更新与下一步 -->
+    <section id="view-radar" class="view product-view opportunity-view hidden">
+      <div class="page-head app-page-head opportunity-page-head">
         <div>
-          <span class="page-eyebrow">LIVE SOURCE RADAR / 05</span>
-          <h2>动态赛事雷达</h2>
-          <p class="muted">持续比对官方网页与通知版本；任何关键变化必须经过人工审核。</p>
+          <span class="page-eyebrow">OPPORTUNITY PULSE / 06</span>
+          <h2>机会提醒</h2>
+          <p class="muted">把官方赛事变化翻译成你现在可以处理的下一步。</p>
         </div>
-        <div class="radar-actions">
-          <button id="radar-run" class="btn ghost hidden">立即扫描</button>
-          <button id="radar-demo" class="btn primary hidden">演示截止日期变化</button>
+        <button id="opportunity-explore" class="btn ghost">浏览赛事</button>
+      </div>
+
+      <section class="opportunity-hero" aria-labelledby="opportunity-hero-title">
+        <div class="opportunity-hero-copy">
+          <span id="opportunity-hero-kicker" class="opportunity-kicker">正在为你整理官方更新</span>
+          <h3 id="opportunity-hero-title">先处理真正影响你参赛计划的变化</h3>
+          <p id="opportunity-hero-desc">报名、赛程或材料发生变化时，我们会先核验，再把可执行的事项放到这里。</p>
+          <div class="opportunity-hero-actions">
+            <button id="opportunity-primary" class="btn primary">查看需要处理的事项</button>
+            <button id="opportunity-projects" class="btn ghost">我的项目</button>
+          </div>
         </div>
-      </div>
-      <div class="radar-stats">
-        <div><span>监控来源</span><strong id="radar-watch-count">—</strong></div>
-        <div><span>运行正常</span><strong id="radar-healthy-count">—</strong></div>
-        <div><span>待人工审核</span><strong id="radar-pending-count">—</strong></div>
-        <div><span>可信原则</span><strong>不自动覆盖</strong></div>
-      </div>
-      <div class="radar-command-grid">
-        <section class="radar-command-card radar-health-card">
-          <div class="command-card-head"><div><span>SOURCE HEALTH</span><h3>来源健康总览</h3></div><b id="radar-signal">SIGNAL —</b></div>
-          <div id="radar-health-overview" class="radar-health-overview"></div>
-        </section>
-        <section class="radar-command-card radar-rules-card">
-          <div class="command-card-head"><div><span>WATCH RULES</span><h3>监控规则引擎</h3></div><b>DETERMINISTIC</b></div>
-          <div id="radar-rules" class="radar-rules"></div>
-        </section>
-        <section class="radar-command-card radar-inbox-card">
-          <div class="command-card-head"><div><span>ACTION INBOX</span><h3>待处置情报</h3></div><b id="radar-inbox-count">0 NEW</b></div>
-          <div id="radar-inbox" class="radar-inbox"></div>
-        </section>
-      </div>
-      <div class="radar-event-toolbar">
-        <div><span class="radar-pulse"></span><b>变化情报流</b><small>官方来源 → 差异识别 → 人工审核 → 项目影响</small></div>
-        <div class="radar-filter" role="group" aria-label="雷达事件筛选">
-          <button type="button" class="active" data-radar-filter="all">全部</button>
-          <button type="button" data-radar-filter="pending">待审核</button>
-          <button type="button" data-radar-filter="high">高影响</button>
+        <div class="opportunity-orbit" aria-label="当前关注机会数量">
+          <div class="opportunity-orbit-ring"><div><b id="opportunity-action-count">—</b><span>场可行动机会</span></div></div>
+          <small>持续关注报名与关键节点</small>
         </div>
+      </section>
+
+      <div class="opportunity-stats">
+        <article><span>需要你处理</span><strong id="opportunity-pending-count">—</strong><small id="opportunity-pending-note">官方变化会先经过核验</small></article>
+        <article><span>当前机会</span><strong id="opportunity-live-count">—</strong><small>仍有下一步可以推进的赛事</small></article>
+        <article><span>我的参赛计划</span><strong id="opportunity-project-count">—</strong><small>已加入项目会同步接收提醒</small></article>
       </div>
-      <div class="radar-grid">
-        <section class="card"><div class="section-title"><h3>变化时间线</h3><span>新旧原文差异</span></div><div id="radar-events" class="radar-events"></div></section>
-        <section class="card"><div class="section-title"><h3>监控矩阵</h3><span>官方来源健康状态</span></div><div id="radar-watches" class="radar-watches"></div></section>
+
+      <div class="opportunity-main-grid">
+        <section class="opportunity-feed-card" aria-labelledby="opportunity-feed-title">
+          <header class="opportunity-section-head"><div><span>PRIORITY</span><h3 id="opportunity-feed-title">优先处理</h3></div><small id="opportunity-feed-note">只呈现值得你花时间的更新</small></header>
+          <div id="opportunity-feed" class="opportunity-feed"></div>
+        </section>
+        <aside class="opportunity-support-card">
+          <span>你的赛事助手</span>
+          <h3>后台持续做的三件事</h3>
+          <ul>
+            <li><i>✓</i><div><b>追踪官方变化</b><small>报名、赛程、材料和规则变化会被持续比对。</small></div></li>
+            <li><i>✓</i><div><b>先核验，再提醒</b><small>关键事实不会因为网页波动而自动改写。</small></div></li>
+            <li><i>✓</i><div><b>不只关注当届</b><small>已结束赛事仍会发现下一赛季公告和结果通知。</small></div></li>
+          </ul>
+          <div class="opportunity-coverage"><b id="opportunity-coverage-count">—</b><span>个官方来源正在被持续关注</span></div>
+          <button id="opportunity-admin-link" class="btn ghost hidden">管理监控来源</button>
+        </aside>
       </div>
+
+      <section class="opportunity-next-card">
+        <div><span>还没有找到合适的目标？</span><h3>从赛事大厅开始，系统会根据你的画像生成推荐和组合方案。</h3></div>
+        <div><button id="opportunity-hall" class="btn primary">去看赛事</button><button id="opportunity-portfolio" class="btn ghost">查看机会组合</button></div>
+      </section>
     </section>
 
     <!-- 智能问答 -->
@@ -269,8 +295,8 @@
       <div class="agent-workspace">
         <header class="agent-titlebar">
           <div>
-            <h2>智能问答</h2>
-            <p>基于官方通知，为你核对赛事规则与参赛资格</p>
+            <h2>智能顾问</h2>
+            <p>规则核验 · 个性推荐 · 参赛规划</p>
           </div>
           <div class="agent-title-actions">
             <span id="agent-llm-status" class="agent-llm-status" data-on="0">
@@ -279,13 +305,13 @@
             <span id="agent-web-status" class="agent-llm-status web-off" data-on="0">
               <span class="agent-llm-dot"></span><span class="agent-llm-text">联网搜索关闭</span>
             </span>
-            <span class="agent-trust"><span aria-hidden="true">✓</span> 智能体已就绪</span>
+            <span class="agent-trust"><span aria-hidden="true">✓</span> 回答可追溯</span>
           </div>
         </header>
 
         <div class="agent-context-bar" aria-label="问答上下文">
           <label class="agent-context-field">
-            <span>赛事上下文</span>
+            <span>当前赛事</span>
             <select id="agent-cid">
               <option value="">自动识别</option>
             </select>
@@ -293,33 +319,35 @@
           <label class="agent-profile-toggle">
             <input id="agent-use-profile" type="checkbox" checked />
             <span class="agent-toggle" aria-hidden="true"></span>
-            使用我的画像
+            参考我的画像
           </label>
         </div>
 
         <div id="agent-log" class="agent-log" aria-live="polite">
           <div id="agent-empty" class="agent-empty">
             <div class="agent-empty-mark" aria-hidden="true">CI</div>
-            <h3>今天想了解什么赛事？</h3>
-            <p>可以询问时间、参赛资格、团队要求，或让智能体根据你的画像推荐。</p>
+            <h3>你好，我是你的科创顾问</h3>
+            <p>告诉我你的目标，我会结合赛事规则和个人画像，给出可以直接执行的建议。</p>
             <div id="agent-chips" class="chips agent-prompts">
-              <button type="button" class="chip" data-q="推荐适合我的比赛">推荐适合我的比赛</button>
+              <button type="button" class="chip" data-q="结合我的画像，推荐三场最值得投入的比赛，并说明取舍">推荐三场值得投入的比赛</button>
               <button type="button" class="chip" data-q="帮我找互补队友">🤝 帮我找互补队友</button>
-              <button type="button" class="chip" data-q="蓝桥杯团队几人？报名什么时候截止">核对蓝桥杯截止时间</button>
-              <button type="button" class="chip" data-q="介绍一下中国软件杯">了解中国软件杯</button>
+              <button type="button" class="chip" data-q="蓝桥杯团队几人？报名什么时候截止？请给出明确结论">核对蓝桥杯报名规则</button>
+              <button type="button" class="chip" data-q="根据我的能力，为我制定一周备赛计划">制定一周备赛计划</button>
             </div>
           </div>
         </div>
 
         <div class="agent-composer-wrap">
           <div id="agent-quick" class="agent-quick" aria-label="快捷提问">
-            <button type="button" class="quick-chip" data-q="推荐适合我的比赛">推荐赛事</button>
+            <button type="button" class="quick-chip" data-q="结合我的画像，推荐三场最值得投入的比赛，并说明取舍">推荐赛事</button>
             <button type="button" class="quick-chip" data-q="帮我找互补队友">🤝 找队友</button>
             <button type="button" class="quick-chip" data-q="有哪些还在报名中的比赛">报名中赛事</button>
+            <button type="button" class="quick-chip" data-q="蓝桥杯团队几人？报名什么时候截止？请给出明确结论">核对报名规则</button>
+            <button type="button" class="quick-chip" data-q="根据我的画像，为我制定一周备赛计划">制定备赛计划</button>
+            <button type="button" class="quick-chip" data-q="比较我最匹配的两场赛事，说明投入、风险和取舍">比较两场赛事</button>
           </div>
           <div class="agent-input">
-            <button type="button" class="agent-attach" title="添加附件" aria-label="添加附件">+</button>
-            <textarea id="agent-q" rows="1" placeholder="随心输入"></textarea>
+            <textarea id="agent-q" rows="1" placeholder="输入赛事名称、规则或你的参赛目标…"></textarea>
             <div class="agent-input-right">
               <label class="model-select" title="切换润色模型（需后端已配置对应 LLM key）">
                 <select id="agent-model">
@@ -340,7 +368,7 @@
     <section id="view-admin" class="view product-view admin-view hidden">
       <div class="page-head app-page-head admin-page-head">
         <div>
-          <span class="page-eyebrow">DATA PIPELINE / 06</span>
+          <span class="page-eyebrow">DATA PIPELINE / 09</span>
           <h2>官方数据入库</h2>
           <p class="muted">上传、解析、核对并确认官方通知，入库后同步刷新检索证据。</p>
         </div>
@@ -465,6 +493,48 @@
           </div>
         </form>
       </div>
+
+      <section class="card admin-radar-ops" aria-labelledby="admin-radar-title">
+        <header class="admin-radar-head">
+          <div><span>RADAR OPERATIONS</span><h3 id="admin-radar-title">赛事监控与异常处理</h3><p>技术状态、扫描规则和待审核变化仅在数据维护页展示。</p></div>
+          <div class="radar-actions">
+            <button id="radar-run" class="btn ghost">立即扫描</button>
+            <button id="radar-demo" class="btn primary">生成演示变化</button>
+          </div>
+        </header>
+        <div class="admin-radar-stats">
+          <div><span>启用来源</span><strong id="radar-admin-watch-count">—</strong></div>
+          <div><span>运行正常</span><strong id="radar-admin-healthy-count">—</strong></div>
+          <div><span>异常来源</span><strong id="radar-admin-problem-count">—</strong></div>
+          <div><span>待审核</span><strong id="radar-admin-pending-count">—</strong></div>
+        </div>
+        <div class="radar-command-grid radar-ops-grid">
+          <section class="radar-command-card radar-health-card">
+            <div class="command-card-head"><div><span>SOURCE HEALTH</span><h3>来源健康总览</h3></div><b id="radar-signal">SIGNAL —</b></div>
+            <div id="radar-health-overview" class="radar-health-overview"></div>
+          </section>
+          <section class="radar-command-card radar-rules-card">
+            <div class="command-card-head"><div><span>WATCH RULES</span><h3>监控规则引擎</h3></div><b>DETERMINISTIC</b></div>
+            <div id="radar-rules" class="radar-rules"></div>
+          </section>
+          <section class="radar-command-card radar-inbox-card">
+            <div class="command-card-head"><div><span>REVIEW QUEUE</span><h3>待审核变化</h3></div><b id="radar-inbox-count">0 NEW</b></div>
+            <div id="radar-inbox" class="radar-inbox"></div>
+          </section>
+        </div>
+        <div class="radar-event-toolbar admin-radar-toolbar">
+          <div><span class="radar-pulse"></span><b>变化审核记录</b><small>官方来源 → 差异识别 → 人工审核 → 项目影响</small></div>
+          <div class="radar-filter" role="group" aria-label="雷达事件筛选">
+            <button type="button" class="active" data-radar-filter="all">全部</button>
+            <button type="button" data-radar-filter="pending">待审核</button>
+            <button type="button" data-radar-filter="high">高影响</button>
+          </div>
+        </div>
+        <div class="radar-grid admin-radar-grid">
+          <section class="card"><div class="section-title"><h3>变化时间线</h3><span>新旧原文差异</span></div><div id="radar-events" class="radar-events"></div></section>
+          <section class="card"><div class="section-title"><h3>监控矩阵</h3><span>官方来源健康状态</span></div><div id="radar-watches" class="radar-watches"></div></section>
+        </div>
+      </section>
     </section>
   </main>
 
@@ -493,7 +563,9 @@
 
       <!-- 右侧表单区 -->
       <main class="login-main">
+        <div class="login-entry-brand"><span>CI</span><b>校园科创导航</b><small>Campus Innovation Agent</small></div>
         <div class="login-head">
+          <span class="login-kicker">WELCOME / 01</span>
           <h1>欢迎回来</h1>
           <p class="login-sub">登录或注册后即可使用画像匹配、赛事推荐与智能问答。</p>
         </div>
@@ -507,9 +579,6 @@
           <label>用户名<input id="login-username" type="text" placeholder="用户名" autocomplete="username" maxlength="32" /></label>
           <label>密码<input id="login-password" type="password" placeholder="密码" autocomplete="current-password" /></label>
           <button type="submit" class="btn primary">登录</button>
-          <button type="button" id="demo-quick-login" class="btn ghost demo-quick-login">一键体验（评审演示账号 test / test123）</button>
-          <button type="button" id="dev-admin-login" class="btn ghost dev-admin-login">本地调试：管理员一键登录</button>
-          <small class="dev-admin-note">仅本地开发服务启用；部署前删除此按钮与对应接口。</small>
           <div id="login-msg" class="msg"></div>
         </form>
 
@@ -558,6 +627,6 @@
 
   <div id="toast" class="toast hidden"></div>
 
-  <script src="/static/app.js?v=20260914.1"></script>
+  <script src="/static/app.js?v=20260810.35"></script>
 </body>
 </html>

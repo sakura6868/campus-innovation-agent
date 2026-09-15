@@ -65,20 +65,13 @@ function sessionAuthHeaders() {
 // ---------------------------------------------------------------------------
 // 状态（本地会话模拟）
 // ---------------------------------------------------------------------------
-// 登录态默认保持：刷新 / 重开页面不再强制登出，避免评审与试用时的重复登录。
-// 需要「回到登录页」演示时有两种方式：点击界面上的「退出登录」，或在地址后加 ?fresh=1
+// 每次进入都强制重新登录：启动即清空登录态，不记住（演示更可控）
 (function clearLoginStateOnBoot() {
-  try {
-    if (new URLSearchParams(location.search).get("fresh") === "1") {
-      ["cia_uid", "cia_logged", "cia_is_test", "cia_is_admin", "cia_user_meta"].forEach((k) =>
-        localStorage.removeItem(k)
-      );
-      sessionStorage.removeItem("cia_admin_token");
-      sessionStorage.removeItem("cia_access_token");
-    }
-  } catch (_) {
-    /* 忽略：URL 解析异常时保持默认（不清空） */
-  }
+  ["cia_uid", "cia_logged", "cia_is_test", "cia_is_admin", "cia_user_meta"].forEach((k) =>
+    localStorage.removeItem(k)
+  );
+  sessionStorage.removeItem("cia_admin_token");
+  sessionStorage.removeItem("cia_access_token");
 })();
 
 function _loadUserMeta() {
@@ -92,7 +85,7 @@ const state = {
   consent: localStorage.getItem("cia_consent_" + (localStorage.getItem("cia_uid") || "")) === "1",
   profile: null,
   competitions: [],
-  detailReturn: "#/hall", // 详情页返回目标视图（默认大厅；从推荐进入时为 #/recommend）
+  detailReturn: "#/hall", // 详情页返回目标视图（大厅、首页、推荐或作战地图）
   hallReadiness: "all",
   isTest: localStorage.getItem("cia_is_test") === "1",
   isAdmin: localStorage.getItem("cia_is_admin") === "1",
@@ -103,6 +96,9 @@ const state = {
   projectCalendarCursor: null,
   radarFilter: "all",
   radarStatus: null,
+  hallSearch: "",
+  hallMajor: null,
+  hallMajorLoaded: false,
 };
 
 const CAT_LABEL = {
@@ -136,8 +132,13 @@ function showView(name) {
 }
 
 function router() {
-  const hash = location.hash || "#/hall";
+  const hash = location.hash || "#/home";
   const parts = hash.replace(/^#\//, "").split("/");
+  if (parts[0] === "home") {
+    showView("home");
+    renderHome();
+    return;
+  }
   if (parts[0] === "agent") {
     showView("agent");
     renderAgentView();
@@ -146,7 +147,7 @@ function router() {
   if (parts[0] === "admin") {
     if (!state.isAdmin) {
       toast("无权限访问该页面");
-      location.hash = "#/hall";
+      location.hash = "#/home";
       return;
     }
     showView("admin");
@@ -168,6 +169,11 @@ function router() {
     renderRadar();
     return;
   }
+  if (parts[0] === "hall") {
+    showView("hall");
+    renderHall();
+    return;
+  }
   if (parts[0] === "detail" && parts[1]) {
     showView("detail");
     renderDetail(parts[1]);
@@ -178,13 +184,340 @@ function router() {
     showView("recommend");
     renderRecommend();
   } else {
-    showView("hall");
-    renderHall();
+    showView("home");
+    renderHome();
   }
 }
 
 // ---------------------------------------------------------------------------
-// 质量驾驶舱：冻结评测与运行态指标不混算
+// 首页：把画像、推荐、项目与官方变化收束为“今天先做什么”
+// ---------------------------------------------------------------------------
+function homeDateText(date = new Date()) {
+  const weekdays = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+  return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日 · ${weekdays[date.getDay()]}`;
+}
+
+function homeGreeting(date = new Date()) {
+  const hour = date.getHours();
+  if (hour < 6) return "夜深了";
+  if (hour < 11) return "早上好";
+  if (hour < 14) return "中午好";
+  if (hour < 19) return "下午好";
+  return "晚上好";
+}
+
+function homeDaysUntil(value) {
+  const date = projectDate(value);
+  if (!date) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.ceil((date.getTime() - today.getTime()) / 86400000);
+}
+
+function homeDeadlineText(value) {
+  const days = homeDaysUntil(value);
+  if (days === null) return "暂未设置日期";
+  if (days < 0) return "节点已过期";
+  if (days === 0) return "今天截止";
+  if (days === 1) return "明天截止";
+  if (days <= 7) return `${days} 天后截止`;
+  return String(value).slice(0, 10);
+}
+
+function homeProfileLabel(profile) {
+  const persona = profile.persona || (state.userMeta && state.userMeta.persona) || "";
+  if (persona && !persona.startsWith("演示账号")) return persona;
+  return [profile.grade, profile.major].filter(Boolean).join(" · ") || "已完成个人画像";
+}
+
+function homeProjectSnapshot(project) {
+  const items = project.items || [];
+  const open = items.filter((item) => !["done", "skipped"].includes(String(item.status)));
+  const entries = open.map((item) => ({ item, dependency: projectDependencyInfo(project, item) }));
+  const blockedEntries = entries.filter((entry) => entry.dependency.blocked);
+  const sortedEntries = entries.slice().sort((a, b) => {
+    if (a.dependency.blocked !== b.dependency.blocked) return a.dependency.blocked ? -1 : 1;
+    const ad = projectDate(a.item.due_date); const bd = projectDate(b.item.due_date);
+    return (ad ? ad.getTime() : Infinity) - (bd ? bd.getTime() : Infinity) || Number(a.item.sort_order || 0) - Number(b.item.sort_order || 0);
+  });
+  const done = items.filter((item) => item.status === "done").length;
+  const progress = Number.isFinite(Number(project.progress_percent))
+    ? Number(project.progress_percent)
+    : (items.length ? Math.round(done / items.length * 100) : 0);
+  const nearestDates = [
+    ...open.map((item) => item.due_date),
+    project.registration_deadline,
+    project.submission_deadline,
+  ].filter(Boolean).sort();
+  const nearestDate = nearestDates.find((date) => {
+    const days = homeDaysUntil(date);
+    return days !== null && days >= 0;
+  }) || nearestDates[0] || null;
+  const blocked = Math.max(Number(project.blocked_count || 0), blockedEntries.length);
+  const risk = blocked > 0 || project.risk_level === "high" ? "high"
+    : project.risk_level === "medium" || (nearestDate && homeDaysUntil(nearestDate) <= 7) ? "medium" : "low";
+  return { project, open, entries, blockedEntries, next: sortedEntries[0] || null, progress, nearestDate, blocked, risk };
+}
+
+function homeReasonFragments(value, output = []) {
+  if (value === null || value === undefined || output.length >= 6) return output;
+  if (Array.isArray(value)) {
+    value.forEach((item) => homeReasonFragments(item, output));
+  } else if (typeof value === "object") {
+    Object.values(value).forEach((item) => homeReasonFragments(item, output));
+  } else {
+    const textValue = String(value).replace(/\s+/g, " ").trim();
+    if (textValue && !/^\d+(?:\.\d+)?$/.test(textValue)) output.push(textValue);
+  }
+  return output;
+}
+
+function homeRecommendationReasons(recommendation) {
+  const result = [];
+  const score = recommendation.match_breakdown || {};
+  if (Number(score.skill_score) >= 70) result.push("技能基础匹配");
+  if (Number(score.experience_score) >= 70) result.push("经历方向契合");
+  if (Number(score.workload_score) >= 70) result.push("时间投入合适");
+  if (Number(score.resource_score) >= 70) result.push("组队资源适配");
+  if (recommendation.urgent) result.push("临近报名截止");
+  homeReasonFragments(recommendation.explanation).forEach((item) => {
+    const clean = item.replace(/^[：:·\-\s]+/, "").slice(0, 38);
+    if (clean && !result.includes(clean)) result.push(clean);
+  });
+  return result.slice(0, 2);
+}
+
+function homeRadarItems(status, alertsPayload) {
+  const data = status || {};
+  const alerts = (alertsPayload && alertsPayload.alerts) || [];
+  const inbox = buildRadarInbox(data, alerts);
+  const alertEventIds = new Set(inbox.map((item) => String(item.event_id || "")));
+  const dismissed = radarDismissedSet();
+  const notices = (data.events || [])
+    .filter((event) => event.status === "pending" && !alertEventIds.has(String(event.event_id)))
+    .map((event) => ({
+      key: `notice-${event.event_id}`,
+      kind: "notice",
+      event_id: event.event_id,
+      competition_id: event.competition_id,
+      title: event.competition_name || "赛事官方更新",
+      message: "官方通知有新的变化，建议查看更新后再安排下一步。",
+      severity: event.severity || "low",
+      created_at: event.detected_at,
+    }))
+    .filter((item) => !dismissed.has(item.key));
+  return [...inbox, ...notices].sort((a, b) => {
+    const severity = { high: 0, medium: 1, low: 2 };
+    return (severity[a.severity] ?? 3) - (severity[b.severity] ?? 3)
+      || String(b.created_at || "").localeCompare(String(a.created_at || ""));
+  });
+}
+
+function homeOnboardingMarkup() {
+  const name = (state.userMeta && state.userMeta.display_name) || state.uid || "同学";
+  return `<header class="home-head">
+    <div><span>${escapeHtml(homeDateText())}</span><h1>${escapeHtml(homeGreeting())}，${escapeHtml(name)}</h1><p>先用 3 分钟告诉系统你的方向，首页才会真正属于你。</p></div>
+    <button class="btn ghost" data-home-route="#/hall">先浏览公开赛事</button>
+  </header>
+  <section class="home-onboarding-card">
+    <div class="home-onboarding-copy"><span>START HERE</span><h2>完成画像，解锁你的科创行动首页</h2><p>只需要学历、专业、技能和每周可投入时间。系统会据此筛选资格、排序机会，并把推荐转成可以执行的项目。</p><div><button class="btn primary" data-home-route="#/profile">开始完善画像</button><button class="btn ghost" data-home-route="#/hall">查看全部赛事</button></div></div>
+    <ol class="home-onboarding-steps"><li><b>01</b><div><strong>建立画像</strong><span>说明专业、能力与时间</span></div></li><li><b>02</b><div><strong>匹配机会</strong><span>先过资格门槛，再计算适配度</span></div></li><li><b>03</b><div><strong>进入执行</strong><span>生成任务、材料与时间节点</span></div></li></ol>
+  </section>`;
+}
+
+function homeEmptyBlock(title, detail, route, label) {
+  return `<div class="home-empty"><span>◇</span><b>${escapeHtml(title)}</b><small>${escapeHtml(detail)}</small><button class="btn ghost" data-home-route="${escapeHtml(route)}">${escapeHtml(label)}</button></div>`;
+}
+
+function bindHomeControls(root) {
+  $$('[data-home-route]', root).forEach((button) => {
+    button.addEventListener("click", () => { location.hash = button.dataset.homeRoute; });
+  });
+  $$('[data-home-project]', root).forEach((button) => {
+    button.addEventListener("click", () => {
+      state.projectFocus = button.dataset.homeProject;
+      location.hash = "#/projects";
+    });
+  });
+  $$('[data-home-detail]', root).forEach((button) => {
+    button.addEventListener("click", () => {
+      state.detailReturn = "#/home";
+      location.hash = `#/detail/${encodeURIComponent(button.dataset.homeDetail)}`;
+    });
+  });
+  $$('[data-home-join]', root).forEach((button) => {
+    button.addEventListener("click", () => joinProject(button.dataset.homeJoin));
+  });
+  $$('[data-home-ai]', root).forEach((button) => {
+    button.addEventListener("click", () => {
+      sessionStorage.setItem("cia_agent_seed_prompt", button.dataset.homeAi || "我今天应该先做什么？");
+      location.hash = "#/agent";
+    });
+  });
+}
+
+async function renderHome() {
+  const root = $("#home-root");
+  if (!root) return;
+  root.innerHTML = '<div class="home-loading"><span></span><b>正在整理今天最重要的事项</b><small>同步画像、项目、推荐与官方变化</small></div>';
+  if (!state.uid || !state.loggedIn) {
+    root.innerHTML = homeOnboardingMarkup();
+    bindHomeControls(root);
+    return;
+  }
+  if (!state.consent) {
+    root.innerHTML = homeOnboardingMarkup();
+    bindHomeControls(root);
+    return;
+  }
+
+  const uid = encodeURIComponent(state.uid);
+  const results = await Promise.allSettled([
+    apiGet(`/api/users/${uid}/profile`),
+    apiGet(`/api/users/${uid}/projects`),
+    apiGet(`/api/users/${uid}/recommendations`),
+    apiGet("/api/radar/status"),
+    apiGet(`/api/users/${uid}/alerts`),
+  ]);
+  const profile = results[0].status === "fulfilled" ? results[0].value : state.profile;
+  if (!profile) {
+    if (String(results[0].reason || "").includes("404")) {
+      state.consent = false;
+      root.innerHTML = homeOnboardingMarkup();
+    } else {
+      root.innerHTML = `<div class="home-failed"><span>暂时无法整理首页</span><h2>你的数据没有丢失，请稍后重试</h2><p>${escapeHtml((results[0].reason && results[0].reason.message) || "画像服务暂时不可用")}</p><div><button class="btn primary" data-home-route="#/home">重新加载</button><button class="btn ghost" data-home-route="#/hall">浏览赛事大厅</button></div></div>`;
+    }
+    bindHomeControls(root);
+    return;
+  }
+
+  state.profile = profile;
+  const projects = results[1].status === "fulfilled" ? (results[1].value || []) : [];
+  const recommendations = results[2].status === "fulfilled" ? (results[2].value || []) : [];
+  const radarStatus = results[3].status === "fulfilled" ? (results[3].value || {}) : {};
+  const alertsPayload = results[4].status === "fulfilled" ? (results[4].value || { alerts: [] }) : { alerts: [] };
+  state.projects = projects;
+  state.radarStatus = radarStatus;
+
+  const snapshots = projects.map(homeProjectSnapshot).sort((a, b) => {
+    const risk = { high: 0, medium: 1, low: 2 };
+    const aDate = projectDate(a.nearestDate);
+    const bDate = projectDate(b.nearestDate);
+    return risk[a.risk] - risk[b.risk]
+      || (aDate ? aDate.getTime() : Infinity) - (bDate ? bDate.getTime() : Infinity);
+  });
+  const activeSnapshots = snapshots.filter((snapshot) => snapshot.open.length > 0);
+  const radarItems = homeRadarItems(radarStatus, alertsPayload);
+  const eligibleRecommendations = recommendations
+    .filter((item) => item.eligible && !["ineligible", "candidate_only"].includes(item.recommendation_status))
+    .sort((a, b) => Number(b.score || 0) - Number(a.score || 0));
+  const allOpen = snapshots.flatMap((snapshot) => snapshot.entries.map((entry) => ({ ...entry, snapshot })));
+  const blocked = allOpen.filter((entry) => entry.dependency.blocked);
+  const milestones = [];
+  snapshots.forEach((snapshot) => {
+    const project = snapshot.project;
+    if (project.registration_deadline) milestones.push({ key: `${project.project_id}-registration`, date: project.registration_deadline });
+    if (project.submission_deadline) milestones.push({ key: `${project.project_id}-submission`, date: project.submission_deadline });
+    snapshot.open.forEach((item) => { if (item.due_date) milestones.push({ key: `${project.project_id}-${item.item_id}`, date: item.due_date }); });
+  });
+  const dueSeven = milestones.filter((item) => {
+    const days = homeDaysUntil(item.date);
+    return days !== null && days >= 0 && days <= 7;
+  }).length;
+
+  let focus;
+  const highImpact = radarItems.find((item) => item.kind === "impact" && item.severity === "high");
+  const overdueEntry = allOpen.filter((entry) => {
+    const days = homeDaysUntil(entry.item.due_date);
+    return !entry.dependency.blocked && days !== null && days < 0;
+  }).sort((a, b) => homeDaysUntil(a.item.due_date) - homeDaysUntil(b.item.due_date))[0];
+  const dueEntry = allOpen.filter((entry) => {
+    const days = homeDaysUntil(entry.item.due_date);
+    return !entry.dependency.blocked && days !== null && days >= 0;
+  }).sort((a, b) => homeDaysUntil(a.item.due_date) - homeDaysUntil(b.item.due_date))[0];
+  if (highImpact) {
+    focus = { tone: "alert", eyebrow: "OFFICIAL CHANGE", title: `先确认「${highImpact.title || "赛事"}」的最新变化`, detail: highImpact.message || "这条官方更新可能影响你的参赛计划，建议先确认再继续投入。", route: "#/radar", action: "查看官方变化", signal: "!", signalLabel: "优先确认", progress: 100, prompt: `请说明 ${highImpact.title || "这场赛事"} 的最新变化会怎样影响我的参赛计划` };
+  } else if (blocked.length) {
+    const entry = blocked[0];
+    focus = { tone: "risk", eyebrow: "UNBLOCK NEXT", title: `先解除「${entry.item.title}」的阻塞`, detail: `它正在影响「${entry.snapshot.project.competition_name}」的后续推进。打开项目查看前置任务和完成条件。`, project: entry.snapshot.project.competition_id, action: "打开项目处理", signal: String(blocked.length), signalLabel: "项任务受阻", progress: entry.snapshot.progress, prompt: `帮我分析「${entry.item.title}」为什么受阻，并给出最短解决步骤` };
+  } else if (overdueEntry) {
+    const overdueDays = Math.abs(homeDaysUntil(overdueEntry.item.due_date));
+    focus = { tone: "alert", eyebrow: "OVERDUE", title: `补上已逾期的「${overdueEntry.item.title}」`, detail: `它属于「${overdueEntry.snapshot.project.competition_name}」，已经逾期 ${overdueDays} 天。先更新计划或完成这项，再继续后续节点。`, project: overdueEntry.snapshot.project.competition_id, action: "打开项目处理", signal: String(overdueDays), signalLabel: "天已逾期", progress: overdueEntry.snapshot.progress, prompt: `帮我重新安排「${overdueEntry.item.title}」这项已逾期任务` };
+  } else if (dueEntry) {
+    const days = homeDaysUntil(dueEntry.item.due_date);
+    focus = { tone: days <= 3 ? "urgent" : "normal", eyebrow: "NEXT DEADLINE", title: `今天优先推进「${dueEntry.item.title}」`, detail: `属于「${dueEntry.snapshot.project.competition_name}」，${homeDeadlineText(dueEntry.item.due_date)}。先完成最近节点，可以避免后续任务集中拥堵。`, project: dueEntry.snapshot.project.competition_id, action: "进入项目执行", signal: days === 0 ? "今" : String(days), signalLabel: days === 0 ? "天截止" : "天后截止", progress: dueEntry.snapshot.progress, prompt: `把「${dueEntry.item.title}」拆成今天可以完成的具体步骤` };
+  } else if (activeSnapshots.length) {
+    const snapshot = activeSnapshots[0];
+    focus = { tone: "normal", eyebrow: "KEEP MOMENTUM", title: `继续推进「${snapshot.project.competition_name}」`, detail: snapshot.next ? `下一步是「${snapshot.next.item.title}」。完成后，项目整体进度会继续向前。` : "当前任务已处理完，可以检查材料和官方截止日期。", project: snapshot.project.competition_id, action: "查看项目下一步", signal: String(snapshot.progress), signalLabel: "% 已完成", progress: snapshot.progress, prompt: `根据我的项目「${snapshot.project.competition_name}」，建议今天最值得推进的一件事` };
+  } else if (eligibleRecommendations.length) {
+    const recommendation = eligibleRecommendations[0];
+    focus = { tone: "discover", eyebrow: "BEST MATCH", title: `从「${recommendation.competition_name}」开始第一项计划`, detail: `当前匹配度 ${Math.round(Number(recommendation.score || 0))}，先查看参赛要求，再决定是否加入项目。`, detailId: recommendation.competition_id, action: "查看这场赛事", signal: String(Math.round(Number(recommendation.score || 0))), signalLabel: "匹配度", progress: Math.round(Number(recommendation.score || 0)), prompt: `为什么「${recommendation.competition_name}」适合我？我还缺什么能力？` };
+  } else {
+    focus = { tone: "normal", eyebrow: "EXPLORE", title: "为自己选定一场值得投入的比赛", detail: "当前没有紧急事项。可以先浏览赛事，或让智能体根据画像帮你缩小范围。", route: "#/recommend", action: "查看我的推荐", signal: "0", signalLabel: "项紧急事项", progress: 0, prompt: "根据我的画像，推荐三场最值得投入的赛事并说明取舍" };
+  }
+
+  const displayName = profile.display_name || (state.userMeta && state.userMeta.display_name) || state.uid;
+  const profileTags = [profile.grade, profile.major, `${profile.weekly_available_hours || 0}h/周`].filter(Boolean);
+  const focusActionAttr = focus.project ? `data-home-project="${escapeHtml(focus.project)}"`
+    : focus.detailId ? `data-home-detail="${escapeHtml(focus.detailId)}"`
+      : `data-home-route="${escapeHtml(focus.route || "#/home")}"`;
+  const failedCount = results.filter((item) => item.status === "rejected").length;
+
+  const projectMarkup = snapshots.length ? snapshots.slice(0, 3).map((snapshot) => {
+    const project = snapshot.project;
+    const status = snapshot.risk === "high" ? "需要处理" : snapshot.risk === "medium" ? "临近节点" : PROJECT_STATUS[project.status] || "进行中";
+    const nextText = snapshot.next ? snapshot.next.item.title : "当前清单已完成";
+    return `<article class="home-project-card risk-${snapshot.risk}">
+      <header><div><span>${escapeHtml(project.document_year)} · ${escapeHtml(PROJECT_STATUS[project.status] || "参赛项目")}</span><h3>${escapeHtml(project.competition_name)}</h3></div><em>${escapeHtml(status)}</em></header>
+      <div class="home-project-progress"><i><b style="width:${Math.max(0, Math.min(100, snapshot.progress))}%"></b></i><span>${snapshot.progress}%</span></div>
+      <div class="home-project-next"><span>下一步</span><b>${escapeHtml(nextText)}</b><small>${snapshot.nearestDate ? escapeHtml(homeDeadlineText(snapshot.nearestDate)) : "按计划推进"}${snapshot.blocked ? ` · ${snapshot.blocked} 项受阻` : ""}</small></div>
+      <button type="button" data-home-project="${escapeHtml(project.competition_id)}" aria-label="打开 ${escapeHtml(project.competition_name)}">→</button>
+    </article>`;
+  }).join("") : homeEmptyBlock("还没有参赛项目", "从一场匹配的赛事开始，系统会自动生成任务与材料清单。", "#/recommend", "去选择赛事");
+
+  const recommendationMarkup = eligibleRecommendations.length ? eligibleRecommendations.slice(0, 3).map((item) => {
+    const reasons = homeRecommendationReasons(item);
+    const status = STATUS_LABEL[item.recommendation_status] || "适合你";
+    return `<article class="home-recommend-card">
+      <div class="home-recommend-score"><strong>${Math.round(Number(item.score || 0))}</strong><span>匹配度</span></div>
+      <div class="home-recommend-copy"><span>${escapeHtml(status)}${item.urgent ? " · 临近截止" : ""}</span><h3>${escapeHtml(item.competition_name)}</h3><div>${reasons.map((reason) => `<em>${escapeHtml(reason)}</em>`).join("") || "<em>通过资格筛选</em>"}</div></div>
+      <div class="home-recommend-actions"><button type="button" class="home-link" data-home-detail="${escapeHtml(item.competition_id)}">查看</button><button type="button" class="home-add" data-home-join="${escapeHtml(item.competition_id)}">加入项目</button></div>
+    </article>`;
+  }).join("") : homeEmptyBlock("暂无新的正式推荐", "可以调整画像，或先浏览赛事大厅中的公开机会。", "#/hall", "浏览赛事");
+
+  const radarMarkup = radarItems.length ? radarItems.slice(0, 3).map((item) => `<article class="home-update-item severity-${escapeHtml(item.severity || "low")}">
+    <i></i><div><span>${item.kind === "impact" ? "影响我的计划" : "官方通知有变化"} · ${escapeHtml(radarTime(item.created_at))}</span><h3>${escapeHtml(item.title || "赛事更新")}</h3><p>${escapeHtml(item.message || "请查看赛事说明确认最新安排。")}</p></div><button type="button" data-home-route="#/radar">查看</button>
+  </article>`).join("") : `<div class="home-update-clear"><span>✓</span><div><b>当前没有需要立即处理的官方变化</b><small>赛事雷达仍在后台持续关注报名、赛程、材料与新赛季公告。</small></div><button class="btn ghost" data-home-route="#/radar">查看机会提醒</button></div>`;
+
+  const homeDueStat = dueSeven ? String(dueSeven) : "—";
+  const homeOpenStat = allOpen.length ? String(allOpen.length) : "—";
+  const homeRadarStat = radarItems.length ? String(radarItems.length) : "—";
+
+  root.innerHTML = `<header class="home-head">
+    <div><span>${escapeHtml(homeDateText())}</span><h1>${escapeHtml(homeGreeting())}，${escapeHtml(displayName)}</h1><p>${escapeHtml(homeProfileLabel(profile))}</p><div class="home-profile-tags">${profileTags.map((tag) => `<em>${escapeHtml(tag)}</em>`).join("")}</div></div>
+    <button class="home-ask" type="button" data-home-ai="根据我的画像、项目和最近变化，告诉我今天最应该先做什么"><span>AI</span><b>问智能体</b><small>帮我判断下一步</small></button>
+  </header>
+  ${failedCount ? `<div class="home-sync-note"><span>部分信息暂未同步</span><small>${failedCount} 项数据加载失败，已展示其余可用内容。</small><button data-home-route="#/home">重试</button></div>` : ""}
+  <section class="home-focus tone-${escapeHtml(focus.tone)}">
+    <div class="home-focus-copy"><span><i></i>${escapeHtml(focus.eyebrow)} · 今日聚焦</span><h2>${escapeHtml(focus.title)}</h2><p>${escapeHtml(focus.detail)}</p><div><button class="btn primary" type="button" ${focusActionAttr}>${escapeHtml(focus.action)}</button><button class="btn ghost" type="button" data-home-ai="${escapeHtml(focus.prompt)}">让智能顾问拆解</button></div></div>
+    <aside class="home-focus-signal"><span>行动信号</span><strong>${escapeHtml(focus.signal)}</strong><small>${escapeHtml(focus.signalLabel)}</small><i><b style="width:${Math.max(0, Math.min(100, Number(focus.progress || 0)))}%"></b></i></aside>
+  </section>
+  <section class="home-stats" aria-label="今天的关键数字">
+    <button type="button" data-home-route="#/projects"><span>未来 7 天关键节点</span><strong>${homeDueStat}</strong><small>${dueSeven ? "优先处理最近截止" : "本周暂无临近截止"}</small><i>01</i></button>
+    <button type="button" data-home-route="#/projects"><span>待完成执行项</span><strong>${homeOpenStat}</strong><small>${blocked.length ? `${blocked.length} 项正在受阻` : "没有前置阻塞"}</small><i>02</i></button>
+    <button type="button" data-home-route="#/radar"><span>官方更新</span><strong>${homeRadarStat}</strong><small>${radarItems.length ? "查看是否影响计划" : "雷达持续关注中"}</small><i>03</i></button>
+  </section>
+  <div class="home-main-grid">
+    <section class="home-panel home-projects"><header><div><span>MY PROJECTS</span><h2>我的项目</h2></div><button data-home-route="#/projects">查看全部 →</button></header><div>${projectMarkup}</div></section>
+    <section class="home-panel home-recommendations"><header><div><span>JUST FOR YOU</span><h2>适合你的新机会</h2></div><button data-home-route="#/recommend">查看全部 →</button></header><div>${recommendationMarkup}</div></section>
+  </div>
+  <section class="home-panel home-updates"><header><div><span>OFFICIAL PULSE</span><h2>官方动态</h2></div><button data-home-route="#/radar">查看全部 →</button></header><div>${radarMarkup}</div></section>
+  <section class="home-ai-strip"><div><span>AI SHORTCUTS</span><h2>一句话开始行动</h2><p>问题已带入智能问答，由你确认后发送。</p></div><div class="home-ai-prompts"><button data-home-ai="结合我的全部项目，告诉我今天最应该先完成哪一项任务">今天先做什么</button><button data-home-ai="比较我最匹配的三场赛事，说明投入产出和风险">比较三场机会</button><button data-home-ai="检查我的项目是否存在阻塞、时间冲突或材料风险">检查项目风险</button><button data-home-ai="根据我的技能缺口，给出一周提升计划">规划一周提升</button></div></section>`;
+  bindHomeControls(root);
+}
+
+// ---------------------------------------------------------------------------
+// 冻结评测与运行态指标不混算，避免演示数据影响正式评测口径。
 // ---------------------------------------------------------------------------
 function qualityRate(value) {
   const n = Number(value);
@@ -338,10 +671,13 @@ $("#profile-form").addEventListener("submit", async (ev) => {
     localStorage.setItem("cia_consent_" + state.uid, "1");
     state.consent = true;
     state.profile = payload;
+    state.hallMajor = payload.major || null;
+    state.hallMajorLoaded = true;
     updateUserChip();
     $("#profile-msg").textContent = "已保存到数据库。";
     $("#profile-msg").className = "msg ok";
-    toast("画像已保存");
+    toast("画像已保存，正在生成你的首页");
+    location.hash = "#/home";
   } catch (err) {
     $("#profile-msg").textContent = "保存失败：" + err.message;
     $("#profile-msg").className = "msg err";
@@ -424,10 +760,11 @@ function competitionStatus(c) {
   const today = new Date().toISOString().slice(0, 10);
   const sd = c.competition_start_date, ed = c.competition_end_date;
   const rd = c.registration_deadline, sub = c.submission_deadline;
-  if (sd && sd <= today) return { label: "已开赛", cls: "status-progress" };
   if (ed && ed < today) return { label: "已结束", cls: "status-ended" };
   if (rd && rd < today) return { label: "报名已截止", cls: "status-closed" };
   if (!rd && sub && sub < today) return { label: "报名已截止", cls: "status-closed" };
+  if (sd && sd <= today) return { label: "已开赛", cls: "status-progress" };
+  if (!rd && !sub) return { label: "分赛区/滚动报名", cls: "status-open" };
   return { label: "报名中", cls: "status-open" };
 }
 function statusTag(c) {
@@ -441,31 +778,59 @@ function compCardHtml(c, matchLevel) {
     : (matchLevel === 1 ? `<span class="tag major-open">不限专业</span>` : "");
   return `<article class="card comp-card" data-id="${escapeHtml(c.competition_id)}" tabindex="0">
       <div class="comp-card-main">
-        <div class="comp-kicker">${escapeHtml(c.competition_id)}</div>
         <div class="comp-title">${escapeHtml(c.competition_name)}</div>
         <div class="comp-meta">
           <span class="tag cat">${CAT_LABEL[c.category] || c.category}</span>
           <span class="tag year">${c.document_year}</span>
           ${statusTag(c)}
-          <span class="tag ${c.recommendation_ready ? "status-verified" : "status-unverified"}">${c.recommendation_ready ? "可正式推荐" : "待核验候选"}</span>
           ${majorTag}
         </div>
-        <div class="card-open-hint">点击查看详情 ›</div>
+        <div class="card-open-hint">查看赛事详情 <i aria-hidden="true">↗</i></div>
       </div>
-      <div class="comp-card-side"><span>报名截止</span><strong>${escapeHtml(c.registration_deadline || "未明确")}</strong><i aria-hidden="true">→</i></div>
+      <div class="comp-card-side"><span>${c.registration_deadline ? "报名截止" : "赛程"}</span><strong>${escapeHtml(c.registration_deadline || "分赛区/以官网为准")}</strong><i aria-hidden="true">→</i></div>
     </article>`;
 }
 
+function hallNormalize(value) {
+  return String(value ?? "").toLowerCase().replace(/\s+/g, "");
+}
+
+function hallSearchText(competition) {
+  // 面向用户的大厅检索只匹配赛事正式名称，避免简介中的类比赛事制造误命中。
+  return hallNormalize(competition.competition_name);
+}
+
+function hallMatchesSearch(competition, query) {
+  const tokens = String(query || "").toLowerCase().trim().split(/[\s,，、;；|/]+/).filter(Boolean).map(hallNormalize);
+  if (!tokens.length) return true;
+  const text = hallSearchText(competition);
+  return tokens.every((token) => text.includes(token));
+}
+
+function hallUpdateResultMeta(count, total, query = "") {
+  const target = $("#hall-result-count");
+  if (!target) return;
+  target.textContent = query ? `${count} / ${total} 场赛事` : `${count} 场赛事`;
+}
+
 async function renderHall() {
-  // 拉取全部赛事（用于专业匹配与年份下拉）
-  let all;
-  try {
-    all = await apiGet("/api/competitions");
-  } catch (err) {
-    $("#hall-list").innerHTML = `<div class="card">加载失败：${escapeHtml(err.message)}</div>`;
-    return;
+  const listBox = $("#hall-list");
+  if (!listBox) return;
+  // 首次进入大厅才请求赛事库；检索和筛选直接复用内存数据，避免每次按键都打接口。
+  let all = Array.isArray(state.competitions) && state.competitions.length ? state.competitions : null;
+  if (!all) {
+    listBox.innerHTML = '<div class="hall-loading"><span></span><b>正在打开赛事大厅</b><small>加载赛事与官方截止日期</small></div>';
+    try {
+      all = await apiGet("/api/competitions");
+      state.competitions = all;
+    } catch (err) {
+      hallUpdateResultMeta(0, 0);
+      listBox.innerHTML = `<div class="hall-error"><b>赛事大厅暂时打不开</b><span>${escapeHtml(err.message)}</span><button type="button" class="btn ghost" id="hall-retry">重新加载</button></div>`;
+      $("#hall-retry")?.addEventListener("click", () => { state.competitions = []; renderHall(); });
+      return;
+    }
   }
-  state.competitions = all;
+  all = Array.isArray(all) ? all : [];
 
   // 年份下拉
   const years = Array.from(new Set(all.map((c) => c.document_year))).sort((a, b) => b - a);
@@ -476,28 +841,33 @@ async function renderHall() {
   if (cur) yearSel.value = cur;
 
   // 用户专业画像（已登录且已填写画像时生效）
-  let major = null;
-  if (state.uid) {
+  let major = state.hallMajor;
+  if (state.uid && !state.hallMajorLoaded) {
     try {
       const p = await apiGet(`/api/users/${encodeURIComponent(state.uid)}/profile`);
       major = p && p.major ? p.major : null;
     } catch (_) { major = null; }
+    state.hallMajor = major;
+    state.hallMajorLoaded = true;
   }
   const levelOf = (c) => compMatchLevel(c, major);
 
   // 应用类别/年份筛选（客户端，便于专业优先排序）
   const cat = $("#filter-cat").value;
   const year = $("#filter-year").value;
+  const query = state.hallSearch || $("#hall-search")?.value || "";
   const list = all.filter((c) =>
     (!cat || c.category === cat)
     && (!year || String(c.document_year) === String(year))
+    && hallMatchesSearch(c, query)
     && (state.hallReadiness === "all"
       || (state.hallReadiness === "ready" && c.recommendation_ready)
       || (state.hallReadiness === "candidate" && !c.recommendation_ready))
   );
+  hallUpdateResultMeta(list.length, all.length, query);
 
   if (!list.length) {
-    $("#hall-list").innerHTML = `<div class="card muted">暂无符合条件的赛事。</div>`;
+    $("#hall-list").innerHTML = `<div class="hall-empty"><span>⌕</span><b>没有找到符合条件的赛事</b><small>${query ? `试试更短的关键词，或清空“${escapeHtml(query)}”重新检索。` : "可以切换类别、年份或可信状态。"}</small></div>`;
     return;
   }
 
@@ -514,21 +884,21 @@ async function renderHall() {
 
   // 顶部「为你推荐」区块（跨筛选，取专业匹配度最高的若干项）
   let strip = "";
-  if (major && state.hallReadiness === "all") {
+  if (major && state.hallReadiness === "all" && !query) {
     const matched = all
       .map((c) => ({ c, l: levelOf(c) }))
       .filter((x) => x.l > 0 && x.c.recommendation_ready)
       .sort((a, b) => b.l - a.l || byDeadline(a.c, b.c))
       .slice(0, 6);
     if (matched.length) {
-      strip = `<div class="reco-strip">
-        <div class="reco-head">与你专业相关 · ${escapeHtml(major)} · ${matched.length} 项可正式推荐赛事</div>
-        <div class="cards reco-cards">${matched.map((x) => compCardHtml(x.c, x.l)).join("")}</div>
-      </div>`;
+      strip = `<section class="reco-strip">
+        <header class="reco-head"><div><span>为你优选</span><b>${escapeHtml(major)} · ${matched.length} 项正在报名的机会</b></div><small>已按你的专业与报名时间排序</small></header>
+        <div class="cards reco-cards">${matched.slice(0, 3).map((x) => compCardHtml(x.c, x.l)).join("")}</div>
+      </section>`;
     }
   }
 
-  $("#hall-list").innerHTML = strip + sorted.map((c) => compCardHtml(c, levelOf(c))).join("");
+  listBox.innerHTML = strip + sorted.map((c) => compCardHtml(c, levelOf(c))).join("");
 
   $$("#hall-list .comp-card").forEach((el) => {
     el.addEventListener("click", () => {
@@ -541,6 +911,18 @@ async function renderHall() {
   });
 }
 
+$("#hall-search").addEventListener("input", (event) => {
+  state.hallSearch = event.target.value || "";
+  $("#hall-search-clear").classList.toggle("hidden", !state.hallSearch);
+  clearTimeout(renderHall._searchTimer);
+  renderHall._searchTimer = setTimeout(renderHall, 120);
+});
+$("#hall-search-clear").addEventListener("click", () => {
+  state.hallSearch = "";
+  $("#hall-search").value = "";
+  $("#hall-search-clear").classList.add("hidden");
+  renderHall();
+});
 $("#filter-cat").addEventListener("change", renderHall);
 $("#filter-year").addEventListener("change", renderHall);
 $$('.hall-trust-filter button').forEach((button) => button.addEventListener("click", () => {
@@ -552,13 +934,60 @@ $$('.hall-trust-filter button').forEach((button) => button.addEventListener("cli
 // ---------------------------------------------------------------------------
 // 赛事详情
 // ---------------------------------------------------------------------------
+function detailScheduleHint(competition, notes) {
+  const text = String(notes || "");
+  if (/分赛区|多赛道|各赛道|各赛区|滚动/.test(text)) {
+    return "不同赛区或赛道的时间可能不同，请以你报名的赛道公告为准。";
+  }
+  if (/另行通知|具体日期|尚未|待定|未确认|留空|中旬|下旬|上旬/.test(text)) {
+    return "部分赛程节点可能随官方通知更新，报名后请留意官网公告。";
+  }
+  if (competition.competition_start_date || competition.competition_end_date) {
+    return "关键时间已整理在上方，提交前建议再打开官网确认最新安排。";
+  }
+  return "赛程信息可能分阶段发布，建议以赛事官网的最新通知为准。";
+}
+
+function detailUserGuidanceMarkup(competition, detail) {
+  const status = competitionStatus(competition);
+  const min = Number(competition.team_min ?? 1);
+  const max = Number(competition.team_max ?? min);
+  const teamHint = min === 1 && max === 1
+    ? "个人即可参加，不需要提前组队。"
+    : competition.team_required
+      ? `需要组队参加，建议准备 ${min}—${max} 人的队伍。`
+      : `可个人参加，也可以组队（${min}—${max} 人）。`;
+  const timeHint = status.cls === "status-open"
+    ? (competition.registration_deadline ? `当前仍可关注，报名截止 ${competition.registration_deadline}。` : "当前仍可关注，具体报名节点请查看官网。")
+    : status.cls === "status-progress"
+      ? "赛事已经开始，本届报名通常已结束，可关注后续赛程或下一届通知。"
+      : "本届报名已结束，建议关注主办方发布的下一届通知。";
+  const hints = [
+    { icon: "01", label: "参赛方式", text: teamHint },
+    { icon: "02", label: "时间提醒", text: timeHint },
+    { icon: "03", label: "赛程提示", text: detailScheduleHint(competition, competition.notes) },
+  ];
+  const readyText = status.cls === "status-open"
+    ? (detail.recommendation_ready
+      ? "符合基本展示条件，可以结合你的画像决定是否加入项目。"
+      : "报名前请打开官网核对资格与材料要求。")
+    : "本届已结束，可以收藏官网，等待下一届通知。";
+  return `<div class="section user-guidance-section"><h3>给你的参赛提示</h3><div class="card user-guidance-card">
+    <header><div><span>QUICK READ</span><b>先看这几件事，再决定是否报名</b></div><span class="tag ${escapeHtml(status.cls)}">${escapeHtml(status.label)}</span></header>
+    <div class="user-guidance-grid">${hints.map((hint) => `<div class="user-guidance-item"><i>${escapeHtml(hint.icon)}</i><div><b>${escapeHtml(hint.label)}</b><p>${escapeHtml(hint.text)}</p></div></div>`).join("")}</div>
+    <footer><span>下一步</span><p>${escapeHtml(readyText)}</p></footer>
+  </div></div>`;
+}
+
 async function renderDetail(id) {
-  // 根据来源更新「返回」链接（从推荐进入 → 返回推荐；其余 → 返回大厅）
+  // 根据来源更新返回链接。
   const backEl = document.querySelector("#view-detail .back");
   if (backEl) {
     const ret = state.detailReturn || "#/hall";
     backEl.setAttribute("href", ret);
-    backEl.textContent = ret === "#/recommend" ? "← 返回推荐" : ret === "#/portfolio" ? "← 返回作战地图" : "← 返回大厅";
+    backEl.textContent = ret === "#/home" ? "← 返回首页"
+      : ret === "#/recommend" ? "← 返回推荐"
+        : ret === "#/portfolio" ? "← 返回作战地图" : "← 返回大厅";
   }
   let detail;
   try {
@@ -568,17 +997,18 @@ async function renderDetail(id) {
     return;
   }
   const c = detail.competition;
-  // recommendation_ready 同时包含“仍可报名”的时效门控；来源可信状态需要
-  // 单独展示，避免已截止但证据完整的赛事被误标为“关键证据待补充”。
-  const sourceReady = c.data_status === "verified"
-    && c.trusted_level === "A"
-    && c.official_source_status === "found";
   const kv = (k, v) =>
     `<div class="kv"><span class="k">${escapeHtml(k)}</span><span class="v">${v}</span></div>`;
 
   const grades = c.allowed_grades && c.allowed_grades.length ? c.allowed_grades.join("、") : "不限年级";
   const majors = c.allowed_majors && c.allowed_majors.length ? c.allowed_majors.join("、") : "不限专业";
-  const teamTxt = `${c.team_min ?? 1}—${c.team_max ?? 1} 人${c.team_required ? "（组队赛）" : "（个人或组队）"}`;
+  const teamMin = Number(c.team_min ?? 1);
+  const teamMax = Number(c.team_max ?? teamMin);
+  const teamTxt = teamMin === 1 && teamMax === 1
+    ? "个人参赛（1人）"
+    : c.team_required
+      ? `${teamMin}—${teamMax} 人（组队赛）`
+      : `${teamMin}—${teamMax} 人（个人或组队）`;
 
   // 适合谁参加（基于资格要求自动拼接）
   const whoItems = [];
@@ -602,7 +1032,7 @@ async function renderDetail(id) {
   if (c.result_announcement_date) keyTimeItems.push({ label: "成绩公布", date: String(c.result_announcement_date) });
   const keyTimeHtml = keyTimeItems.length
     ? keyTimeItems.map((t) => `<div class="kv"><span class="k">${escapeHtml(t.label)}</span><span class="v">${escapeHtml(t.date)}</span></div>`).join("")
-    : `<div class="muted">暂无时间安排</div>`;
+    : `<div class="muted">具体时间请查看赛事官网的最新赛程。</div>`;
 
   // 奖项设置（奖项 + 比例）
   let awardHtml = "";
@@ -627,7 +1057,6 @@ async function renderDetail(id) {
         <span class="tag cat">${CAT_LABEL[c.category] || c.category}</span>
         <span class="tag year">${c.document_year}</span>
         ${statusTag(c)}
-        ${(c.official_source_status === "not_found") ? `<span class="tag src-unverified">未找到官方来源</span>` : (sourceReady ? `<span class="tag src-verified">官网证据已确认</span>` : `<span class="tag src-unverified">关键证据待补充</span>`)}
       </div>
       </div>
       <div class="detail-actions">
@@ -635,18 +1064,6 @@ async function renderDetail(id) {
         ${detail.recommendation_ready ? `<button id="join-project" class="btn primary">加入我的项目</button>` : ""}
       </div>
     </div>
-
-    ${!sourceReady ? `<div class="verify-warn">
-      <strong>候选信息，不参与资格判断或匹配评分</strong>
-      <div>${escapeHtml((detail.readiness_reasons || []).join("；") || "关键证据待补充")}。请访问官网核对最新通知。</div>
-    </div>` : ""}
-
-    ${c.official_source_status === "not_found" ? `
-    <div class="verify-warn">
-      <strong>⚠ 未找到官方链接</strong>
-      <div>本赛事未能核实到官方来源，以上数据来源待确认，请勿当作定论。</div>
-      ${c.notes ? `<details><summary>查看核实说明</summary><div>${escapeHtml(c.notes)}</div></details>` : ""}
-    </div>` : ""}
 
     ${c.brief_description ? `<div class="section"><h3>比赛简介</h3><div class="card"><p class="brief-desc" style="line-height:1.7;color:#30343a;margin:0;white-space:pre-wrap;">${escapeHtml(c.brief_description)}</p></div></div>` : ""}
 
@@ -657,12 +1074,15 @@ async function renderDetail(id) {
       ${kv("年级要求", grades)}
       ${kv("专业要求", majors)}
       ${kv("团队规模", teamTxt)}
+      ${c.organizer ? kv("主办单位", c.organizer) : ""}
     </div></div>
 
     <div class="section"><h3>关键时间</h3><div class="card">
       ${keyTimeHtml}
       ${awardHtml}
     </div></div>
+
+    ${detailUserGuidanceMarkup(c, detail)}
 
     <div class="section"><h3>材料与能力</h3><div class="card">
       ${(c.required_materials && c.required_materials.length) ? kv("所需材料", c.required_materials.join("、")) : ""}
@@ -997,11 +1417,13 @@ function radarWatchRules(watch) {
   if (Array.isArray(explicit) && explicit.length) {
     return explicit.map((rule) => typeof rule === "string" ? rule : (rule.label || rule.name || rule.expression || JSON.stringify(rule)));
   }
+  const dynamic = String(watch.source_type || "").toLowerCase() === "dynamic";
+  const maintenance = watch.monitor_tier === "maintenance";
   return [
-    `${String(watch.source_type || "auto").toUpperCase()} 抓取`,
+    maintenance ? "资料维护层：低频来源追踪" : (dynamic ? "动态页面原始响应指纹" : `${String(watch.source_type || "auto").toUpperCase()} 抓取`),
     watch.css_selector ? `限定区域 ${watch.css_selector}` : "全文规范化比对",
     `每 ${watch.interval_hours || 24} 小时扫描`,
-    "关键字段必须人工审核",
+    maintenance ? "新赛季线索仅提交人工复核" : (dynamic ? "变化仅提交人工复核" : "关键字段必须人工审核"),
   ];
 }
 
@@ -1030,14 +1452,6 @@ function buildRadarInbox(status, alerts) {
   const dismissed = radarDismissedSet();
   const eventById = Object.fromEntries((status.events || []).map((event) => [String(event.event_id), event]));
   const items = [];
-  if (state.isAdmin) {
-    (status.events || []).filter((event) => event.status === "pending").forEach((event) => items.push({
-      key: `event-${event.event_id}`, kind: "review", event_id: event.event_id,
-      competition_id: event.competition_id, title: event.competition_name,
-      message: event.summary, severity: event.severity || "medium", created_at: event.detected_at,
-      source_url: event.source_url, event,
-    }));
-  }
   (alerts || []).filter((alert) => ["pending", "replan_requested"].includes(alert.status || "pending")).forEach((alert) => {
     const event = eventById[String(alert.event_id)] || {};
     items.push({
@@ -1110,7 +1524,108 @@ async function radarActOnAlert(alertId, action, key) {
   } catch (error) { toast(error.message); }
 }
 
+function radarOpenCompetition(competitionId) {
+  if (!competitionId) return;
+  state.detailReturn = "#/radar";
+  location.hash = `#/detail/${encodeURIComponent(competitionId)}`;
+}
+
+function opportunityFeedMarkup(item) {
+  const isImpact = item.kind === "impact";
+  const severityLabel = ({ high: "优先关注", medium: "需要留意", low: "官方更新" })[item.severity] || "官方更新";
+  const actionMarkup = isImpact
+    ? `<button class="btn primary radar-user-task" data-key="${escapeHtml(item.key)}">加入待办</button>${item.alert_id ? `<button class="btn ghost radar-user-accept" data-key="${escapeHtml(item.key)}" data-id="${item.alert_id}">我已了解</button>` : ""}`
+    : `<button class="btn primary radar-user-open" data-cid="${escapeHtml(item.competition_id)}">查看赛事</button>`;
+  return `<article class="opportunity-item severity-${escapeHtml(item.severity || "low")}">
+    <div class="opportunity-item-mark"><span>${escapeHtml(severityLabel)}</span></div>
+    <div class="opportunity-item-copy"><b>${escapeHtml(item.title || item.competition_id || "赛事官方更新")}</b><p>${escapeHtml(item.message || "官方来源有新的内容，请查看赛事详情确认下一步。")}</p><small><span>${isImpact ? "与你的参赛计划相关" : "来自官方通知"}</span><span>◷ ${escapeHtml(radarTime(item.created_at))}</span></small></div>
+    <div class="opportunity-item-actions">${actionMarkup}<button class="radar-user-dismiss" data-key="${escapeHtml(item.key)}">稍后处理</button></div>
+  </article>`;
+}
+
+function bindOpportunityControls(hasPriorityItems) {
+  $("#opportunity-explore").onclick = () => { location.hash = "#/hall"; };
+  $("#opportunity-hall").onclick = () => { location.hash = "#/hall"; };
+  $("#opportunity-portfolio").onclick = () => { location.hash = "#/portfolio"; };
+  $("#opportunity-projects").onclick = () => { location.hash = "#/projects"; };
+  $("#opportunity-primary").onclick = () => {
+    if (hasPriorityItems) $("#opportunity-feed").scrollIntoView({ behavior: "smooth", block: "start" });
+    else location.hash = "#/hall";
+  };
+  $("#opportunity-admin-link").onclick = () => { location.hash = "#/admin"; };
+  $$(".radar-user-task", $("#opportunity-feed")).forEach((button) => button.addEventListener("click", () => radarCreateTask(button.dataset.key)));
+  $$(".radar-user-accept", $("#opportunity-feed")).forEach((button) => button.addEventListener("click", () => radarActOnAlert(button.dataset.id, "accept", button.dataset.key)));
+  $$(".radar-user-open", $("#opportunity-feed")).forEach((button) => button.addEventListener("click", () => radarOpenCompetition(button.dataset.cid)));
+  $$(".radar-user-dismiss", $("#opportunity-feed")).forEach((button) => button.addEventListener("click", () => dismissRadarInbox(button.dataset.key)));
+}
+
 async function renderRadar() {
+  const requests = [apiGet("/api/radar/status")];
+  if (state.uid && state.consent) requests.push(apiGet(`/api/users/${encodeURIComponent(state.uid)}/alerts`));
+  if (state.uid && state.consent) requests.push(apiGet(`/api/users/${encodeURIComponent(state.uid)}/projects`));
+  const results = await Promise.allSettled(requests);
+  if (results[0].status !== "fulfilled") {
+    $("#opportunity-hero-kicker").textContent = "官方更新暂时无法同步";
+    $("#opportunity-hero-title").textContent = "稍后再来看看新的赛事变化";
+    $("#opportunity-hero-desc").textContent = "赛事资料不会被覆盖；恢复连接后会继续从最近的可信版本比对。";
+    $("#opportunity-feed").innerHTML = '<div class="opportunity-empty"><b>暂时无法加载机会提醒</b><span>你仍可以浏览赛事大厅，稍后再回来查看更新。</span></div>';
+    ["#opportunity-pending-count", "#opportunity-live-count", "#opportunity-project-count", "#opportunity-action-count", "#opportunity-coverage-count"].forEach((selector) => { $(selector).textContent = "—"; });
+    bindOpportunityControls(false);
+    return;
+  }
+
+  const data = results[0].value || {};
+  const alertsPayload = results[1] && results[1].status === "fulfilled" ? results[1].value : { alerts: [] };
+  if (results[2] && results[2].status === "fulfilled") state.projects = results[2].value || [];
+  state.radarStatus = data;
+  const watches = Array.isArray(data.watches) ? data.watches : [];
+  const events = Array.isArray(data.events) ? data.events : [];
+  const actionWatches = data.action_watch_count ?? watches.filter((watch) => watch.monitor_tier === "action").length;
+  const maintenanceWatches = data.maintenance_watch_count ?? watches.filter((watch) => watch.monitor_tier === "maintenance").length;
+  state.radarInboxItems = buildRadarInbox({ ...data, events }, alertsPayload.alerts || []);
+  const alertedEventIds = new Set(state.radarInboxItems.map((item) => String(item.event_id || "")));
+  const officialNotices = events
+    .filter((event) => event.status === "pending" && !alertedEventIds.has(String(event.event_id)))
+    .map((event) => ({
+      key: `notice-${event.event_id}`, kind: "notice", event_id: event.event_id,
+      competition_id: event.competition_id, title: event.competition_name,
+      message: "官方通知有新的变化，正在等待核验；你可以先查看赛事说明。",
+      severity: event.severity || "low", created_at: event.detected_at, event,
+    }));
+  const priorityItems = [...state.radarInboxItems, ...officialNotices]
+    .sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")));
+  const projectCount = state.uid ? state.projects.length : 0;
+
+  $("#opportunity-pending-count").textContent = priorityItems.length;
+  $("#opportunity-live-count").textContent = actionWatches;
+  $("#opportunity-project-count").textContent = projectCount;
+  $("#opportunity-action-count").textContent = actionWatches;
+  $("#opportunity-coverage-count").textContent = data.watch_count ?? watches.length;
+  $("#opportunity-admin-link").classList.toggle("hidden", !state.isAdmin);
+
+  if (priorityItems.length) {
+    $("#opportunity-hero-kicker").textContent = "有新的官方更新需要你留意";
+    $("#opportunity-hero-title").textContent = `现在有 ${priorityItems.length} 条事项值得先处理`;
+    $("#opportunity-hero-desc").textContent = "我们已经完成来源比对，并把与你的参赛计划有关的变化放在优先处理区。";
+    $("#opportunity-primary").textContent = "查看需要处理的事项";
+    $("#opportunity-feed-note").textContent = "按影响程度和更新时间排序";
+    $("#opportunity-pending-note").textContent = "可以加入待办，或稍后处理";
+    $("#opportunity-feed").innerHTML = priorityItems.slice(0, 6).map(opportunityFeedMarkup).join("");
+  } else {
+    $("#opportunity-hero-kicker").textContent = "当前没有紧急更新";
+    $("#opportunity-hero-title").textContent = "放心推进你的参赛计划";
+    $("#opportunity-hero-desc").textContent = `我们仍在关注 ${actionWatches} 场可行动赛事，并为 ${maintenanceWatches} 个历史来源持续寻找新赛季公告。`;
+    $("#opportunity-primary").textContent = "浏览仍可报名赛事";
+    $("#opportunity-feed-note").textContent = "新的官方变化会第一时间出现在这里";
+    $("#opportunity-pending-note").textContent = "目前没有需要你立即处理的事项";
+    $("#opportunity-feed").innerHTML = `<div class="opportunity-empty"><b>暂时没有需要处理的更新</b><span>你可以浏览赛事，或让系统为你生成一套机会组合。</span><div><button class="btn primary radar-user-explore">浏览赛事</button><button class="btn ghost radar-user-portfolio">查看机会组合</button></div></div>`;
+    $(".radar-user-explore", $("#opportunity-feed"))?.addEventListener("click", () => { location.hash = "#/hall"; });
+    $(".radar-user-portfolio", $("#opportunity-feed"))?.addEventListener("click", () => { location.hash = "#/portfolio"; });
+  }
+  bindOpportunityControls(priorityItems.length > 0);
+}
+
+async function renderRadarOperations() {
   $("#radar-run").classList.toggle("hidden", !state.isAdmin);
   $("#radar-demo").classList.toggle("hidden", !state.isAdmin);
   const requests = [apiGet("/api/radar/status")];
@@ -1130,14 +1645,15 @@ async function renderRadar() {
   const events = Array.isArray(data.events) ? data.events : [];
   const healthy = data.healthy_count ?? watches.filter((watch) => ["new", "ok"].includes(watch.last_status)).length;
   const pending = data.pending_count ?? events.filter((event) => event.status === "pending").length;
-  $("#radar-watch-count").textContent = data.watch_count ?? watches.length;
-  $("#radar-healthy-count").textContent = healthy;
-  $("#radar-pending-count").textContent = pending;
+  $("#radar-admin-watch-count").textContent = data.watch_count ?? watches.length;
+  $("#radar-admin-healthy-count").textContent = healthy;
+  $("#radar-admin-pending-count").textContent = pending;
 
   const healthScores = watches.map(radarHealthForWatch);
   const healthScore = healthScores.length ? Math.round(healthScores.reduce((sum, value) => sum + value, 0) / healthScores.length) : 0;
   const degraded = watches.filter((watch) => ["error", "stale"].includes(watch.last_status)).length;
   const stale = watches.filter((watch) => radarFreshnessHours(watch.last_checked_at) > Number(watch.interval_hours || 24) * 2).length;
+  $("#radar-admin-problem-count").textContent = degraded;
   const signal = healthScore >= 90 ? "NOMINAL" : healthScore >= 65 ? "DEGRADED" : "CRITICAL";
   $("#radar-signal").textContent = `SIGNAL ${signal}`;
   $("#radar-signal").dataset.signal = signal.toLowerCase();
@@ -1146,24 +1662,23 @@ async function renderRadar() {
     <div class="health-stream">${watches.slice(0, 6).map((watch) => `<span title="${escapeHtml(watch.competition_name || watch.competition_id)}"><i style="width:${radarHealthForWatch(watch)}%"></i><b>${escapeHtml(String(watch.competition_name || watch.competition_id).slice(0, 9))}</b><em>${radarHealthForWatch(watch)}</em></span>`).join("") || '<small>尚无健康样本</small>'}</div>`;
 
   $("#radar-rules").innerHTML = watches.slice(0, 5).map((watch, index) => `<article>
-    <header><span>${String(index + 1).padStart(2, "0")}</span><b>${escapeHtml(watch.competition_name || watch.competition_id)}</b><em>${watch.enabled === false ? "PAUSED" : "ACTIVE"}</em></header>
+    <header><span>${String(index + 1).padStart(2, "0")}</span><b>${escapeHtml(watch.competition_name || watch.competition_id)}</b><em>${watch.enabled === false ? "PAUSED" : (watch.monitor_tier === "maintenance" ? "MAINTAIN" : "ACTION")}</em></header>
     <div>${radarWatchRules(watch).map((rule) => `<span>${escapeHtml(rule)}</span>`).join("")}</div>
   </article>`).join("") || '<div class="command-empty">尚未配置监控规则</div>';
 
-  state.radarInboxItems = buildRadarInbox({ ...data, events }, alertsPayload.alerts || []);
-  $("#radar-inbox-count").textContent = `${state.radarInboxItems.length} NEW`;
-  $("#radar-inbox").innerHTML = state.radarInboxItems.slice(0, 6).map((item) => `<article class="inbox-item severity-${escapeHtml(item.severity)}">
-    <span class="inbox-signal">${item.kind === "review" ? "REVIEW" : "IMPACT"}</span>
-    <div><b>${escapeHtml(item.title || item.competition_id)}</b><p>${escapeHtml(item.message || "官方来源发生变化")}</p><small>${escapeHtml(radarTime(item.created_at))}</small></div>
-    <div class="inbox-actions">
-      ${item.kind === "review" && state.isAdmin ? `<button class="inbox-primary radar-inbox-review" data-key="${escapeHtml(item.key)}" data-id="${item.event_id}" data-action="approve">确认</button><button class="radar-inbox-review" data-key="${escapeHtml(item.key)}" data-id="${item.event_id}" data-action="reject">忽略</button>` : `<button class="inbox-primary radar-to-task" data-key="${escapeHtml(item.key)}">转任务</button>${item.alert_id ? `<button class="radar-alert-action" data-key="${escapeHtml(item.key)}" data-id="${item.alert_id}" data-action="accept">接受</button><button class="radar-alert-action" data-key="${escapeHtml(item.key)}" data-id="${item.alert_id}" data-action="replan">重规划</button>` : ""}<button class="radar-open-project" data-cid="${escapeHtml(item.competition_id)}">打开项目</button><button class="radar-dismiss" data-key="${escapeHtml(item.key)}">稍后</button>`}
-    </div>
-  </article>`).join("") || '<div class="command-empty"><b>情报已清空</b><span>新的规则变化会在这里等待处置</span></div>';
+  const reviewItems = events.filter((event) => event.status === "pending");
+  $("#radar-inbox-count").textContent = `${reviewItems.length} NEW`;
+  $("#radar-inbox").innerHTML = reviewItems.slice(0, 6).map((event) => `<article class="inbox-item severity-${escapeHtml(event.severity || "low")}">
+    <span class="inbox-signal">REVIEW</span>
+    <div><b>${escapeHtml(event.competition_name || event.competition_id)}</b><p>${escapeHtml(event.summary || "官方来源发生变化")}</p><small>${escapeHtml(radarTime(event.detected_at))}</small></div>
+    <div class="inbox-actions"><button class="inbox-primary radar-inbox-review" data-id="${event.event_id}" data-action="approve">确认</button><button class="radar-inbox-review" data-id="${event.event_id}" data-action="reject">忽略</button></div>
+  </article>`).join("") || '<div class="command-empty"><b>没有待审核变化</b><span>新的官方变化会在这里等待管理员确认。</span></div>';
 
   $("#radar-watches").innerHTML = watches.map((watch) => {
     const status = ({ new: "等待基线", ok: "正常", error: "暂时异常", stale: "连续失败" })[watch.last_status] || watch.last_status;
     const health = radarHealthForWatch(watch);
-    return `<div class="radar-watch"><span class="radar-dot status-${escapeHtml(watch.last_status)}"></span><div><b>${escapeHtml(watch.competition_name || watch.competition_id)}</b><a href="${escapeHtml(watch.source_url)}" target="_blank" rel="noopener">${escapeHtml(watch.source_url)}</a><span class="watch-tags"><i>${escapeHtml(String(watch.source_type || "auto").toUpperCase())}</i><i>${watch.interval_hours || 24}H</i>${watch.css_selector ? '<i>SELECTOR</i>' : ""}</span></div><small><b>${health}</b>${escapeHtml(status)} · ${escapeHtml(radarTime(watch.last_checked_at))}</small></div>`;
+    const tier = watch.monitor_tier === "maintenance" ? "维护" : "行动";
+    return `<div class="radar-watch"><span class="radar-dot status-${escapeHtml(watch.last_status)}"></span><div><b>${escapeHtml(watch.competition_name || watch.competition_id)}</b><a href="${escapeHtml(watch.source_url)}" target="_blank" rel="noopener">${escapeHtml(watch.source_url)}</a><span class="watch-tags"><i>${escapeHtml(tier)}</i><i>${escapeHtml(String(watch.source_type || "auto").toUpperCase())}</i><i>${watch.interval_hours || 24}H</i>${watch.css_selector ? '<i>SELECTOR</i>' : ""}</span></div><small><b>${health}</b>${escapeHtml(status)} · ${escapeHtml(radarTime(watch.last_checked_at))}</small></div>`;
   }).join("") || '<div class="empty-state"><b>尚未配置监控来源</b><span>管理员可从已核验赛事创建监控项。</span></div>';
 
   const filteredEvents = events.filter((event) => state.radarFilter === "all"
@@ -1202,7 +1717,7 @@ async function reviewRadarEvent(eventId, action) {
   try {
     await apiPost(`/api/admin/radar/events/${eventId}/review`, { action, note: "通过态势中心审核" }, adminHeaders());
     toast(action === "approve" ? "变化已确认并完成影响通知" : "变化已忽略");
-    renderRadar();
+    renderRadarOperations();
   } catch (e) { toast(e.message); }
 }
 
@@ -1210,7 +1725,7 @@ $("#radar-run").addEventListener("click", async () => {
   try {
     const result = await apiPost("/api/admin/radar/run", {}, adminHeaders());
     toast(`扫描完成：${result.checked} 个来源，发现 ${result.changed} 项变化`);
-    renderRadar();
+    renderRadarOperations();
   } catch (e) { toast(e.message); }
 });
 
@@ -1224,13 +1739,13 @@ $("#radar-demo").addEventListener("click", async () => {
     await apiPost("/api/admin/radar/run", { watch_ids: [watch.watch_id], demo_content_by_watch: { [watch.watch_id]: first } }, adminHeaders());
     await apiPost("/api/admin/radar/run", { watch_ids: [watch.watch_id], demo_content_by_watch: { [watch.watch_id]: changed } }, adminHeaders());
     toast("已生成一条待审核的截止日期变化");
-    renderRadar();
+    renderRadarOperations();
   } catch (e) { toast(e.message); }
 });
 
 $$('[data-radar-filter]').forEach((button) => button.addEventListener("click", () => {
   state.radarFilter = button.dataset.radarFilter || "all";
-  renderRadar();
+  renderRadarOperations();
 }));
 
 // ---------------------------------------------------------------------------
@@ -1396,12 +1911,18 @@ function renderProjectsCalendar(projects) {
   events.forEach((event) => { (eventMap[event.date] ||= []).push(event); });
   const days = Array.from({ length: 42 }, (_, index) => { const date = new Date(start); date.setDate(start.getDate() + index); return date; });
   const today = isoDay(new Date());
+  const monthEvents = events.filter((event) => {
+    const date = projectDate(event.date);
+    return date.getFullYear() === cursor.getFullYear() && date.getMonth() === cursor.getMonth();
+  });
+  const deadlineCount = monthEvents.filter((event) => String(event.kind).includes("official")).length;
+  const activeDayCount = new Set(monthEvents.map((event) => event.date)).size;
   return `<section class="execution-calendar">
-    <header><button type="button" data-calendar-move="-1" aria-label="上个月">←</button><div><span>EXECUTION CALENDAR</span><h3>${cursor.getFullYear()} 年 ${cursor.getMonth() + 1} 月</h3></div><button type="button" data-calendar-move="1" aria-label="下个月">→</button></header>
+    <header class="calendar-head"><div class="calendar-nav"><button type="button" data-calendar-move="-1" aria-label="上个月">←</button></div><div class="calendar-title"><span>EXECUTION CALENDAR</span><h3>${cursor.getFullYear()} 年 ${cursor.getMonth() + 1} 月</h3></div><div class="calendar-overview"><span><b>${monthEvents.length}</b> 个本月节点</span><span><b>${activeDayCount}</b> 个排期日</span><span><b>${deadlineCount}</b> 个官方截止</span></div><div class="calendar-nav"><button type="button" data-calendar-move="1" aria-label="下个月">→</button></div></header>
     <div class="calendar-week"><span>周一</span><span>周二</span><span>周三</span><span>周四</span><span>周五</span><span>周六</span><span>周日</span></div>
     <div class="calendar-grid">${days.map((date) => {
       const key = isoDay(date); const dayEvents = eventMap[key] || [];
-      return `<article class="calendar-day ${date.getMonth() !== cursor.getMonth() ? "is-outside" : ""} ${key === today ? "is-today" : ""}"><time>${date.getDate()}</time><div>${dayEvents.slice(0, 4).map((event) => `<span class="calendar-event event-${escapeHtml(event.kind.replace(" ", "-"))}" title="${escapeHtml(event.project.competition_name)} · ${escapeHtml(event.title)}"><i></i><b>${escapeHtml(event.title)}</b><small>${escapeHtml(event.project.competition_name)}</small></span>`).join("")}${dayEvents.length > 4 ? `<em>+${dayEvents.length - 4} 项</em>` : ""}</div></article>`;
+      return `<article class="calendar-day ${date.getMonth() !== cursor.getMonth() ? "is-outside" : ""} ${key === today ? "is-today" : ""} ${dayEvents.length ? "has-events" : ""}" aria-label="${date.getFullYear()} 年 ${date.getMonth() + 1} 月 ${date.getDate()} 日${dayEvents.length ? `，${dayEvents.length} 个节点` : ""}"><time>${date.getDate()}</time><div>${dayEvents.slice(0, 3).map((event) => `<span class="calendar-event event-${escapeHtml(event.kind.replace(" ", "-"))}" title="${escapeHtml(event.project.competition_name)} · ${escapeHtml(event.title)}"><i></i><b>${escapeHtml(event.title)}</b><small>${escapeHtml(event.project.competition_name)}</small></span>`).join("")}${dayEvents.length > 3 ? `<em>+${dayEvents.length - 3} 项</em>` : ""}</div></article>`;
     }).join("")}</div>
   </section>`;
 }
@@ -1414,20 +1935,21 @@ function renderProjectsTimeline(projects) {
   const span = Math.max(1, end - start);
   const position = (date) => Math.max(1, Math.min(99, ((projectDate(date) - start) / span) * 100));
   return `<section class="execution-timeline">
-    <header><div><span>MASTER TIMELINE</span><h3>跨赛事执行时间线</h3><small>点击节点查看完整任务</small></div><div><div class="timeline-legend" aria-label="时间线节点图例"><span class="legend-done"><i></i>已完成</span><span class="legend-task"><i></i>待办任务</span><span class="legend-official"><i></i>报名/官方节点</span><span class="legend-submit"><i></i>提交截止</span><span class="legend-material"><i></i>材料准备</span></div><b>${escapeHtml(isoDay(start))}</b><i></i><b>${escapeHtml(isoDay(end))}</b></div></header>
+    <header><div><span>MASTER TIMELINE</span><h3>跨赛事执行时间线</h3><small>节点按时间编号；点击编号查看完整任务</small></div><div><div class="timeline-legend" aria-label="时间线节点图例"><span class="legend-done"><i></i>完成</span><span class="legend-task"><i></i>待办</span><span class="legend-official"><i></i>官方</span><span class="legend-submit"><i></i>截止</span><span class="legend-material"><i></i>材料</span></div><b>${escapeHtml(isoDay(start))}</b><i></i><b>${escapeHtml(isoDay(end))}</b></div></header>
     <div class="timeline-scale">${[0, .25, .5, .75, 1].map((ratio) => { const date = new Date(start.getTime() + span * ratio); return `<span style="left:${ratio * 100}%">${date.getMonth() + 1}/${date.getDate()}</span>`; }).join("")}</div>
     <div class="timeline-lanes">${projects.map((project) => {
       const routeEvents = events.filter((event) => event.project.project_id === project.project_id);
       const positioned = routeEvents.map((event) => ({ ...event, position: position(event.date) })).sort((a, b) => a.position - b.position);
       const recentPositions = [];
+      const stackOffsets = [0, 1, -1, 2, -2];
       positioned.forEach((event) => {
         while (recentPositions.length && event.position - recentPositions[0] > 13) recentPositions.shift();
-        event.stack = recentPositions.length % 4;
+        event.stack = stackOffsets[recentPositions.length % stackOffsets.length];
         recentPositions.push(event.position);
       });
       const blockers = (project.items || []).filter((item) => projectDependencyInfo(project, item).blocked);
-      return `<article class="timeline-lane"><div class="timeline-label"><span>${escapeHtml(project.document_year)}</span><b>${escapeHtml(project.competition_name)}</b>${blockers.length ? `<em>${blockers.length} BLOCKED</em>` : ""}</div><div class="timeline-track-line">
-        ${positioned.map((event) => `<button type="button" class="timeline-point point-${escapeHtml(event.kind.replace(" ", "-"))} ${event.item && event.item.status === "done" ? "is-done" : ""}" style="left:${event.position}%;--stack:${event.stack}" title="${escapeHtml(event.date)} · ${escapeHtml(event.title)}"><i></i><span>${escapeHtml(event.title)}</span><small>${escapeHtml(event.date)}</small></button>`).join("") || '<span class="timeline-no-date">暂无节点</span>'}
+      return `<article class="timeline-lane"><div class="timeline-label"><span>${escapeHtml(project.document_year)}</span><b>${escapeHtml(project.competition_name)}</b><small class="timeline-node-count">${positioned.length} 个执行节点</small>${blockers.length ? `<em>${blockers.length} BLOCKED</em>` : ""}</div><div class="timeline-track-line">
+        ${positioned.map((event, index) => `<button type="button" class="timeline-point point-${escapeHtml(event.kind.replace(" ", "-"))} ${event.item && event.item.status === "done" ? "is-done" : ""}" style="left:${event.position}%;--stack:${event.stack}" title="${escapeHtml(event.date)} · ${escapeHtml(event.title)}" aria-label="节点 ${index + 1}：${escapeHtml(event.title)}，${escapeHtml(event.date)}"><i>${String(index + 1).padStart(2, "0")}</i><span><b>${String(index + 1).padStart(2, "0")}</b> ${escapeHtml(event.title)}<small>${escapeHtml(event.date)} · ${escapeHtml(event.project.competition_name)}</small></span></button>`).join("") || '<span class="timeline-no-date">暂无节点</span>'}
       </div></article>`;
     }).join("")}</div>
   </section>`;
@@ -1554,14 +2076,55 @@ async function renderAgentView() {
     sel.innerHTML = opts.join("");
     sel.dataset.filled = "1";
   }
+  const seedPrompt = sessionStorage.getItem("cia_agent_seed_prompt");
+  const question = $("#agent-q");
+  if (seedPrompt && question) {
+    question.value = seedPrompt;
+    sessionStorage.removeItem("cia_agent_seed_prompt");
+    question.dispatchEvent(new Event("input", { bubbles: true }));
+    requestAnimationFrame(() => question.focus());
+  }
 }
 
-// 将答案渲染为轻量 Markdown（**加粗**）的结构化文本
+function renderAgentInline(text) {
+  return escapeHtml(text || "")
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(/\s*\[\d+\]/g, "");
+}
+
+// 将回答整理成真正可读的段落与列表，避免把整段内容堆成一块文本。
 function renderAnswerWithCites(text) {
-  let html = escapeHtml(text || "");
-  html = html.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
-  html = html.replace(/\s*\[\d+\]/g, "");
-  return html;
+  const lines = String(text || "").replace(/\r/g, "").split("\n");
+  const html = [];
+  let listType = "";
+  const closeList = () => {
+    if (!listType) return;
+    html.push(`</${listType}>`);
+    listType = "";
+  };
+  lines.forEach((raw) => {
+    const line = raw.trim();
+    if (!line) { closeList(); return; }
+    const numbered = line.match(/^\d+[.、]\s*(.+)$/);
+    const bullet = line.match(/^[·•*-]\s*(.+)$/);
+    if (numbered || bullet) {
+      const nextType = numbered ? "ol" : "ul";
+      if (listType !== nextType) {
+        closeList();
+        listType = nextType;
+        html.push(`<${nextType}>`);
+      }
+      html.push(`<li>${renderAgentInline((numbered || bullet)[1])}</li>`);
+      return;
+    }
+    closeList();
+    const heading = line.match(/^#{1,3}\s+(.+)$/);
+    if (heading) html.push(`<h4>${renderAgentInline(heading[1])}</h4>`);
+    else html.push(`<p>${renderAgentInline(line)}</p>`);
+  });
+  closeList();
+  return html.join("");
 }
 
 function cleanAgentAnswer(text) {
@@ -1696,10 +2259,10 @@ function renderDecisionTheater(trace, payload = {}) {
   const fallbackCount = steps.filter((step) => step.status === "fallback" || step.status === "blocked").length;
   const runId = payload.run_id || payload.trace_id || payload.request_id || "";
   const statusIcon = { success: "✓", running: "↻", warning: "!", fallback: "↘", blocked: "×" };
-  return `<details class="decision-theater" open>
+  return `<details class="decision-theater">
     <summary>
-      <div><span class="theater-kicker">DECISION RUN THEATER</span><b>决策运行剧场</b><small>结构化业务轨迹 · 不展示模型隐式推理</small></div>
-      <span class="theater-toggle">展开 / 收起</span>
+      <div><span class="theater-kicker">ANSWER BASIS</span><b>查看回答依据</b><small>${steps.length} 个处理步骤 · ${evidenceTotal || (payload.citations || []).length || 0} 条依据</small></div>
+      <span class="theater-toggle">展开详情</span>
     </summary>
     <div class="theater-dashboard">
       <div class="theater-metrics">
@@ -1737,7 +2300,7 @@ function bindDecisionTheater(root) {
 
 const INTENT_LABEL = {
   qa: "规则问答", detail: "赛事介绍", recommend: "个性化推荐",
-  team: "组队文案", unknown: "需要补充信息",
+  team: "组队文案", teammate: "队友匹配", chat: "参赛建议", unknown: "需要补充信息",
 };
 
 async function agentAsk() {
@@ -1777,7 +2340,7 @@ async function agentAsk() {
   if (uid) url += `&user_id=${encodeURIComponent(uid)}`;
   if (cid) url += `&competition_id=${encodeURIComponent(cid)}`;
   const mdlEl = document.getElementById("agent-model");
-  const mdl = mdlEl && mdlEl.value ? mdlEl.value : "";
+  const mdl = mdlEl && !mdlEl.disabled && mdlEl.value ? mdlEl.value : "";
   if (mdl) url += `&model=${encodeURIComponent(mdl)}`;
 
   let data;
@@ -1797,14 +2360,14 @@ async function agentAsk() {
   const intentTag = `<span class="intent-tag">${INTENT_LABEL[data.intent] || data.intent} · ${escapeHtml(data.resolved_name || "自动识别赛事")}</span>`;
 
   const traceHtml = renderDecisionTheater(data.trace, data);
-  const agentTaskHtml = (uid && data.resolved_competition)
+  const agentTaskHtml = (uid && data.resolved_competition && ["recommend", "chat", "team"].includes(data.intent))
     ? `<div class="agent-action-strip"><span>把建议落到执行闭环</span><button type="button" class="btn primary agent-create-task" data-cid="${escapeHtml(data.resolved_competition)}" data-cite="${citeList[0] ? escapeHtml(citeList[0].citation_id || "") : ""}">一键转为我的任务</button></div>`
     : "";
   // 联网信息补充（与官方 [n] 引用区隔，明确标注仅供参考）
   const webResults = data.web_results || [];
   const webHtml = webResults.length
-    ? `<div class="web-results">
-        <div class="web-results-head">🌐 联网信息补充<span>仅供参考，请以官方 / 官网最新通知为准</span></div>
+    ? `<details class="web-results">
+        <summary class="web-results-head">🌐 查看联网补充<span>仅供参考，请以官方 / 官网最新通知为准</span></summary>
         <ul class="web-list">
           ${webResults.slice(0, 5).map((r) => `
             <li class="web-item">
@@ -1813,7 +2376,7 @@ async function agentAsk() {
               <div class="web-url muted">${escapeHtml(r.url || "")}</div>
             </li>`).join("")}
         </ul>
-      </div>`
+      </details>`
     : "";
   // 暂存本轮队友数据，供「邀 TA 组队」按钮取用
   currentTeammates = data.teammate_matches || [];
@@ -1837,7 +2400,7 @@ async function agentAsk() {
   const elapsed = ((performance.now() - startTime) / 1000).toFixed(2);
   const rawAnswer = cleanAgentAnswer(data.answer);
   const answerHtml = renderAnswerWithCites(rawAnswer);
-  const isLong = rawAnswer.length > 400;
+  const isLong = rawAnswer.length > 1200;
   const bodyClass = isLong ? "agent-answer-body is-collapsed" : "agent-answer-body";
   const expandBtn = isLong ? '<button type="button" class="agent-expand-btn" aria-expanded="false">显示更多 <span class="chevron" aria-hidden="true">▼</span></button>' : "";
 
@@ -1886,7 +2449,11 @@ async function agentAsk() {
     btn.addEventListener("click", () => openInviteModal(Number(btn.dataset.idx)));
   });
 
-  log.scrollTop = log.scrollHeight;
+  requestAnimationFrame(() => {
+    const logRect = log.getBoundingClientRect();
+    const rowRect = aRow.getBoundingClientRect();
+    log.scrollTo({ top: Math.max(0, log.scrollTop + rowRect.top - logRect.top - 18), behavior: "smooth" });
+  });
   sendBtn.disabled = false;
   sendBtn.classList.remove("is-loading");
   sendBtn.textContent = "↑";
@@ -1935,18 +2502,22 @@ async function refreshLlmStatus() {
     const r = await apiGet("/api/agent/llm-status");
     const on = !!r.enabled;
     el.dataset.on = on ? "1" : "0";
-    const mdl = (document.getElementById("agent-model") || {}).value || "";
+    const modelSelect = document.getElementById("agent-model");
+    const modelWrap = modelSelect && modelSelect.closest(".model-select");
+    if (modelSelect) modelSelect.disabled = !on;
+    if (modelWrap) modelWrap.classList.toggle("is-disabled", !on);
+    const mdl = (modelSelect || {}).value || "";
     txt.textContent = on
-      ? `智能润色已连接 · ${mdl || r.model || "LLM"}`
-      : "未启用智能润色（标准答复）";
+      ? `智能模型 · ${mdl || r.model || "LLM"}`
+      : "本地知识库模式";
     // 联网搜索状态
     if (webEl) {
       const won = !!r.web_search_enabled;
       webEl.dataset.on = won ? "1" : "0";
       webEl.classList.toggle("web-off", !won);
       webEl.querySelector(".agent-llm-text").textContent = won
-        ? `联网搜索已开启 · ${r.web_search_provider || "web"}`
-        : "联网搜索关闭（纯本地）";
+        ? "联网补充已开启"
+        : "仅使用本地资料";
     }
   } catch (e) {
     el.dataset.on = "0";
@@ -2106,6 +2677,7 @@ function renderAdminView() {
   $("#adm-token").value = sessionStorage.getItem("cia_admin_token") || "";
   renderAdminEvidence();
   setAdminStep(1);
+  renderRadarOperations();
 }
 
 function adminHeaders() {
@@ -2324,6 +2896,8 @@ async function doLogin(username, password) {
   state.loggedIn = true;
   state.isTest = !!data.is_test;
   state.profile = null;
+  state.hallMajor = null;
+  state.hallMajorLoaded = false;
   state.userMeta = {
     display_name: data.display_name || data.username,
     persona: data.persona || "",
@@ -2349,7 +2923,7 @@ async function doLogin(username, password) {
     state.consent = localStorage.getItem("cia_consent_" + data.username) === "1";
   }
   if (state.consent) localStorage.setItem("cia_consent_" + data.username, "1");
-  if (hasProfile && state.consent) location.hash = "#/recommend";
+  if (hasProfile && state.consent) location.hash = "#/home";
   else location.hash = "#/profile";
   router();
 }
@@ -2384,43 +2958,6 @@ $("#login-form").addEventListener("submit", (e) => {
   doLogin(u, pw);
 });
 
-// 评审 / 试用一键体验：直接用内置演示账号登录，免去手工输入。
-// 该账号为数据库种子账号（与 README、参赛材料公布的测试账号一致），非任何真实用户。
-$("#demo-quick-login").addEventListener("click", async () => {
-  const msg = $("#login-msg");
-  const btn = $("#demo-quick-login");
-  msg.textContent = "正在以演示账号进入…";
-  msg.className = "msg";
-  btn.disabled = true;
-  try {
-    await doLogin("test", "test123");
-  } catch (error) {
-    msg.textContent = "演示账号进入失败：" + error.message;
-    msg.className = "msg err";
-  } finally {
-    btn.disabled = false;
-  }
-});
-
-// 仅本地开发：后端开关启用时返回临时管理员令牌。部署构建不设置开关，按钮会提示不可用。
-$("#dev-admin-login").addEventListener("click", async () => {
-  const msg = $("#login-msg");
-  msg.textContent = "正在进入本地管理员调试模式…";
-  msg.className = "msg";
-  try {
-    const data = await apiPost("/api/auth/dev-admin-login", {});
-    await doLogin(data.username, "test123");
-    state.isAdmin = true;
-    localStorage.setItem("cia_is_admin", "1");
-    sessionStorage.setItem("cia_admin_token", data.admin_token);
-    revealAdminNav();
-    toast("本地管理员调试模式已开启");
-    location.hash = "#/admin";
-  } catch (error) {
-    msg.textContent = "本地管理员入口未启用：" + error.message;
-    msg.className = "msg err";
-  }
-});
 $("#register-form").addEventListener("submit", (e) => {
   e.preventDefault();
   const u = ($("#reg-username").value || "").trim();
@@ -2469,7 +3006,21 @@ async function renderTestPanel() {
     $("#test-types").innerHTML = `<div class="muted">加载学生类型失败</div>`;
     return;
   }
-  $("#test-types").innerHTML = types.map((t) => {
+  const seenLabels = new Map();
+  const visibleTypes = [];
+  for (const t of types) {
+    const rawLabel = String(t.display_name || t.user_id || "").trim();
+    const canonicalLabel = rawLabel.replace(/^测试[·•．.\s]*/, "").trim();
+    if (!canonicalLabel) continue;
+    const isTempLabel = /^测试[·•．.]/.test(rawLabel);
+    const previous = seenLabels.get(canonicalLabel);
+    if (!previous || (previous.isTempLabel && !isTempLabel)) {
+      seenLabels.set(canonicalLabel, { item: t, isTempLabel });
+    }
+  }
+  for (const { item } of seenLabels.values()) visibleTypes.push(item);
+
+  $("#test-types").innerHTML = visibleTypes.map((t) => {
     const skills = (t.skills || []).slice(0, 4).map((s) => `<span class="uc-skill">${escapeHtml(s)}</span>`).join("");
     const team = t.expected_team_size > 1 ? `${t.expected_team_size}人队` : "个人赛";
     const active = ((t.major || "") + "|" + (t.grade || "")) === currentKey ? " active" : "";
@@ -2521,11 +3072,18 @@ async function applyStudentType(uid) {
     state.consent = true;
     localStorage.setItem("cia_consent_" + state.uid, "1");
     state.profile = payload;
+    state.hallMajor = payload.major || null;
+    state.hallMajorLoaded = true;
+    state.userMeta = {
+      ...(state.userMeta || {}),
+      display_name: payload.display_name,
+      persona: payload.persona,
+      avatar: payload.avatar,
+    };
+    localStorage.setItem("cia_user_meta", JSON.stringify(state.userMeta));
     updateUserChip();
     toast("已切换为：" + (t.display_name || uid));
-    const h = location.hash;
-    if (h === "#/profile" || h === "#/recommend") router();
-    else location.hash = "#/recommend";
+    router();
   } catch (e) {
     toast("切换失败：" + e.message);
   }
@@ -2546,6 +3104,9 @@ function logout() {
   state.isTest = false;
   state.isAdmin = false;
   state.profile = null;
+  state.hallMajor = null;
+  state.hallMajorLoaded = false;
+  state.hallSearch = "";
   revealAdminNav();
   updateUserChip();
   openLogin();
