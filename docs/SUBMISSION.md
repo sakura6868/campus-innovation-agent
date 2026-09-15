@@ -14,7 +14,7 @@
 | 1 | **可运行作品**（含测试账号/演示模式） | 本地见下方「快速开始」 | 登录页点「一键体验」或填 `test / test123` 即可零输入进入 |
 | 2 | **技术文档** | `docs/ARCHITECTURE.md`（架构）、`docs/RAG_ARCHITECTURE.md`（检索）、`docs/DEPLOYMENT.md`（运行）、`参赛作品说明.md`（根目录主文档）、`docs/INNOVATION_HIGHLIGHTS.md`（创新点） | 直接阅读 |
 | 3 | **README** | `README.md`（环境/依赖/启动/测试/FAQ） | 直接阅读 |
-| 4 | **用例集（≥10 条）** | `docs/TEST_CASES.md`（46 条正常/异常/边界/安全用例）、`scripts/challenge_probe.py`（15 条现场挑战用例）、`docs/TRIAL_FORM.md`（真人试用表） | 见第三节复现命令 |
+| 4 | **用例集（≥10 条）** | `docs/TEST_CASES.md`（44 条正常/异常/边界/安全用例）、`scripts/challenge_probe.py`（15 条现场挑战用例）、`docs/TRIAL_FORM.md`（真人试用表） | 见第三节复现命令 |
 | 5 | **演示视频（3—5 分钟）** | `demo/campus-agent-demo.mp4` + 脚本 `docs/DEMO_VIDEO_SCRIPT.md` | 播放；脚本按决赛 6 分钟演示结构撰写 |
 | 6 | **合规说明** | `docs/COMPLIANCE.md`（数据来源/隐私/脱敏/权限） | 直接阅读 |
 
@@ -111,7 +111,7 @@ campus-innovation-agent/
 │  ├─ INNOVATION_HIGHLIGHTS.md # 五大核心创新
 │  ├─ DEPLOYMENT.md           # 部署
 │  ├─ COMPLIANCE.md           # 合规说明（数据/隐私/脱敏）
-│  ├─ TEST_CASES.md           # 46 条正式用例集
+│  ├─ TEST_CASES.md           # 44 条正式用例集
 │  ├─ CHALLENGE_PROBE.md      # 现场挑战压测报告（15/15 安全）
 │  ├─ PERFORMANCE.md          # 并发稳定性（210/210）
 │  ├─ THIRD_PARTY_NOTICES.md  # 第三方依赖清单
