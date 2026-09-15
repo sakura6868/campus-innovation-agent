@@ -1,0 +1,426 @@
+{
+  "reviewed_at": "2026-07-30",
+  "corrections": {
+    "accounting_2026": {
+      "competition_name": "2026年全国大学生数智化业财融合竞赛",
+      "organizer": "中国商业会计学会",
+      "eligible_students": [
+        "本科生",
+        "研究生"
+      ],
+      "allowed_grades": null,
+      "allowed_majors": null,
+      "team_required": true,
+      "team_min": 1,
+      "team_max": null,
+      "registration_deadline": null,
+      "submission_deadline": null,
+      "competition_start_date": null,
+      "competition_end_date": null,
+      "result_announcement_date": null,
+      "award_settings": "奖项与赛程以当届组委会通知为准。",
+      "award_distribution": [],
+      "brief_description": "由中国商业会计学会主办的全国大学生数智化业财融合竞赛，聚焦数智化财务与业财融合能力。原“全国大学生会计技能竞赛”名称对应的公开全国赛已停留在往届，故纠正为 2026 年官网已发布通知的现行赛事。",
+      "required_materials": [
+        "以当届组委会通知为准"
+      ],
+      "evaluation_dimensions": [
+        "以当届竞赛规程为准"
+      ],
+      "required_skills": [
+        "财务分析",
+        "业财融合",
+        "Excel"
+      ],
+      "official_source_url": "https://yyxbk.99onez.com/notice/",
+      "source_acquired_date": "2026-07-30",
+      "trusted_level": "B",
+      "data_status": "verified",
+      "official_source_status": "found",
+      "last_verified_at": "2026-07-30",
+      "doc_version": "2026_v2",
+      "evidence": [
+        {
+          "field": "competition_name",
+          "page": null,
+          "source_text": "中商学字[2026]4号-关于举办2026年全国大学生数智化业财融合竞赛的通知。",
+          "document_name": "全国大学生数智化业财融合大赛官网通知列表",
+          "source_url": "https://yyxbk.99onez.com/notice/",
+          "acquired_date": "2026-07-30",
+          "last_verified_at": "2026-07-30",
+          "trusted_level": "A"
+        },
+        {
+          "field": "official_source_url",
+          "page": null,
+          "source_text": "官网公开 2026 年竞赛通知与竞赛规程，发布时间为 2026 年 3 月 9 日。",
+          "document_name": "全国大学生数智化业财融合大赛官网通知列表",
+          "source_url": "https://yyxbk.99onez.com/notice/",
+          "acquired_date": "2026-07-30",
+          "last_verified_at": "2026-07-30",
+          "trusted_level": "A"
+        }
+      ],
+      "notes": "【2026-07-30 纠名】原“全国大学生会计技能竞赛”未找到 2026 年独立官方赛程；官网显示该系列近年已转为“全国大学生数智化业财融合竞赛”，并发布 2026 年通知及规程。各赛程节点以当届规程为准。"
+    },
+    "spatial_data_2026": {
+      "competition_name": "第六届“苍穹杯”全国大学生空间信息技术大赛",
+      "organizer": "中国测绘学会、苍穹数码技术股份有限公司",
+      "eligible_students": [
+        "本科生",
+        "研究生"
+      ],
+      "allowed_grades": null,
+      "allowed_majors": [
+        "地理信息科学",
+        "测绘工程",
+        "遥感科学与技术",
+        "地理科学",
+        "计算机科学与技术"
+      ],
+      "team_required": true,
+      "team_min": 1,
+      "team_max": 4,
+      "registration_deadline": "2026-05-31",
+      "submission_deadline": null,
+      "competition_start_date": null,
+      "competition_end_date": null,
+      "result_announcement_date": null,
+      "award_settings": "各组奖项与评审安排以大赛平台当届通知为准。",
+      "award_distribution": [],
+      "brief_description": "面向空间信息技术应用的全国大学生赛事，设地图制图、地理设计、论文和应用开发组。原“空间数据分析竞赛”并无独立官方名称，现纠正为 2026 年通知明确列出的“苍穹杯”赛事。",
+      "required_materials": [
+        "按赛组要求提交参赛作品"
+      ],
+      "evaluation_dimensions": [
+        "空间信息技术应用",
+        "创新性",
+        "作品完成度"
+      ],
+      "required_skills": [
+        "GIS",
+        "空间数据分析",
+        "数据可视化"
+      ],
+      "official_source_url": "http://support.kqgeo.com:18081/static/KQcup/#/home",
+      "source_acquired_date": "2026-07-30",
+      "trusted_level": "B",
+      "data_status": "verified",
+      "official_source_status": "found",
+      "last_verified_at": "2026-07-30",
+      "doc_version": "2026_v2",
+      "evidence": [
+        {
+          "field": "competition_name",
+          "page": null,
+          "source_text": "2026年第六届“苍穹杯”全国大学生空间信息技术大赛。",
+          "document_name": "吉林大学关于组织参加2026年GIS系列竞赛的通知",
+          "source_url": "https://gest.jlu.edu.cn/info/1037/10775.htm",
+          "acquired_date": "2026-07-30",
+          "last_verified_at": "2026-07-30",
+          "trusted_level": "A"
+        },
+        {
+          "field": "registration_deadline",
+          "page": null,
+          "source_text": "报名截止时间：2026年5月31日24:00。",
+          "document_name": "吉林大学关于组织参加2026年GIS系列竞赛的通知",
+          "source_url": "https://gest.jlu.edu.cn/info/1037/10775.htm",
+          "acquired_date": "2026-07-30",
+          "last_verified_at": "2026-07-30",
+          "trusted_level": "A"
+        },
+        {
+          "field": "team_max",
+          "page": null,
+          "source_text": "各赛事的各赛组均可以个人或团队形式参赛，每组限1-4名同学。",
+          "document_name": "吉林大学关于组织参加2026年GIS系列竞赛的通知",
+          "source_url": "https://gest.jlu.edu.cn/info/1037/10775.htm",
+          "acquired_date": "2026-07-30",
+          "last_verified_at": "2026-07-30",
+          "trusted_level": "A"
+        }
+      ],
+      "notes": "【2026-07-30 纠名】原“全国大学生空间数据分析竞赛”没有独立可核实的当前官方名称；依据 2026 年 GIS 系列竞赛通知，纠正为第六届“苍穹杯”全国大学生空间信息技术大赛。"
+    },
+    "mcm_icm_2026": {
+      "registration_deadline": "2026-01-29",
+      "competition_start_date": "2026-01-29",
+      "competition_end_date": "2026-02-02",
+      "result_announcement_date": "2026-05-08",
+      "official_source_url": "https://www.contest.comap.com/undergraduate/contests/mcm/instructions.html",
+      "source_acquired_date": "2026-07-30",
+      "trusted_level": "B",
+      "data_status": "unverified",
+      "official_source_status": "found",
+      "last_verified_at": "2026-07-30",
+      "doc_version": "2026_v2",
+      "notes": "【2026-07-30 赛程补正】COMAP 官方赛事规则页显示 MCM/ICM 按年度在 1 月底至 2 月初举行；经 2026 赛季官方规则与结果页核对，本届报名、比赛和结果节点已结束。该条保留为历史赛季查询，不再进入当前推荐或自动雷达轮询。"
+    },
+    "openharmony_2026": {
+      "competition_name": "2026开源鸿蒙大学生创新大赛（校园与创新应用赛道）",
+      "organizer": "开源鸿蒙项目群技术指导委员会（主办）；AtomGit（承办）",
+      "eligible_students": [
+        "本科生",
+        "研究生"
+      ],
+      "allowed_grades": null,
+      "allowed_majors": null,
+      "team_required": true,
+      "team_min": 1,
+      "team_max": 3,
+      "registration_deadline": "2026-09-15",
+      "submission_deadline": "2026-10-31",
+      "competition_start_date": null,
+      "competition_end_date": "2026-11-30",
+      "result_announcement_date": null,
+      "award_settings": "一等奖 5 万元（2 队）、二等奖 3 万元（3 队）、三等奖 2 万元（5 队）、优秀奖 1 万元（10 队），另设特别创新奖 5 万元（1 队）。",
+      "award_distribution": [],
+      "brief_description": "2026开源鸿蒙大学生创新大赛设系统与技术创新、鸿蒙 PC 专项积分、校园与创新应用三个赛道；本条对应面向高校在校学生的校园与创新应用赛道，鼓励完成开源鸿蒙创新应用、校级/院级官方应用上架或 OpenHarmony 设备应用兼容认证。",
+      "required_materials": [
+        "参赛作品简介",
+        "项目文档",
+        "项目视频或 PPT",
+        "其他可选辅助材料"
+      ],
+      "evaluation_dimensions": [
+        "商业价值（40 分）",
+        "创新性（30 分）",
+        "完成度（20 分）",
+        "应用规范性（10 分）"
+      ],
+      "official_source_url": "https://competition.gitcode.com/competition/2074797483593228289/intro",
+      "source_acquired_date": "2026-07-30",
+      "trusted_level": "A",
+      "data_status": "verified",
+      "official_source_status": "found",
+      "last_verified_at": "2026-07-30",
+      "doc_version": "2026_v2",
+      "evidence": [
+        {
+          "field": "competition_name",
+          "page": null,
+          "source_text": "2026开源鸿蒙大学生创新大赛 · 赛道三：校园与创新应用赛道。",
+          "document_name": "AtomGit 官方赛事介绍页",
+          "source_url": "https://competition.gitcode.com/competition/2074797483593228289/intro",
+          "acquired_date": "2026-07-30",
+          "last_verified_at": "2026-07-30",
+          "trusted_level": "A"
+        },
+        {
+          "field": "organizer",
+          "page": null,
+          "source_text": "由开源鸿蒙项目群技术指导委员会主办、AtomGit承办。",
+          "document_name": "AtomGit 官方赛事介绍页",
+          "source_url": "https://competition.gitcode.com/competition/2074797483593228289/intro",
+          "acquired_date": "2026-07-30",
+          "last_verified_at": "2026-07-30",
+          "trusted_level": "A"
+        },
+        {
+          "field": "eligible_students",
+          "page": null,
+          "source_text": "面向高校在校学生。",
+          "document_name": "AtomGit 官方赛事介绍页",
+          "source_url": "https://competition.gitcode.com/competition/2074797483593228289/intro",
+          "acquired_date": "2026-07-30",
+          "last_verified_at": "2026-07-30",
+          "trusted_level": "A"
+        },
+        {
+          "field": "team_max",
+          "page": null,
+          "source_text": "每支参赛团队学生人数限 3 人（队长包含在内），每队最多配备 1 名指导教师。",
+          "document_name": "AtomGit 官方赛事介绍页",
+          "source_url": "https://competition.gitcode.com/competition/2074797483593228289/intro",
+          "acquired_date": "2026-07-30",
+          "last_verified_at": "2026-07-30",
+          "trusted_level": "A"
+        },
+        {
+          "field": "registration_deadline",
+          "page": null,
+          "source_text": "报名截止时间：2026年9月15日。",
+          "document_name": "AtomGit 官方赛事介绍页",
+          "source_url": "https://competition.gitcode.com/competition/2074797483593228289/intro",
+          "acquired_date": "2026-07-30",
+          "last_verified_at": "2026-07-30",
+          "trusted_level": "A"
+        },
+        {
+          "field": "submission_deadline",
+          "page": null,
+          "source_text": "作品提交截止日期：2026年10月31日。",
+          "document_name": "AtomGit 官方赛事介绍页",
+          "source_url": "https://competition.gitcode.com/competition/2074797483593228289/intro",
+          "acquired_date": "2026-07-30",
+          "last_verified_at": "2026-07-30",
+          "trusted_level": "A"
+        },
+        {
+          "field": "required_materials",
+          "page": null,
+          "source_text": "参赛作品简介、项目文档、项目视频或 PPT，以及其他可选辅助材料。",
+          "document_name": "AtomGit 官方赛事介绍页",
+          "source_url": "https://competition.gitcode.com/competition/2074797483593228289/intro",
+          "acquired_date": "2026-07-30",
+          "last_verified_at": "2026-07-30",
+          "trusted_level": "A"
+        }
+      ],
+      "notes": "【2026-07-30 纠名与补全】原条目混入往届开放原子大赛鸿蒙赛项，现纠正为 AtomGit 已公开的 2026 开源鸿蒙大学生创新大赛校园与创新应用赛道。赛事页为动态渲染，雷达以原始响应指纹监测版本变化；任何赛程或规则变化仍须人工核对后才写入事实。"
+    }
+  },
+  "archived": [
+    {
+      "competition_id": "marketing_2026",
+      "reason": "未找到“全国大学生市场营销大赛”2026 年独立官方赛程；检索结果主要为往届或校级/地方赛。",
+      "replacement": "全国高校商业精英挑战赛品牌策划类赛项"
+    },
+    {
+      "competition_id": "new_material_2026",
+      "reason": "未找到“全国大学生新材料创新设计竞赛”2026 年可追溯的主办方与官方赛程。"
+    },
+    {
+      "competition_id": "env_monitor_2026",
+      "reason": "未找到“全国大学生环境监测与治理创新竞赛”2026 年全国性官方通知；检索到的是地方赛事。",
+      "replacement": "全国大学生节能减排社会实践与科技竞赛"
+    },
+    {
+      "competition_id": "eco_env_2026",
+      "reason": "未找到“全国大学生生态环保科技创新大赛”2026 年全国性官方通知；检索到的是省级赛事或往届生态环境赛事。",
+      "replacement": "全国大学生节能减排社会实践与科技竞赛"
+    },
+    {
+      "competition_id": "bi_comp_2026",
+      "reason": "未找到“全国大学生商业数据分析大赛”2026 年独立官方来源。",
+      "replacement": "中国高校SAS数据分析大赛"
+    },
+    {
+      "competition_id": "data_mining_2026",
+      "reason": "可追溯的“长风杯”全国大学生大数据分析与挖掘竞赛为往届信息，未找到 2026 年官方赛程。"
+    },
+    {
+      "competition_id": "fin_data_2026",
+      "reason": "未找到“全国大学生金融数据分析大赛”2026 年独立官方来源。",
+      "replacement": "工行杯全国大学生金融科技创新大赛"
+    },
+    {
+      "competition_id": "huaweicloud_dev_data_2026",
+      "reason": "“华为云大数据挑战赛”可定位的官方信息停留在往届，未找到 2026 年高校赛道官方通知。",
+      "replacement": "中国高校计算机大赛相关赛项"
+    },
+    {
+      "competition_id": "animation_2026",
+      "reason": "未找到“全国大学生动画与新媒体作品大赛”2026 年全国统一主办方与官方赛程。"
+    },
+    {
+      "competition_id": "fashion_2026",
+      "reason": "检索到的是往届或地方服装设计赛，未找到该名称对应的 2026 年全国官方赛程。"
+    },
+    {
+      "competition_id": "smart_sensor_2026",
+      "reason": "未找到“全国大学生智能感知与检测竞赛”2026 年独立官方通知。",
+      "replacement": "中国大学生机械工程创新创意大赛相关传感赛项"
+    },
+    {
+      "competition_id": "comm_net_2026",
+      "reason": "未找到“全国大学生通信网络部署与运维大赛”2026 年全国性官方通知；检索到的是职业技能或地方赛。"
+    },
+    {
+      "competition_id": "thermal_2026",
+      "reason": "未找到“全国大学生热能动力工程竞赛”2026 年独立官方赛程。",
+      "replacement": "全国大学生节能减排社会实践与科技竞赛"
+    },
+    {
+      "competition_id": "oral_eng_2026",
+      "reason": "未找到“全国大学生英语口语竞赛”2026 年独立全国官方赛事页面；检索到的是校级、地方赛或考试口语。"
+    },
+    {
+      "competition_id": "eng_dub_2026",
+      "reason": "未找到“全国大学生英语影视配音大赛”2026 年全国统一主办方与官方赛程；检索到的是校级、地区赛事。"
+    },
+    {
+      "competition_id": "cxcx_2026",
+      "reason": "未找到“中国创新创业大赛（大学生专场）”2026 年独立官方赛程。",
+      "replacement": "中国国际大学生创新大赛"
+    },
+    {
+      "competition_id": "rk_finance_2026",
+      "reason": "未找到“中国金融科技创新创业大赛（高校组）”2026 年独立官方赛程。",
+      "replacement": "工行杯全国大学生金融科技创新大赛"
+    },
+    {
+      "competition_id": "green_innov_2026",
+      "reason": "未找到“全国大学生绿色创新大赛”2026 年独立官方来源；同名或近名赛事均为特定行业/往届活动。"
+    },
+    {
+      "competition_id": "tcm_2026",
+      "reason": "未找到该名称的 2026 年全国统一官方赛程。",
+      "replacement": "全国医药院校药学/中药学专业大学生实验技能展示活动"
+    },
+    {
+      "competition_id": "agri_bio_2026",
+      "reason": "未找到“全国大学生农业生物技术竞赛”2026 年独立官方通知。",
+      "replacement": "全国大学生生命科学竞赛"
+    },
+    {
+      "competition_id": "ecology_2026",
+      "reason": "未找到“全国大学生生态知识竞赛”2026 年独立官方来源；检索到的是环保知识公益活动或地方赛。"
+    },
+    {
+      "competition_id": "bioinfo_2026",
+      "reason": "未找到“全国大学生生物信息学竞赛”2026 年独立官方通知。"
+    },
+    {
+      "competition_id": "neuro_2026",
+      "reason": "未找到“全国大学生神经科学竞赛”2026 年独立官方通知。"
+    },
+    {
+      "competition_id": "applied_math_2026",
+      "reason": "未找到“全国大学生应用数学竞赛”2026 年独立官方赛程；名称易与全国大学生数学竞赛或华教杯混淆。",
+      "replacement": "全国大学生数学竞赛"
+    },
+    {
+      "competition_id": "num_theory_2026",
+      "reason": "未找到“全国大学生数论与组合竞赛”2026 年独立官方通知；数论与组合为丘成桐大学生数学竞赛赛题方向。",
+      "replacement": "丘成桐大学生数学竞赛"
+    },
+    {
+      "competition_id": "prob_stat_2026",
+      "reason": "未找到“全国大学生概率统计竞赛”2026 年独立官方赛程。"
+    },
+    {
+      "competition_id": "discrete_math_2026",
+      "reason": "未找到“全国大学生离散数学与应用竞赛”2026 年独立官方赛程。"
+    },
+    {
+      "competition_id": "condensed_2026",
+      "reason": "未找到“全国大学生凝聚态物理竞赛”2026 年独立官方赛程。"
+    },
+    {
+      "competition_id": "applied_physics_2026",
+      "reason": "未找到“全国大学生应用物理竞赛”2026 年独立官方赛程。",
+      "replacement": "全国大学生物理实验竞赛（创新）"
+    },
+    {
+      "competition_id": "embodied_ai_2026",
+      "reason": "未找到该名称对应的 2026 年独立全国大学生官方赛事；具身智能为多项机器人赛的赛题方向。",
+      "replacement": "中国高校智能机器人创意大赛"
+    },
+    {
+      "competition_id": "deep_learning_2026",
+      "reason": "未找到“全国大学生深度学习算法竞赛”2026 年独立官方赛程。",
+      "replacement": "中国高校计算机大赛相关赛项"
+    },
+    {
+      "competition_id": "iot_app_2026",
+      "reason": "“全国高校物联网应用创新大赛”可定位的全国官方资料停留在往届，未找到 2026 年赛程。",
+      "replacement": "全国大学生物联网设计竞赛"
+    },
+    {
+      "competition_id": "sas_2026",
+      "reason": "中国高校SAS数据分析大赛的可追溯公开资料停留在往届；原报名站点返回 403 或自签名证书，且未找到 2026 年官方赛程。为避免把历史赛事当作当前机会，现归档保留审计记录。"
+    }
+  ]
+}

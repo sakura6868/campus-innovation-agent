@@ -1,0 +1,30 @@
+{
+  "reviewed_at": "2026-08-10",
+  "sources": {
+    "chem_exp_2026": {
+      "source_url": "http://edu.cteic.com/match/app/notice/55",
+      "source_type": "dynamic",
+      "note": "HTTPS 入口为自签名证书，无法安全校验；HTTP 入口只做响应指纹维护，不提取字段、不自动生成事实变更，任何变化均需人工打开官网复核。"
+    },
+    "datang_2026": {
+      "source_url": "https://www.cuit.edu.cn/info/1006/16218.htm",
+      "source_type": "html",
+      "note": "原赛事域名 TLS 握手失败；改用已有证据中的 2026 年高校参赛通知作为补充监控入口。"
+    },
+    "env_design_2026": {
+      "source_url": "https://arch.hit.edu.cn/2026/0408/c11953a389510/pagem.htm",
+      "source_type": "html",
+      "note": "主办方专题页证书过期；改用已有证据中的 2026 年高校通知作为补充监控入口。"
+    },
+    "process_equip_2026": {
+      "source_url": "https://gxzx.snut.edu.cn/info/1481/7491.htm",
+      "source_type": "html",
+      "note": "官方平台证书主机名不匹配；改用已有证据中的 2026 年校内选拔通知作为补充监控入口。"
+    },
+    "supply_chain_2026": {
+      "source_url": "https://jw.wzbc.edu.cn/UploadFile/202603/202603301522526497.pdf",
+      "source_type": "pdf",
+      "note": "原赛事域名无法解析；改用已有证据中的第七届全国供应链大赛通知 PDF 作为补充监控入口。"
+    }
+  }
+}
