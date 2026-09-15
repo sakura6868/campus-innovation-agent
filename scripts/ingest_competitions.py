@@ -1,24 +1,17 @@
 #!/usr/bin/env python3
-"""定时发现的新赛事：去重 + 入库本地 + (可选) 推送线上 Render。
+"""定时发现的新赛事：去重 + 入库本地 + 生成周报。
 
 工作流（由 WorkBuddy 自动化任务驱动）：
   1. 自动化任务用 WebSearch 发现新比赛，写入 data/ground_truth/incoming/*.json
      （字段同 samples，trusted_level=C, data_status=unverified，禁止编造日期/链接）。
-  2. 本脚本：去重 -> 移入 samples/ -> 重灌本地库 -> (若配置) 批量推送 Render -> 生成周报。
+  2. 本脚本：去重 -> 移入 samples/ -> 重灌本地库 -> 生成周报。
 
-配置（环境变量，未设置则跳过对应步骤）：
-  RENDER_API_BASE   例如 https://campus-innovation-agent.onrender.com
-  ADMIN_API_TOKEN   与 Render 环境变量 ADMIN_API_TOKEN 一致（可选防护）
-  （也可用 scripts/ingest_config.json 提供同样两个键，该文件已被 .gitignore 忽略）
 """
 from __future__ import annotations
 
 import json
-import os
 import re
 import sys
-import urllib.error
-import urllib.request
 from datetime import date
 from pathlib import Path
 
@@ -32,18 +25,6 @@ import schemas  # noqa: E402
 INCOMING_DIR = ROOT / "data" / "ground_truth" / "incoming"
 SAMPLES_DIR = ROOT / "data" / "ground_truth" / "samples"
 DIGEST_DIR = ROOT / "data"
-
-RENDER_API_BASE = os.getenv("RENDER_API_BASE", "").rstrip("/")
-ADMIN_API_TOKEN = os.getenv("ADMIN_API_TOKEN", "")
-# 兜底：从被 gitignore 的本地配置文件读取（不入库，避免泄露密钥）
-_CONFIG_FILE = ROOT / "scripts" / "ingest_config.json"
-if _CONFIG_FILE.exists():
-    try:
-        _cfg = json.loads(_CONFIG_FILE.read_text(encoding="utf-8"))
-        RENDER_API_BASE = RENDER_API_BASE or _cfg.get("render_api_base", "").rstrip("/")
-        ADMIN_API_TOKEN = ADMIN_API_TOKEN or _cfg.get("admin_api_token", "")
-    except Exception:
-        pass
 
 
 def slugify(text: str) -> str:
@@ -155,27 +136,6 @@ def build_competition(raw: dict, existing_ids: set) -> tuple[dict, str]:
     return rec, cid
 
 
-def push_to_render(records: list[dict]) -> dict:
-    if not RENDER_API_BASE:
-        return {"skipped": True, "reason": "RENDER_API_BASE 未设置"}
-    if not ADMIN_API_TOKEN:
-        return {"skipped": True, "reason": "ADMIN_API_TOKEN 未设置，拒绝向管理接口发送数据"}
-    url = f"{RENDER_API_BASE}/api/admin/competitions/bulk"
-    payload = json.dumps({"competitions": records}).encode("utf-8")
-    req = urllib.request.Request(
-        url, data=payload, method="POST",
-        headers={"Content-Type": "application/json"},
-    )
-    req.add_header("X-Admin-Token", ADMIN_API_TOKEN)
-    try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            return {"ok": True, "response": json.loads(resp.read().decode("utf-8"))}
-    except urllib.error.HTTPError as e:
-        return {"ok": False, "error": f"HTTP {e.code}: {e.read().decode('utf-8', 'ignore')[:200]}"}
-    except Exception as e:  # 网络/解析失败不应中断主流程
-        return {"ok": False, "error": str(e)}
-
-
 def main() -> None:
     import argparse
     ap = argparse.ArgumentParser()
@@ -228,11 +188,6 @@ def main() -> None:
         n = db.seed_all()
         print(f"[ingest] 本地重灌完成，当前赛事总数：{n}")
 
-    # 推送线上
-    push_result = None
-    if added and not args.dry_run:
-        push_result = push_to_render([rec for _, rec, _ in added])
-
     # 周报
     lines = [
         f"# 赛事自动发现周报 {date.today().isoformat()}",
@@ -252,10 +207,6 @@ def main() -> None:
         lines.append("## 重复跳过（已存在同名同年份）")
         for n in skipped_dup:
             lines.append(f"- {n}")
-    if push_result:
-        lines.append("")
-        lines.append("## 线上推送")
-        lines.append(f"- {json.dumps(push_result, ensure_ascii=False)}")
     digest = "\n".join(lines) + "\n"
     if not args.dry_run:
         (DIGEST_DIR / f"INGEST_DIGEST_{date.today().isoformat()}.md").write_text(digest, encoding="utf-8")

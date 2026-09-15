@@ -8,7 +8,6 @@
 
 > 本作品参加**中兴赛道 · 命题五「自主命题智能体」**。评委请先看 [`docs/SUBMISSION.md`](docs/SUBMISSION.md)：六件提交物位置、本地一键运行、测试账号、复现评测证据与 100 分评审维度对照，一处可查。
 >
-> - 线上试用：`https://campus-innovation-agent.onrender.com`（需 Manual Deploy 后生效）
 > - 测试账号：**`test` / `test123`**（登录页可「一键体验」零输入进入）
 > - 提交清单：可运行作品 / 技术文档 / README / 用例集(46 条) / 演示视频(3—5 min) / 合规说明 —— 详见 SUBMISSION.md
 
@@ -107,49 +106,6 @@ python -m venv venv
 .\venv\Scripts\python.exe -m uvicorn api:app --app-dir src --host 127.0.0.1 --port 8000
 ```
 
-## ☁️ 云端部署（Render）与更新
-
-本项目已配置 GitHub + Render 自动部署：代码 push 到 GitHub 的 `master` 分支后，Render 通过 `render.yaml`（Blueprint）自动重新构建并上线，**无需手动操作 Render 控制台**。
-
-### 首次部署（一次性）
-
-1. 在 GitHub 创建仓库（本仓库为 `sakura6868/campus-innovation-agent`，私有，`master` 分支）。
-2. 打开预填链接用 GitHub 登录 Render：
-   `https://dashboard.render.com/new/blueprint?repo=https://github.com/sakura6868/campus-innovation-agent`
-3. 授权时勾选允许访问该私有仓库；确认将创建两个资源：
-   - `campus-innovation-agent`（Web 服务，free）
-   - `campus-db`（PostgreSQL，free，数据持久化）
-4. 点 **Deploy Blueprint**，等待 3–8 分钟构建完成，即可访问
-   `https://campus-innovation-agent.onrender.com`。
-
-> **健康检查（可选但建议）**：服务启动后默认暴露 `GET /health` 接口（返回
-> `{"status":"ok"}`）。可在 Render 服务设置页把 **Health Check Path** 设为
-> `/health`，让平台自动探活、异常时自动重启，提升稳定性观感与可用性。
-> 健康检查只返回数据库连通状态，不返回连接地址或凭据。所有 `/api/admin/*`
-> 接口强制使用 `X-Admin-Token`；Render Blueprint 会自动生成 `ADMIN_API_TOKEN`。
-
-### 部署踩过的坑（已修复，记录备查）
-
-- `requirements.txt` 中 `pdfplumber>=3.0` 版本不存在（最新 `0.11.10`）→ 已改为 `>=0.11`；并补充 `psycopg2-binary>=2.9`（连接 Postgres 必需）。
-- `render.yaml` 旧版把 Postgres 写在 `services:` 下（`type: postgres`）→ 报 `unknown type "postgres"`；Postgres 必须放在顶层 `databases:` 块，且 `fromDatabase.name` 与该块 `name` 一致。
-- `rag/store.py` 原本在模块顶层 `import chromadb` → Render 未装该库时启动即崩溃；已改为构造器内**惰性导入 + 未安装自动降级本地检索**。
-- Render 注入的 `DATABASE_URL` 协议头为 `postgres://`，而 SQLAlchemy 2.0 只认 `postgresql://` → `db.py` 已做归一化。
-
-### 以后怎么更新
-
-> 核心：把新代码 push 到 GitHub `master` → Render 自动重新部署。
-
-- **方式 A（找我改）**：在对话里说明要改什么，我直接在沙箱改代码、提交并 push；每次 push 需要你的 GitHub PAT（建议用完即 revoke）。
-- **方式 B（自己改）**：本地 `git clone` 后修改，`git push` 即触发自动部署。
-
-push 后一般无需去 Render 点按钮（auto-sync 会自动触发）；若未自动部署，到服务页点 **Manual Deploy → Deploy latest commit**。
-
-### 免费套餐注意事项
-
-- **冷启动**：15 分钟无访问服务休眠，首次打开需等 10–30 秒唤醒。
-- **数据库保留**：免费 Postgres 90 天无访问会被自动删库；可设置定时访问（如每 10 天请求一次 `/health`）保活。
-- **访问量**：无硬性人数上限，但单实例资源有限，适合教学/作业展示级别的几十人访问。
-
 ## 自动测试
 
 ```powershell
@@ -225,7 +181,7 @@ campus-innovation-agent/
 | 配置 | 默认值 | 说明 |
 | --- | --- | --- |
 | `DATABASE_URL` | 本地 SQLite | 可切换为 PostgreSQL SQLAlchemy URL |
-| `AUTH_TOKEN_SECRET` | 进程启动时随机生成 | 签发用户会话；云端/多进程部署必须配置稳定的独立随机密钥 |
+| `AUTH_TOKEN_SECRET` | 进程启动时随机生成 | 签发用户会话；多进程部署必须配置稳定的独立随机密钥 |
 | `AUTH_TOKEN_TTL_SECONDS` | `28800` | 用户签名会话有效期，限制为 15 分钟至 24 小时 |
 | `RAG_USE_ST` | `自动` | 是否启用真实语义向量：`0` 强制关、`1` 强制开、不设则**本地有 all-MiniLM-L6-v2 即默认开启真·语义检索**（详见 [RAG 架构](docs/RAG_ARCHITECTURE.md)） |
 | `CHROMA_HOST` | 空 | 远程 Chroma 地址；为空时使用本地检索 |
@@ -251,7 +207,7 @@ campus-innovation-agent/
 - 每次提问会把所选模型通过 `?model=` 透传到后端，后端用同一个 `AGENT_LLM_API_KEY` 请求对应模型。
 - 仅影响 Agent 答案的自然语言润色层；引用编号 `[n]`、资格门控与推荐结论由确定性逻辑生成，不受模型选择影响。
 
-> 前提：已在环境变量（本地 `.env` 或 Render 控制台）配置 `AGENT_LLM_API_KEY`、`AGENT_LLM_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1`、`AGENT_LLM_MODEL=qwen-plus`、`AGENT_LLM_PROVIDER=qwen`。未配置 LLM 时下拉框无效，答案回退到确定性模板，不影响可信检索与推荐。
+> 前提：已在环境变量（本地 `.env`）配置 `AGENT_LLM_API_KEY`、`AGENT_LLM_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1`、`AGENT_LLM_MODEL=qwen-plus`、`AGENT_LLM_PROVIDER=qwen`。未配置 LLM 时下拉框无效，答案回退到确定性模板，不影响可信检索与推荐。
 
 ## 提交文档
 

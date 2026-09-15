@@ -15,7 +15,7 @@
 | **Uvicorn** | https://github.com/encode/uvicorn | ASGI 服务器，承载应用进程 | 启动命令 `uvicorn api:app`（见 `start.ps1`） |
 | **Pydantic** v2 | https://github.com/pydantic/pydantic | 请求/响应数据校验、`src/schemas.py` 全部数据模型 | 以模型类声明接口契约与 ORM 序列化结构 |
 | **SQLAlchemy** 2.0 | https://github.com/sqlalchemy/sqlalchemy | ORM 与数据库访问层（12 张表） | `src/db.py` 中声明模型与仓储查询 |
-| **psycopg2-binary** | https://github.com/psycopg/psycopg2 | PostgreSQL 驱动（云端 Render 使用；本地 SQLite 不依赖） | 由 `DATABASE_URL` 自动选择驱动 |
+| **psycopg2-binary** | https://github.com/psycopg/psycopg2 | PostgreSQL 驱动（可选；仅配置 PostgreSQL 时使用，本地 SQLite 不依赖） | 由 `DATABASE_URL` 自动选择驱动 |
 | **pdfplumber** | https://github.com/jsvine/pdfplumber | 抽取官方通知 **PDF** 的文本与表格 | 来源雷达解析 PDF、证据定位（`src/evidence/`） |
 | **python-docx** | https://github.com/python-openxml/python-docx | 解析官方通知 **DOCX** | 来源雷达解析 Word 文档 |
 | **requests** | https://github.com/psf/requests | HTTP 客户端 | ① 调用 LLM 接口 ② 联网补充检索 ③ 雷达抓取官方页面 |
@@ -53,7 +53,6 @@
 
 | 平台 | 用途 | 说明 |
 |---|---|---|
-| **Render** | 云端部署（Web 服务 + PostgreSQL） | 配置见 `render.yaml`，一键部署 |
 | **Docker / Docker Compose** | 容器化部署 | 见 `compose.yaml`、`Dockerfile` |
 | **GitHub Actions** | 定时触发官方来源雷达扫描 | `.github/workflows/source-radar.yml`，每 6 小时调用 `/api/admin/radar/run` |
 
