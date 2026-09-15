@@ -1,0 +1,52 @@
+# ── Python ──
+venv/
+venv312/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+
+# ── macOS Finder metadata ──
+.DS_Store
+._*
+
+# ── 运行时产物 / 数据 (非源码) ──
+*.log
+*.db
+*.sqlite3
+*.db.bak
+*.db.bak*
+*.zip
+*.pdf
+output/
+demo/*
+!demo/campus-agent-demo.mp4
+tmp/
+backups/
+# 本地数据库备份与归档旧数据（不入库）
+data/ground_truth/samples/_archive/
+data/campus_agent.db.bak*
+
+# 仅保留种子数据 data/ground_truth/，排除运行时生成目录
+data/raw/
+data/uploads/
+data/parsed/
+data/chunks/
+
+# ── 环境 / 密钥 ──
+.env
+.env.*
+!.env.example
+scripts/ingest_config.json
+
+# ── 内部记忆 (不应入库) ──
+.workbuddy/
+
+# ── Docker ──
+.dockerignore 已覆盖，此处无需重复
+
+# ── 运行时/测试产物 ──
+.playwright-cli
+src/data/chunks
+**/.playwright-cli/**
+**/src/data/chunks/**

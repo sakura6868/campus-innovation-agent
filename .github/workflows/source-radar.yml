@@ -1,0 +1,28 @@
+name: Official Source Radar
+
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+      timezone: "Asia/Shanghai"
+  workflow_dispatch:
+
+concurrency:
+  group: official-source-radar
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger bounded official-source scan
+        env:
+          RADAR_BASE_URL: ${{ secrets.RADAR_BASE_URL }}
+          ADMIN_API_TOKEN: ${{ secrets.ADMIN_API_TOKEN }}
+        run: |
+          test -n "$RADAR_BASE_URL"
+          test -n "$ADMIN_API_TOKEN"
+          curl --fail-with-body --max-time 180 \
+            -H "Content-Type: application/json" \
+            -H "X-Admin-Token: $ADMIN_API_TOKEN" \
+            -d '{}' \
+            "$RADAR_BASE_URL/api/admin/radar/run"

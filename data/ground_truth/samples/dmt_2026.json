@@ -1,0 +1,111 @@
+{
+  "competition_id": "dmt_2026",
+  "competition_name": "全国大学生数字媒体科技作品及创意竞赛",
+  "document_year": 2026,
+  "category": "design",
+  "organizer": "中国人工智能学会",
+  "eligible_students": [
+    "本科生",
+    "研究生",
+    "专科生",
+    "毕业生（毕业5年内）"
+  ],
+  "allowed_grades": [
+    "大一",
+    "大二",
+    "大三",
+    "大四"
+  ],
+  "allowed_majors": null,
+  "team_required": true,
+  "team_min": 1,
+  "team_max": 5,
+  "registration_deadline": null,
+  "submission_deadline": null,
+  "competition_start_date": null,
+  "competition_end_date": null,
+  "result_announcement_date": null,
+  "award_settings": "设一等奖、二等奖、三等奖、优秀奖，对获奖团队颁发证书并可推荐更高层级赛事。",
+  "award_distribution": [
+    {
+      "award": "一等奖",
+      "proportion": "约5%",
+      "note": "全国"
+    },
+    {
+      "award": "二等奖",
+      "proportion": "约15%",
+      "note": "全国"
+    },
+    {
+      "award": "三等奖",
+      "proportion": "约25%",
+      "note": "全国"
+    },
+    {
+      "award": "优秀奖",
+      "proportion": "其余",
+      "note": "省市赛"
+    }
+  ],
+  "brief_description": "全国大学生数字媒体科技作品及创意竞赛是由中国人工智能学会等主办的艺术设计类赛事，面向本科生、研究生、专科生及毕业5年内初创团队（专业不限）。以1-5人团队参赛，考察创意性、表现力、完整性与主题契合度。",
+  "required_materials": [
+    "设计作品",
+    "创作说明",
+    "源文件",
+    "展示视频"
+  ],
+  "evaluation_dimensions": [
+    "创意性",
+    "表现力",
+    "完整性",
+    "主题契合"
+  ],
+  "required_skills": [
+    "平面设计",
+    "创意构思",
+    "排版",
+    "视频制作",
+    "手绘"
+  ],
+  "official_source_url": "http://www.cmit.cn",
+  "source_acquired_date": "2026-07-18",
+  "trusted_level": "B",
+  "data_status": "unverified",
+  "last_verified_at": "2026-07-18",
+  "doc_version": "2026_v1",
+  "evidence": [
+    {
+      "field": "competition_name",
+      "page": null,
+      "source_text": "全国大学生数字媒体科技作品及创意竞赛",
+      "document_name": "数媒竞赛网（官方）",
+      "source_url": "http://www.cmit.cn",
+      "acquired_date": "2026-07-18",
+      "last_verified_at": "2026-07-18",
+      "trusted_level": "A"
+    },
+    {
+      "field": "team_max",
+      "page": null,
+      "source_text": "单支队伍参赛学生最少1人、最多5人",
+      "document_name": "2026全国大学生数字媒体科技作品及创意竞赛手机版作品提交流程使用说明",
+      "source_url": "http://www.cmit.cn/wap/liucheng/show-277-45691-1.html",
+      "acquired_date": "2026-07-18",
+      "last_verified_at": "2026-07-18",
+      "trusted_level": "A"
+    },
+    {
+      "field": "eligible_students",
+      "page": null,
+      "source_text": "凡教育部批准设立的普通高等学校（含高职高专）各类在校生均可参赛；近5年及以内毕业生的大学生初创团队",
+      "document_name": "数媒竞赛网（官方）赛事介绍",
+      "source_url": "https://www.cmit.cn/wap/index.html",
+      "acquired_date": "2026-07-18",
+      "last_verified_at": "2026-07-18",
+      "trusted_level": "A"
+    }
+  ],
+  "notes": "由公开赛事名录整理的结构化参考字段，尚未完成人工核验；仅供导航参考，正式报名请以主办单位官方通知为准。 已核实：官方名称、主办单位（官网显示为组委会/中国人工智能学会）、团队1-5人、参赛对象含专科生及毕业5年内初创团队；2026年具体报名与作品提交截止日期未在官网公开摘要中取得，原占位日期已置空，请以官网（cmit.cn）为准。",
+  "official_source_status": "found"
+}

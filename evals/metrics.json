@@ -1,0 +1,60 @@
+{
+  "total_cases": 86,
+  "intent_acc": 100.0,
+  "resolve_acc": 100.0,
+  "citation_recall": 100.0,
+  "gate_consistency": 100.0,
+  "answer_coverage": 100.0,
+  "by_group": {
+    "detail": {
+      "n": 21,
+      "intent_acc": 100.0,
+      "resolve_acc": 100.0,
+      "citation_recall": 100.0,
+      "gate_consistency": 100.0,
+      "answer_coverage": 100.0
+    },
+    "qa_deadline": {
+      "n": 21,
+      "intent_acc": 100.0,
+      "resolve_acc": 100.0,
+      "citation_recall": 100.0,
+      "gate_consistency": 100.0,
+      "answer_coverage": 100.0
+    },
+    "qa_team": {
+      "n": 21,
+      "intent_acc": 100.0,
+      "resolve_acc": 100.0,
+      "citation_recall": 100.0,
+      "gate_consistency": 100.0,
+      "answer_coverage": 100.0
+    },
+    "recommend": {
+      "n": 1,
+      "intent_acc": 100.0,
+      "resolve_acc": null,
+      "citation_recall": null,
+      "gate_consistency": null,
+      "answer_coverage": 100.0,
+      "recommend_hit": 100.0
+    },
+    "team": {
+      "n": 21,
+      "intent_acc": 100.0,
+      "resolve_acc": 100.0,
+      "citation_recall": null,
+      "gate_consistency": 100.0,
+      "answer_coverage": 100.0,
+      "team_hit": 100.0
+    },
+    "unknown": {
+      "n": 1,
+      "intent_acc": 100.0,
+      "resolve_acc": null,
+      "citation_recall": null,
+      "gate_consistency": null,
+      "answer_coverage": 100.0
+    }
+  }
+}
