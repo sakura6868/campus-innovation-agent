@@ -7425,3 +7425,87 @@ body.agent-fullscreen #view-agent.agent-codex,
   outline: 2px solid #d3a25a;
   outline-offset: 2px;
 }
+
+/* ============================================================
+   深色主题 · 官方数据入库页（view-admin）深色覆盖补齐
+   此前 quality-* 驾驶舱与 admin 流水线/雷达运维卡片只有浅色
+   样式（白底黑字），与全站 .theme-neumorphic 深色主题冲突。
+   统一按主题变量改写：面板 #232630 / 内嵌 #1a1d24 / 文字 #f0e8dc。
+   ============================================================ */
+
+/* —— 质量驾驶舱面板容器（frozen-panel 自带深色渐变，不覆盖） —— */
+.theme-neumorphic .admin-view .quality-live-panel,
+.theme-neumorphic .admin-view .quality-section,
+.theme-neumorphic .admin-view .quality-integrity-note {
+  border: 1px solid rgba(255, 255, 255, .055);
+  background: var(--neo-panel);
+  box-shadow: var(--neo-raised-soft);
+  color: var(--neo-ink);
+}
+.theme-neumorphic .admin-view .quality-integrity-note { background: var(--neo-panel-soft); }
+.theme-neumorphic .admin-view .quality-integrity-note > span { background: rgba(216, 179, 109, .14); color: var(--neo-gold); }
+.theme-neumorphic .admin-view .quality-integrity-note b { color: var(--neo-ink); }
+.theme-neumorphic .admin-view .quality-integrity-note p { color: var(--neo-muted); }
+.theme-neumorphic .admin-view .quality-live-panel header h3,
+.theme-neumorphic .admin-view .quality-section-head h3 { color: var(--neo-ink); }
+.theme-neumorphic .admin-view .quality-live-panel header span,
+.theme-neumorphic .admin-view .quality-section-head span { color: #8b93a5; }
+.theme-neumorphic .admin-view .quality-section-head small { background: rgba(255, 255, 255, .06); color: var(--neo-muted); }
+
+/* —— 运行态统计 / 三道门禁 —— */
+.theme-neumorphic .admin-view .quality-live-stats span { border: 1px solid rgba(255, 255, 255, .055); background: var(--neo-well); box-shadow: var(--neo-inset); }
+.theme-neumorphic .admin-view .quality-live-stats small { color: var(--neo-muted); }
+.theme-neumorphic .admin-view .quality-live-stats b { color: var(--neo-gold-strong); }
+.theme-neumorphic .admin-view .quality-gate { border: 1px solid rgba(255, 255, 255, .055); background: var(--neo-well); }
+.theme-neumorphic .admin-view .quality-gate b { color: var(--neo-ink); }
+.theme-neumorphic .admin-view .quality-gate small { color: var(--neo-muted); }
+.theme-neumorphic .admin-view .quality-gate.is-on > span { color: #7fd6b8; background: rgba(130, 177, 154, .16); }
+.theme-neumorphic .admin-view .quality-gate.is-off > span { color: #e39a8b; background: rgba(202, 122, 114, .16); }
+
+/* —— 五类可量化质量门禁指标卡 —— */
+.theme-neumorphic .admin-view .quality-metric-card { border: 1px solid rgba(255, 255, 255, .055); background: var(--neo-well); box-shadow: var(--neo-inset); }
+.theme-neumorphic .admin-view .quality-metric-card span { color: var(--neo-muted); }
+.theme-neumorphic .admin-view .quality-metric-card b { color: #7fd6b8; }
+.theme-neumorphic .admin-view .quality-metric-card small { color: #6f7480; }
+.theme-neumorphic .admin-view .quality-metric-card i { background: rgba(255, 255, 255, .08); }
+
+/* —— 金标集 / 评审分值证据映射 —— */
+.theme-neumorphic .admin-view .quality-golden-stats span { border: 1px solid rgba(255, 255, 255, .055); background: var(--neo-well); }
+.theme-neumorphic .admin-view .quality-golden-stats b { color: var(--neo-gold-strong); }
+.theme-neumorphic .admin-view .quality-golden-stats small { color: var(--neo-muted); }
+.theme-neumorphic .admin-view .quality-score-list article { border: 1px solid rgba(255, 255, 255, .055); background: var(--neo-well); }
+.theme-neumorphic .admin-view .quality-score-list strong { color: var(--neo-gold); }
+.theme-neumorphic .admin-view .quality-score-list b { color: var(--neo-ink); }
+.theme-neumorphic .admin-view .quality-score-list span { color: var(--neo-muted); }
+
+/* —— 流水线 / 雷达运维卡片（.card 白底 → 深色面板） —— */
+.theme-neumorphic .admin-view .card {
+  border: 1px solid rgba(255, 255, 255, .055);
+  background: var(--neo-panel);
+  box-shadow: var(--neo-raised-soft);
+  color: var(--neo-ink);
+}
+.theme-neumorphic .admin-view .muted,
+.theme-neumorphic .admin-view .card .muted { color: var(--neo-muted); }
+.theme-neumorphic .admin-view .stage-head p { color: var(--neo-muted); }
+.theme-neumorphic .admin-view .section-title span { color: var(--neo-muted); }
+
+/* —— 表单控件 / 文本块 / 证据 —— */
+.theme-neumorphic .admin-view input:not([type="checkbox"]):not([type="file"]),
+.theme-neumorphic .admin-view select,
+.theme-neumorphic .admin-view textarea {
+  border: 1px solid rgba(255, 255, 255, .05);
+  background: var(--neo-well);
+  color: var(--neo-ink);
+}
+.theme-neumorphic .admin-view label { color: var(--neo-muted); }
+.theme-neumorphic .admin-view .block { border: 1px solid rgba(255, 255, 255, .055); background: var(--neo-well); }
+.theme-neumorphic .admin-view .block-text { color: var(--neo-ink); }
+.theme-neumorphic .admin-view .block-meta { color: var(--neo-muted); }
+.theme-neumorphic .admin-view .evidence-box { border: 1px dashed rgba(255, 255, 255, .1); background: rgba(26, 29, 36, .6); }
+.theme-neumorphic .admin-view .ev-item { border: 1px solid rgba(255, 255, 255, .055); background: var(--neo-well); }
+.theme-neumorphic .admin-view .ev-field { background: rgba(156, 143, 202, .16); color: #b7abe0; }
+
+/* —— 雷达运维统计块 —— */
+.theme-neumorphic .admin-view .admin-radar-stats > div { border: 1px solid rgba(255, 255, 255, .055); background: var(--neo-well); }
+.theme-neumorphic .admin-view .admin-radar-stats span { color: var(--neo-muted); }
