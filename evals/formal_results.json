@@ -1,8 +1,8 @@
 {
-  "evaluated_at": "2026-07-29",
+  "evaluated_at": "2026-09-17",
   "environment": {
-    "python": "3.12.13",
-    "platform": "macOS-26.5-arm64-arm-64bit"
+    "python": "3.13.14",
+    "platform": "Windows-11-10.0.26200-SP0"
   },
   "formal_summary": {
     "passed": 15,
@@ -41,14 +41,14 @@
       "metric": "deadline_consistency",
       "scenario": "报名日期与 Ground Truth 一致",
       "passed": true,
-      "detail": "181/181 项报名截止日期与 Ground Truth 一致"
+      "detail": "190/190 项报名截止日期与 Ground Truth 一致"
     },
     {
       "case_id": "FE-02",
       "metric": "deadline_consistency",
       "scenario": "提交日期与 Ground Truth 一致",
       "passed": true,
-      "detail": "181/181 项提交截止日期与 Ground Truth 一致"
+      "detail": "190/190 项提交截止日期与 Ground Truth 一致"
     },
     {
       "case_id": "FE-03",
@@ -62,7 +62,7 @@
       "metric": "eligibility_accuracy",
       "scenario": "开放且符合资格赛事进入评分",
       "passed": true,
-      "detail": "开放且符合资格的赛事进入正式评分，score=75.0"
+      "detail": "开放且符合资格的赛事进入正式评分，score=83.2"
     },
     {
       "case_id": "FE-05",
@@ -111,7 +111,7 @@
       "metric": "basic_data_availability",
       "scenario": "基础资料完整赛事可建项目",
       "passed": true,
-      "detail": "基础资料完整的赛事允许创建项目"
+      "detail": "基础资料完整且仍可报名的赛事 2026年大学生AI信息素养大赛_2026 允许创建项目"
     },
     {
       "case_id": "FE-12",
@@ -143,12 +143,17 @@
     }
   ],
   "regression": {
-    "tests_run": 48,
-    "passed": 46,
-    "failures": 2,
+    "tests_run": 59,
+    "passed": 59,
+    "failures": 0,
     "errors": 0,
-    "successful": false,
-    "output": "test_node_exception_produces_auditable_conservative_fallback (test_agent_trace.AgentTraceTests.test_node_exception_produces_auditable_conservative_fallback) ... ok\ntest_run_agent_returns_structured_audit_trace (test_agent_trace.AgentTraceTests.test_run_agent_returns_structured_audit_trace) ... ok\ntest_trace_summary_and_metrics_are_consistent (test_agent_trace.AgentTraceTests.test_trace_summary_and_metrics_are_consistent) ... ok\ntest_apply_is_atomic_and_idempotent (test_innovation_features.PortfolioApplyTests.test_apply_is_atomic_and_idempotent) ... ok\ntest_three_modes_respect_capacity_and_trust_gate (test_innovation_features.PortfolioOptimizerTests.test_three_modes_respect_capacity_and_trust_gate) ... ok\ntest_critical_deadline_change_is_proposed_not_auto_applied (test_innovation_features.RadarTests.test_critical_deadline_change_is_proposed_not_auto_applied) ... ok\ntest_demo_scan_creates_baseline_then_pending_change (test_innovation_features.RadarTests.test_demo_scan_creates_baseline_then_pending_change) ... ok\ntest_docx_source_is_detected_and_normalized (test_innovation_features.RadarTests.test_docx_source_is_detected_and_normalized) ... ok\ntest_private_source_urls_are_rejected (test_innovation_features.RadarTests.test_private_source_urls_are_rejected) ... ok\ntest_project_template_dependencies (test_innovation_v2.ExecutionContractTests.test_project_template_dependencies) ... ok\ntest_quality_and_agent_run_history_are_separate_from_frozen_metrics (test_innovation_v2.ExecutionContractTests.test_quality_and_agent_run_history_are_separate_from_frozen_metrics) ... ok\ntest_rules_health_field_diff_and_noise_inbox_contract (test_innovation_v2.RadarControlTowerTests.test_rules_health_field_diff_and_noise_inbox_contract) ... ok\ntest_http_error_falls_back (test_llm.TestLLMCitationSafety.test_http_error_falls_back) ... ok\ntest_markers_dropped_falls_back (test_llm.TestLLMCitationSafety.test_markers_dropped_falls_back) ... ok\ntest_markers_preserved_returns_text (test_llm.TestLLMCitationSafety.test_markers_preserved_returns_text) ... ok\ntest_no_markers_draft_not_validated (test_llm.TestLLMCitationSafety.test_no_markers_draft_not_validated) ... ok\ntest_disabled_when_forced_off (test_llm.TestLLMDegradation.test_disabled_when_forced_off) ... ok\ntest_disabled_without_key (test_llm.TestLLMDegradation.test_disabled_without_key) ... ok\ntest_admin_routes_fail_closed_without_server_configuration (test_security_and_readiness.SecurityAndReadinessTests.test_admin_routes_fail_closed_without_server_configuration) ... ok\ntest_all_admin_routes_require_a_valid_token (test_security_and_readiness.SecurityAndReadinessTests.test_all_admin_routes_require_a_valid_token) ... ok\ntest_catalog_filters_use_shared_readiness (test_security_and_readiness.SecurityAndReadinessTests.test_catalog_filters_use_shared_readiness) ... ok\ntest_health_never_exposes_database_url (test_security_and_readiness.SecurityAndReadinessTests.test_health_never_exposes_database_url) ... ok\ntest_missing_evidence_field_does_not_block_scoring (test_security_and_readiness.SecurityAndReadinessTests.test_missing_evidence_field_does_not_block_scoring) ... ok\ntest_not_found_source_with_complete_basics_can_be_scored (test_security_and_readiness.SecurityAndReadinessTests.test_not_found_source_with_complete_basics_can_be_scored) ... ok\ntest_01_join_verified_open_competition (test_submission_cases.SubmissionCases.test_01_join_verified_open_competition) ... ok\ntest_02_join_is_idempotent (test_submission_cases.SubmissionCases.test_02_join_is_idempotent) ... ok\ntest_03_unverified_competition_cannot_become_project (test_submission_cases.SubmissionCases.test_03_unverified_competition_cannot_become_project) ... FAIL\ntest_04_expired_competition_cannot_become_project (test_submission_cases.SubmissionCases.test_04_expired_competition_cannot_become_project) ... ok\ntest_05_project_deadline_is_read_from_competition (test_submission_cases.SubmissionCases.test_05_project_deadline_is_read_from_competition) ... ok\ntest_06_update_project_status (test_submission_cases.SubmissionCases.test_06_update_project_status) ... ok\ntest_07_complete_project_item (test_submission_cases.SubmissionCases.test_07_complete_project_item) ... ok\ntest_08_add_and_delete_material (test_submission_cases.SubmissionCases.test_08_add_and_delete_material) ... ok\ntest_09_project_delete_is_owner_scoped (test_submission_cases.SubmissionCases.test_09_project_delete_is_owner_scoped) ... ok\ntest_10_ics_contains_official_deadline (test_submission_cases.SubmissionCases.test_10_ics_contains_official_deadline) ... ok\ntest_11_profile_delete_cascades_projects (test_submission_cases.SubmissionCases.test_11_profile_delete_cascades_projects) ... ok\ntest_12_same_name_defaults_to_latest_verified_version (test_submission_cases.SubmissionCases.test_12_same_name_defaults_to_latest_verified_version) ... ok\ntest_13_no_year_resolves_latest_verified_version (test_submission_cases.SubmissionCases.test_13_no_year_resolves_latest_verified_version) ... ok\ntest_14_explicit_year_resolves_requested_version (test_submission_cases.SubmissionCases.test_14_explicit_year_resolves_requested_version) ... FAIL\ntest_15_missing_project_returns_none (test_submission_cases.SubmissionCases.test_15_missing_project_returns_none) ... ok\ntest_16_empty_ics_project_is_still_valid_calendar (test_submission_cases.SubmissionCases.test_16_empty_ics_project_is_still_valid_calendar) ... ok\ntest_competition_without_national_registration_deadline_does_not_invent_one (test_trust_rules.TrustRulesTests.test_competition_without_national_registration_deadline_does_not_invent_one) ... ok\ntest_database_deadlines_match_ground_truth (test_trust_rules.TrustRulesTests.test_database_deadlines_match_ground_truth) ... ok\ntest_education_levels_are_complete_and_unknown_values_fail (test_trust_rules.TrustRulesTests.test_education_levels_are_complete_and_unknown_values_fail) ... ok\ntest_expired_competition_is_ineligible_without_score (test_trust_rules.TrustRulesTests.test_expired_competition_is_ineligible_without_score) ... ok\ntest_rag_and_agent_use_one_canonical_registration_deadline (test_trust_rules.TrustRulesTests.test_rag_and_agent_use_one_canonical_registration_deadline) ... ok\ntest_team_query_uses_team_evidence_with_product_default_minimum (test_trust_rules.TrustRulesTests.test_team_query_uses_team_evidence_with_product_default_minimum) ... ok\ntest_unverified_competition_with_complete_basics_can_be_scored (test_trust_rules.TrustRulesTests.test_unverified_competition_with_complete_basics_can_be_scored) ... ok\ntest_verified_core_competitions_have_page_level_evidence (test_trust_rules.TrustRulesTests.test_verified_core_competitions_have_page_level_evidence) ... ok\n\n======================================================================\nFAIL: test_03_unverified_competition_cannot_become_project (test_submission_cases.SubmissionCases.test_03_unverified_competition_cannot_become_project)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/Users/a1/Desktop/school/campus-innovation-agent-master/tests/test_submission_cases.py\", line 117, in test_03_unverified_competition_cannot_become_project\n    with self.assertRaisesRegex(ValueError, \"competition_unverified\"):\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: ValueError not raised\n\n======================================================================\nFAIL: test_14_explicit_year_resolves_requested_version (test_submission_cases.SubmissionCases.test_14_explicit_year_resolves_requested_version)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/Users/a1/Desktop/school/campus-innovation-agent-master/tests/test_submission_cases.py\", line 193, in test_14_explicit_year_resolves_requested_version\n    self.assertTrue(result[\"pending_review\"])\nAssertionError: False is not true\n\n----------------------------------------------------------------------\nRan 48 tests in 0.801s\n\nFAILED (failures=2)\n"
+    "subtests_passed": 13,
+    "successful": true,
+    "output": "59 passed, 13 subtests passed in 135.70s (0:02:15)"
   },
-  "freeze": null
+  "freeze": {
+    "path": "backups/campus-agent-freeze-20260716-235411.zip",
+    "bytes": 32782454,
+    "sha256": "677e8fcc3939d5a0ac65a62fcb06e6daefed3912d5af0a6114cc413fefd7d438"
+  }
 }

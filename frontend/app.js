@@ -532,6 +532,7 @@ function qualityGate(label, enabled, detail) {
 
 async function renderQuality() {
   const host = $("#quality-dashboard");
+  if (!host) return;
   host.innerHTML = '<div class="quality-loading"><span></span><b>正在核对冻结报告与实时指标</b></div>';
   let data;
   try {
@@ -2678,6 +2679,7 @@ function renderAdminView() {
   renderAdminEvidence();
   setAdminStep(1);
   renderRadarOperations();
+  renderQuality();
 }
 
 function adminHeaders() {

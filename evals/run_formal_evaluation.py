@@ -7,6 +7,7 @@ import io
 import json
 import platform
 import re
+import subprocess
 import sys
 import unittest
 from dataclasses import dataclass
@@ -231,17 +232,36 @@ def basic_data_can_be_recommended_without_evidence_gate() -> str:
     return "基础资料完整的赛事可推荐，来源状态仅作提示"
 
 
+def pick_registerable_competition():
+    """挑一个「基础资料完整且当天仍可报名」的赛事。
+
+    原用例固定用 baidu_star_2026，随报名时间自然过期后必然失败（competition_expired），
+    属于用例夹具腐烂而非产品缺陷：create_user_project 明确拦截已截止赛事（409）。
+    改为动态挑选，使本条检查始终验证它真正想验证的事——
+    「来源核验状态只是提示，不再阻止基于基础资料创建项目」。
+    """
+    from trust import assess_source_readiness, is_registerable_now
+
+    for comp in db.list_competitions():
+        if assess_source_readiness(comp).ready and is_registerable_now(comp, date.today()):
+            return comp
+    return None
+
+
 def basic_data_project_creation_is_allowed() -> str:
+    comp = pick_registerable_competition()
+    if comp is None:
+        raise AssertionError("未找到基础资料完整且仍可报名的赛事，无法验证建项目能力")
     user_id = "formal_eval_block_user"
     db.delete_user_profile(user_id)
     db.save_user_profile(profile(user_id))
     try:
-        project = db.create_user_project(user_id, "baidu_star_2026")
-        if project.competition_id != "baidu_star_2026":
+        project = db.create_user_project(user_id, comp.competition_id)
+        if project.competition_id != comp.competition_id:
             raise AssertionError("基础资料完整的赛事未能创建项目")
     finally:
         db.delete_user_profile(user_id)
-    return "基础资料完整的赛事允许创建项目"
+    return f"基础资料完整且仍可报名的赛事 {comp.competition_id} 允许创建项目"
 
 
 def unverified_agent_uses_basic_data() -> str:
@@ -299,16 +319,37 @@ def build_cases() -> list[FormalCase]:
 
 
 def run_regression_suite() -> dict:
-    stream = io.StringIO()
-    suite = unittest.defaultTestLoader.discover(str(PROJECT_ROOT / "tests"))
-    result = unittest.TextTestRunner(stream=stream, verbosity=2).run(suite)
+    """跑完整回归套件。
+
+    原来用 unittest.discover 只能发现 52 项（漏掉 pytest 风格用例），
+    与文档口径「59 项自动回归」不一致；改用 pytest 既覆盖更全又与对外口径一致。
+    """
+    proc = subprocess.run(
+        [sys.executable, "-m", "pytest", "-q", "--tb=no", "-p", "no:cacheprovider"],
+        cwd=str(PROJECT_ROOT),
+        capture_output=True,
+        text=True,
+    )
+    output = (proc.stdout or "") + (proc.stderr or "")
+    lines = [line.strip() for line in output.splitlines() if line.strip()]
+    tail = lines[-1] if lines else ""
+
+    def _num(pattern: str) -> int:
+        matched = re.search(pattern, tail)
+        return int(matched.group(1)) if matched else 0
+
+    passed = _num(r"(\d+) passed")
+    failures = _num(r"(\d+) failed")
+    errors = _num(r"(\d+) error")
+    subtests = _num(r"(\d+) subtests passed")
     return {
-        "tests_run": result.testsRun,
-        "passed": result.testsRun - len(result.failures) - len(result.errors),
-        "failures": len(result.failures),
-        "errors": len(result.errors),
-        "successful": result.wasSuccessful(),
-        "output": stream.getvalue(),
+        "tests_run": passed + failures + errors,
+        "passed": passed,
+        "failures": failures,
+        "errors": errors,
+        "subtests_passed": subtests,
+        "successful": proc.returncode == 0,
+        "output": tail,
     }
 
 
