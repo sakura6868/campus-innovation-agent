@@ -40,6 +40,7 @@ class CompetitionCategory(str, Enum):
     LIFE_SCIENCE = "life_science"     # 生命科学/医药类
     PHYSICS = "physics"               # 物理类
     CHEM_ENV = "chem_env"             # 化工/环境/能源类
+    LOGISTICS = "logistics"           # 物流与供应链类
 
 
 class EducationLevel(str, Enum):

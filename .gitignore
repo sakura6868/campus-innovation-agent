@@ -16,6 +16,8 @@ __pycache__/
 output/
 demo/*
 !demo/campus-agent-demo.mp4
+# 正式演示视频（提交物之一，submission/README.md 直接引用，需入库）
+!demo/campus-agent-demo-final.mp4
 tmp/
 backups/
 # 本地数据库备份与归档旧数据（不入库）

@@ -109,7 +109,7 @@ const CAT_LABEL = {
   data: "数据科学", design: "艺术设计",
   business: "财经商科", engineering: "机械工程",
   life_science: "生科医药", physics: "物理",
-  chem_env: "化工环境",
+  chem_env: "化工环境", logistics: "物流供应链",
 };
 const STATUS_LABEL = {
   highly_suitable: "高度适合", suitable: "比较适合",
@@ -556,7 +556,7 @@ async function renderQuality() {
     deadline_consistency: "截止日期一致率",
     eligibility_accuracy: "资格判断准确率",
     citation_accuracy: "官方证据引用正确率",
-    unverified_block_rate: "未核验赛事拦截率",
+    basic_data_availability: "基础资料可用率",
     insufficient_refusal_rate: "证据不足安全处理率",
   };
   const metricCards = Object.entries(metricLabels).map(([key, label]) => {
@@ -571,7 +571,7 @@ async function renderQuality() {
   const scoreEvidence = [
     ["30", "落地价值", "赛事情报 → 个性化推荐 → 参赛项目"],
     ["25", "任务闭环", "输入、处理、输出、兜底全链路留痕"],
-    ["20", "工程质量", `${regressionTotal || 48} 项回归、日志、健康检查与降级`],
+    ["20", "工程质量", `${regressionTotal || 59} 项回归、日志、健康检查与降级`],
     ["15", "交互体验", "运行剧场与四种项目视图"],
     ["10", "安全合规", "签名会话、SSRF、最小数据与人工审核"],
   ].map(([weight, label, detail]) => `<article><strong>${weight}</strong><div><b>${label}</b><span>${detail}</span></div></article>`).join("");
