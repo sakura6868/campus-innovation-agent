@@ -169,7 +169,7 @@ campus-innovation-agent/
 |   `-- campus_agent.db           # 默认 SQLite 数据库
 |-- tests/                        # 59 条自动回归测试
 |-- docs/                         # 架构、部署、合规、用例、演示脚本
-|-- demo/campus-agent-demo.webm   # 4 分 59 秒操作演示
+|-- demo/campus-agent-demo-final.mp4  # 3 分 28 秒演示视频（无配音、仅中文字幕）
 |-- Dockerfile
 |-- compose.yaml
 |-- .env.example
@@ -220,8 +220,7 @@ campus-innovation-agent/
 - [固定账号端到端验收记录](docs/DEMO_WALKTHROUGH.md)
 - [版本冻结说明](docs/RELEASE_FREEZE.md)
 - [3-5 分钟演示视频脚本](docs/DEMO_VIDEO_SCRIPT.md)
-- [演示视频（mp4，校内平台可直接打开）](demo/campus-agent-demo.mp4)
-- [演示视频（webm，备用）](demo/campus-agent-demo.webm)
+- [演示视频（3:28，mp4，无配音·仅中文字幕，校内平台可直接打开）](demo/campus-agent-demo-final.mp4)
 
 ## 常见问题
 

@@ -15,7 +15,7 @@
 | 2 | **技术文档** | `docs/ARCHITECTURE.md`（架构）、`docs/RAG_ARCHITECTURE.md`（检索）、`docs/DEPLOYMENT.md`（运行）、`参赛作品说明.md`（根目录主文档）、`docs/INNOVATION_HIGHLIGHTS.md`（创新点） | 直接阅读 |
 | 3 | **README** | `README.md`（环境/依赖/启动/测试/FAQ） | 直接阅读 |
 | 4 | **用例集（≥10 条）** | `docs/TEST_CASES.md`（44 条正常/异常/边界/安全用例）、`scripts/challenge_probe.py`（15 条现场挑战用例）、`docs/TRIAL_FORM.md`（真人试用表） | 见第三节复现命令 |
-| 5 | **演示视频（3—5 分钟）** | `demo/campus-agent-demo.mp4` + 脚本 `docs/DEMO_VIDEO_SCRIPT.md` | 播放；脚本按决赛 6 分钟演示结构撰写 |
+| 5 | **演示视频（3—5 分钟）** | `demo/campus-agent-demo-final.mp4`（**3:28**，1440×900，**无配音、仅烧入中文字幕**）+ 脚本 `docs/DEMO_VIDEO_SCRIPT.md` | 播放；覆盖登录→推荐分化→详情来源→智能顾问引用→大厅→机会提醒→行动路线→我的项目→数据维护→质量驾驶舱 |
 | 6 | **合规说明** | `docs/COMPLIANCE.md`（数据来源/隐私/脱敏/权限） | 直接阅读 |
 
 ---
@@ -92,7 +92,7 @@ docker run -p 8011:8011 campus-agent
 ## 五、提交前须知（给队伍）
 
 1. **仓库可见性**：评委若通过链接评审，需将仓库设为 **Public** 或将评委添加为协作者；`.env` 已被 `.gitignore` 排除，仓库不含任何密钥。
-2. **演示视频时长**：手册要求 **3—5 分钟**；当前 `demo/campus-agent-demo.mp4` 若为旧版请按 `docs/DEMO_VIDEO_SCRIPT.md`（决赛 6 分钟演示结构）重录。
+2. **演示视频时长**：手册要求 **3—5 分钟**；已重录为 `demo/campus-agent-demo-final.mp4`（**3:28**，1440×900，无配音、仅中文字幕），由 `rec_demo2.py`（playwright 实时录屏 + 自动生成字幕时间轴）与 `burn_subs.py`（ffmpeg `subtitles=` 烧字幕）可复现。
 3. **第三方依赖**：已在 `docs/THIRD_PARTY_NOTICES.md` 逐项列明来源/用途/使用方式（FastAPI、SQLAlchemy、qwen-plus、duckduckgo、可选 Chroma/sentence-transformers 等），符合「使用开源/公开模型须说明」要求。
 
 ---
@@ -117,7 +117,7 @@ campus-innovation-agent/
 │  ├─ THIRD_PARTY_NOTICES.md  # 第三方依赖清单
 │  ├─ DEMO_VIDEO_SCRIPT.md    # 演示视频脚本
 │  └─ TRIAL_FORM.md           # 真人试用记录表
-├─ demo/campus-agent-demo.mp4 # 演示视频（3—5 分钟）
+├─ demo/campus-agent-demo-final.mp4 # 演示视频（3:28，无配音、仅字幕）
 ├─ scripts/                   # benchmark_smoke.py / challenge_probe.py / trial_replay.py
 ├─ src/                       # 后端（FastAPI + SQLAlchemy + 智能体编排）
 ├─ frontend/                  # 单页前端（index.html / app.js / styles.css）
