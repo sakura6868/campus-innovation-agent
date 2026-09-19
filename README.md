@@ -52,7 +52,16 @@
 → Agent 决策剧场 → 参赛执行闭环
 ```
 
-雷达的管理写操作继续受 `X-Admin-Token` 保护。自动扫描工作流位于 `.github/workflows/source-radar.yml`，需要在 GitHub Actions 中配置 `RADAR_BASE_URL` 和 `ADMIN_API_TOKEN` 两个 Secrets；也可通过管理界面的“立即扫描”和“演示截止日期变化”进行本地验收。
+雷达的管理写操作继续受 `X-Admin-Token` 保护。定时扫描工作流位于 `.github/workflows/source-radar.yml`（每 6 小时调用部署上的 `/api/admin/radar/run`），需要在 GitHub Actions 配置两个 Secrets：
+
+| Secret | 值 | 来源 |
+|---|---|---|
+| `RADAR_BASE_URL` | `https://campus-innovation-agent.onrender.com` | 你的 Render 服务地址（不带结尾斜杠） |
+| `ADMIN_API_TOKEN` | 与 Render 侧**完全相同**的令牌字符串 | Render 控制台 → 服务 → Environment |
+
+配置步骤：① Render 控制台把 `ADMIN_API_TOKEN` 设成一个自己已知的确切字符串——`render.yaml` 已用 `sync: false` 解除蓝图托管，避免手填的值被下次蓝图同步覆盖为空（**全新蓝图部署须手动补建此变量**，未配置时 `/api/admin/*` 全部返回 503）；② GitHub 仓库 → Settings → Secrets and variables → Actions → New repository secret，分别新增上面两个；③ 回到 Actions → *Official Source Radar* → Run workflow 手动触发一次，转绿即打通。
+
+> Secrets 未填时该工作流会直接失败（脚本开头 `test -n` 校验），**与代码质量无关**——`.github/workflows/ci.yml`（跑 `pytest tests/ -q`）才是真正的 CI。也可通过管理界面的“立即扫描”和“演示截止日期变化”做本地验收，不必依赖定时任务。
 
 ## 数据现状
 
