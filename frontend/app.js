@@ -2960,6 +2960,23 @@ $("#login-form").addEventListener("submit", (e) => {
   doLogin(u, pw);
 });
 
+// —— 一键体验：评审零输入进入（演示账号 test / test123）——
+const demoLoginBtn = $("#demo-login-btn");
+if (demoLoginBtn) {
+  demoLoginBtn.addEventListener("click", async () => {
+    const msg = $("#login-msg");
+    msg.textContent = ""; msg.className = "msg";
+    demoLoginBtn.disabled = true;
+    demoLoginBtn.textContent = "正在进入…";
+    try {
+      await doLogin("test", "test123");
+    } finally {
+      demoLoginBtn.disabled = false;
+      demoLoginBtn.textContent = "一键体验（test / test123）";
+    }
+  });
+}
+
 $("#register-form").addEventListener("submit", (e) => {
   e.preventDefault();
   const u = ($("#reg-username").value || "").trim();

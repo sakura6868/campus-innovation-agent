@@ -7509,3 +7509,9 @@ body.agent-fullscreen #view-agent.agent-codex,
 /* —— 雷达运维统计块 —— */
 .theme-neumorphic .admin-view .admin-radar-stats > div { border: 1px solid rgba(255, 255, 255, .055); background: var(--neo-well); }
 .theme-neumorphic .admin-view .admin-radar-stats span { color: var(--neo-muted); }
+
+/* —— 一键体验（演示账号 test / test123）入口 —— */
+.login-form .login-demo-btn { width: 100%; padding: 10px 16px; font-size: 14px; }
+.login-demo-hint { margin: -2px 0 0; font-size: 12px; line-height: 1.6; color: #8b95a5; }
+.theme-neumorphic .login-demo-hint { color: #aaa6ad !important; }
+.theme-neumorphic .login-form .login-demo-btn { color: #e9dfd0 !important; border-color: rgba(216, 179, 109, .42) !important; }
