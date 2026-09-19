@@ -54,7 +54,7 @@
 | 平台 | 用途 | 说明 |
 |---|---|---|
 | **Docker / Docker Compose** | 容器化部署 | 见 `compose.yaml`、`Dockerfile` |
-| **GitHub Actions** | 定时触发官方来源雷达扫描 | `.github/workflows/source-radar.yml`，每 6 小时调用 `/api/admin/radar/run` |
+| **GitHub Actions** | 定时触发官方来源雷达扫描 | `.github/workflows/source-radar.yml`，每 6 小时调用 `/api/admin/radar/run`（当前已停用） |
 
 ## 六、数据来源（非第三方数据集）
 

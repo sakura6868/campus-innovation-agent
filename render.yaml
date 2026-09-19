@@ -12,14 +12,8 @@ services:
         fromDatabase:
           name: campus-db
           property: connectionString   # 自动注入免费 Postgres 的连接串
-      # ADMIN_API_TOKEN：所有数据维护接口强制使用 X-Admin-Token（未配置则 /api/admin/* 全部 503）。
-      # 原来用 generateValue: true，但蓝图生成的随机值既读不出来、也无法同步给 GitHub Actions 的 Secrets，
-      # 且在 dashboard 手动改的值又会被下次蓝图同步覆盖 —— 与下方 AGENT_LLM_API_KEY 同一个坑。
-      # 因此改为 sync:false：值由 Render 控制台 Environment 手动维护，蓝图不再触碰，
-      # 这样同一个令牌才能同时配进 GitHub Actions 的 ADMIN_API_TOKEN Secret，供 source-radar.yml 定时调用。
-      # 注意：全新蓝图部署时需在控制台 Environment 手动补建这个变量，否则管理员相关功能会失效。
       - key: ADMIN_API_TOKEN
-        sync: false
+        generateValue: true            # 所有数据维护接口强制使用 X-Admin-Token
       - key: AUTH_TOKEN_SECRET
         generateValue: true            # 签发用户会话，与管理员令牌分离
       - key: AUTH_TOKEN_TTL_SECONDS
