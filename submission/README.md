@@ -8,7 +8,7 @@
 | 技术文档 | [02_技术文档.md](02_技术文档.md) |
 | README | [../README.md](../README.md) |
 | 用例集 | [03_测试用例摘要.md](03_测试用例摘要.md) + [../docs/TEST_CASES.md](../docs/TEST_CASES.md) |
-| 演示视频 | [正式 MP4（4 分 25 秒）](../demo/campus-agent-demo-final.mp4) + [04_演示视频交付说明.md](04_演示视频交付说明.md) |
+| 演示视频 | [正式 MP4（3 分 28 秒）](../demo/演示视频.mp4) + [04_演示视频交付说明.md](04_演示视频交付说明.md) |
 | 合规说明 | [05_合规说明.md](05_合规说明.md) + [../docs/COMPLIANCE.md](../docs/COMPLIANCE.md) |
 
 提交前请执行 [提交前核验清单.md](提交前核验清单.md)。
