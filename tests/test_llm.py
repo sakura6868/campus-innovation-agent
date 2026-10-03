@@ -73,7 +73,7 @@ class TestLLMDegradation(unittest.TestCase):
 
 class TestLLMCitationSafety(unittest.TestCase):
     def _enabled_env(self) -> dict:
-        return {"AGENT_LLM_API_KEY": "sk-test", "AGENT_LLM_BASE_URL": "https://example/v1"}
+        return {"AGENT_LLM": "1", "AGENT_LLM_API_KEY": "sk-test", "AGENT_LLM_BASE_URL": "https://example/v1"}
 
     def test_markers_preserved_returns_text(self):
         with _EnvPatch(**self._enabled_env()), \

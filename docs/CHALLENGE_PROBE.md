@@ -1,5 +1,7 @@
 # 现场挑战用例压测报告（CHALLENGE_PROBE）
 
+> 最新复测：2026-10-03，`http://127.0.0.1:8013`，LLM 与联网关闭。15/15 通过脚本安全检查，P95 245.3 ms；引用 7 / 普通对话 7 / 噪声拦截 1。原始结果为 `scripts/challenge_probe_result.json`。下方包含历史观测，旧模型延迟不代表本轮；安全检查不等于所有回答语义完全正确，也不代表真实用户收益。
+
 > 模拟评委现场抽取「没见过 / 边界 / 超出范围」的问题，验证 Agent 闭环在陌生输入下**不崩、不空、不编造**。
 > 配套脚本：`scripts/challenge_probe.py`，结果原始数据：`scripts/challenge_probe_result.json`
 

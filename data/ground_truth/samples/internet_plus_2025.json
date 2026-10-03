@@ -26,8 +26,8 @@
   ],
   "official_source_url": "https://www.moe.gov.cn/srcsite/A08/s5672/202505/W020250509342349375155.docx",
   "source_acquired_date": "2026-07-18",
-  "trusted_level": "A",
-  "data_status": "verified",
+  "trusted_level": "B",
+  "data_status": "unverified",
   "last_verified_at": "2026-07-18",
   "doc_version": "2025_moe_official_docx_v1",
   "evidence": [

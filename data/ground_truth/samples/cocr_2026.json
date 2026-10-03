@@ -10,27 +10,16 @@
     "专科生",
     "高职高专生"
   ],
-  "allowed_grades": [
-    "大二",
-    "大三",
-    "大四"
-  ],
-  "allowed_majors": [
-    "计算机科学与技术",
-    "软件工程",
-    "人工智能",
-    "信息安全",
-    "数据科学与大数据技术",
-    "网络空间安全"
-  ],
+  "allowed_grades": null,
+  "allowed_majors": null,
   "team_required": true,
   "team_min": 1,
   "team_max": 3,
-  "registration_deadline": "2026-11-25",
+  "registration_deadline": null,
   "submission_deadline": null,
-  "competition_start_date": "2026-11-29",
-  "competition_end_date": "2026-12-20",
-  "result_announcement_date": "2026-12-31",
+  "competition_start_date": null,
+  "competition_end_date": null,
+  "result_announcement_date": null,
   "award_settings": "区域赛各科目按成绩排名设一、二、三等奖（约10%/20%/25%）；晋级国赛者国赛设一、二、三等奖（约10%/20%/30%），前三名获奖金。",
   "award_distribution": [
     {
@@ -84,38 +73,8 @@
       "acquired_date": "2026-07-18",
       "last_verified_at": "2026-07-18",
       "trusted_level": "A"
-    },
-    {
-      "field": "registration_deadline",
-      "page": null,
-      "source_text": "区域赛/省赛报名:即日起—2026年11月25日",
-      "document_name": "2026年第八届全国高校计算机能力挑战赛 通知",
-      "source_url": "http://www.ncccu.org.cn/",
-      "acquired_date": "2026-07-18",
-      "last_verified_at": "2026-07-18",
-      "trusted_level": "A"
-    },
-    {
-      "field": "competition_start_date",
-      "page": null,
-      "source_text": "区域赛/省赛考试:2026年11月29日",
-      "document_name": "2026年第八届全国高校计算机能力挑战赛 通知",
-      "source_url": "http://www.ncccu.org.cn/",
-      "acquired_date": "2026-07-18",
-      "last_verified_at": "2026-07-18",
-      "trusted_level": "A"
-    },
-    {
-      "field": "competition_end_date",
-      "page": null,
-      "source_text": "国赛考试:2026年12月20日；国赛获奖公示:2026年12月底",
-      "document_name": "2026年第八届全国高校计算机能力挑战赛 通知",
-      "source_url": "http://www.ncccu.org.cn/",
-      "acquired_date": "2026-07-18",
-      "last_verified_at": "2026-07-18",
-      "trusted_level": "A"
     }
   ],
-  "notes": "经官网(ncccu.org.cn)及我爱竞赛网转载核验：本届为第八届（2026）。区域赛/省赛报名截止2026-11-25，区域赛考试2026-11-29，国赛晋级公示2026-12-15，国赛考试2026-12-20，国赛获奖公示2026年12月底。原记录日期(2026-08-17等)均为占位值，已更正。赛事含个人赛与团队赛（团队赛各科目每校限报100队、允许跨校），submission_deadline为考试/答题制、无论文提交，置空；result_announcement_date取国赛获奖公示期末(2026-12-31)作参考。",
+  "notes": "本记录为多赛项目录汇总，不能用程序设计赛的日期代表全部赛项，故汇总日期置空。官网面向高校所有专业在校生，不限制大二至大四或计算机专业。请进入独立赛项查看报名与提交要求：大数据 ncccu_data_2026、人工智能 ncccu_ai_2026、数字媒体 ncccu_digital_2026。其他个人赛仍以官网科目通知为准；汇总记录保持候选状态，不输出正式评分。最终以官网最新通知为准。",
   "official_source_status": "found"
 }

@@ -12,7 +12,7 @@ Windows PowerShell：
 .\start.ps1
 ```
 
-脚本优先使用 Docker；未安装 Docker 时自动使用本地 `venv`。默认访问 `http://127.0.0.1:8000/`。
+脚本默认使用本地 Python `venv` 并安装/检查依赖。默认访问 `http://127.0.0.1:8000/`。Docker 需显式使用 `.\start.ps1 -Docker -Port 8011`，未启动 Docker 引擎时会给出明确错误。
 
 ## 📦 Docker 部署
 
@@ -56,7 +56,8 @@ python -m venv venv
 
 ```powershell
 Invoke-RestMethod http://127.0.0.1:8000/health
-.\venv\Scripts\python.exe -m unittest discover -s tests -v
+.\venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+.\venv\Scripts\python.exe -m pytest tests -q
 ```
 
 预期健康检查返回 `status=ok`，自动测试全部通过。
@@ -72,5 +73,5 @@ Invoke-RestMethod http://127.0.0.1:8000/health
 | 端口被占用 | `.\start.ps1 -Port 8011` 使用其他端口 |
 | 扫描版 PDF 无文本 | 使用可检索官方 PDF，或 OCR 后关联原始页码与来源 |
 | Docker 找不到 `.env` | 从 `.env.example` 复制生成 |
-| 项目无法加入 | 确认已保存画像、赛事官网来源及四类关键证据完整，且仍可报名 |
+| 项目无法加入 | 确认已保存画像、赛事官网来源及五类关键证据完整，且仍可报名 |
 | 同名赛事未识别 | 在问题中写明年份，或先补齐该年份的官网关键证据 |

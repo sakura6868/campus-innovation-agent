@@ -13,13 +13,14 @@
 from __future__ import annotations
 
 import statistics
+import os
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import requests
 
-BASE = "http://127.0.0.1:8011"
+BASE = os.getenv("EVAL_BASE_URL", "http://127.0.0.1:8011").rstrip("/")
 USERNAME = "test"
 PASSWORD = "test123"
 
@@ -145,7 +146,7 @@ def main() -> int:
     ok, total, avg, mx = sample_ask(headers)
     print("成功 %d/%d，平均 %.0f ms，最大 %.0f ms" % (ok, total, avg, mx))
     print("=" * 78)
-    return 0
+    return 0 if all_ok == all_total and ok == total else 1
 
 
 if __name__ == "__main__":

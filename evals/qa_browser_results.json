@@ -1,0 +1,61 @@
+{
+  "executed_at": "2026-10-03T09:20:02.462Z",
+  "mode": "real_browser_local_http_no_response_mocking",
+  "profile_sent": false,
+  "viewports": [
+    "1440x1080",
+    "390x844"
+  ],
+  "errors": [],
+  "checks": [
+    {
+      "id": "BQA-01",
+      "passed": true,
+      "detail": "Model selector reflects configured provider, not obsolete hardcoded models"
+    },
+    {
+      "id": "BQA-02",
+      "passed": true,
+      "detail": "Official deadline rendered through the real HTTP API"
+    },
+    {
+      "id": "BQA-03",
+      "passed": true,
+      "detail": "Conversation context is visible and can be cleared"
+    },
+    {
+      "id": "BQA-04",
+      "passed": true,
+      "detail": "Natural followup sends tab-local context and remains in the same contest"
+    },
+    {
+      "id": "BQA-05",
+      "passed": true,
+      "detail": "Clear resets both explicit selection and conversation context"
+    },
+    {
+      "id": "BQA-06",
+      "passed": true,
+      "detail": "Candidate plan uses real API response, retains warning, and cannot create official tasks"
+    },
+    {
+      "id": "BQA-07",
+      "passed": true,
+      "detail": "Unknown event is not replaced by a real or previously selected contest"
+    },
+    {
+      "id": "BQA-08",
+      "passed": true,
+      "detail": "390px mobile context and send controls fit without horizontal overflow"
+    },
+    {
+      "id": "BQA-09",
+      "passed": true,
+      "detail": "No browser page errors during this workflow"
+    }
+  ],
+  "summary": {
+    "passed": 9,
+    "total": 9
+  }
+}

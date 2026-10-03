@@ -9,3 +9,12 @@ src/data/chunks/
 .playwright-cli/
 output/
 demo/
+backups/
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+*.zip
+.env.*
+!.env.example
+data/uploads/

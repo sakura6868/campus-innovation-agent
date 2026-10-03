@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>校园科创导航智能体</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='10' fill='%2316181d'/%3E%3Ctext x='32' y='40' text-anchor='middle' font-family='Arial' font-size='25' font-weight='700' fill='white'%3ECI%3C/text%3E%3C/svg%3E" />
-  <link rel="stylesheet" href="/static/styles.css?v=20260919.01" />
+  <link rel="stylesheet" href="/static/styles.css?v=20261003.05" />
 </head>
 <body class="theme-neumorphic">
   <header class="topnav">
@@ -71,7 +71,7 @@
             </select>
           </label>
           <label>年级
-            <select id="f-grade">
+            <select id="f-grade" required>
               <option value="大一">大一</option>
               <option value="大二">大二</option>
               <option value="大三">大三</option>
@@ -175,7 +175,7 @@
       <div class="hall-trust-filter segmented" role="group" aria-label="赛事可信状态">
         <button type="button" class="active" data-readiness="all">全部赛事</button>
         <button type="button" data-readiness="ready">可报名推荐</button>
-        <button type="button" data-readiness="candidate">暂不可报名</button>
+        <button type="button" data-readiness="candidate">候选与历史</button>
       </div>
       <div class="hall-result-meta" aria-live="polite"><span id="hall-result-count">正在加载赛事…</span><small>仅按赛事正式名称检索</small></div>
       <div id="hall-list" class="cards"></div>
@@ -316,6 +316,7 @@
               <option value="">自动识别</option>
             </select>
           </label>
+          <button id="agent-context-clear" type="button" class="btn" title="清除对话赛事" aria-label="清除对话赛事" hidden>×</button>
           <label class="agent-profile-toggle">
             <input id="agent-use-profile" type="checkbox" checked />
             <span class="agent-toggle" aria-hidden="true"></span>
@@ -351,9 +352,7 @@
             <div class="agent-input-right">
               <label class="model-select" title="切换润色模型（需后端已配置对应 LLM key）">
                 <select id="agent-model">
-                  <option value="qwen-plus">qwen-plus</option>
-                  <option value="qwen-max">qwen-max</option>
-                  <option value="qwen-turbo">qwen-turbo</option>
+                  <option value="">服务默认模型</option>
                 </select>
               </label>
               <button id="agent-send" class="agent-send" type="button" title="发送问题" aria-label="发送问题">↑</button>
@@ -380,12 +379,12 @@
       <div id="quality-dashboard" class="quality-dashboard"></div>
 
       <div class="card admin-stage admin-stage-active">
-        <header class="stage-head"><span class="stage-index">01</span><div><h3>上传官方通知</h3><p>支持 PDF、DOC 与 DOCX 文件</p></div></header>
+        <header class="stage-head"><span class="stage-index">01</span><div><h3>上传官方通知</h3><p>PDF / DOCX</p></div></header>
         <label class="admin-token-field">管理员令牌
           <input id="adm-token" type="password" autocomplete="off" placeholder="X-Admin-Token" />
         </label>
         <div class="admin-file-row">
-          <input id="adm-file" type="file" accept=".pdf,.docx,.doc" />
+          <input id="adm-file" type="file" accept=".pdf,.docx" />
         </div>
         <div class="grid admin-meta-grid">
           <label>类别
@@ -435,13 +434,39 @@
               <input id="adm-organizer" type="text" />
             </label>
             <label>官方链接
-              <input id="adm-url" type="text" placeholder="https://..." />
+              <input id="adm-url" type="url" placeholder="https://..." />
             </label>
-            <label>报名截止
+            <label>来源获取日期
+              <input id="adm-acquired" type="date" />
+            </label>
+            <label>官网来源检查日期
+              <input id="adm-checked" type="date" />
+            </label>
+            <label>报名截止日期
               <input id="adm-reg" type="date" />
             </label>
-            <label>提交截止
+            <label>报名截止时刻（原文有时填写）
+              <input id="adm-reg-time" type="time" step="1" />
+            </label>
+            <label>提交截止日期
               <input id="adm-sub" type="date" />
+            </label>
+            <label>提交截止时刻（原文有时填写）
+              <input id="adm-sub-time" type="time" step="1" />
+            </label>
+            <label>截止时区
+              <select id="adm-offset">
+                <option value="+08:00">UTC+08:00</option>
+                <option value="+00:00">UTC+00:00</option>
+                <option value="-05:00">UTC-05:00</option>
+                <option value="-04:00">UTC-04:00</option>
+              </select>
+            </label>
+            <label>时区依据
+              <select id="adm-timezone-basis">
+                <option value="campus_default">校园 UTC+08:00 假设</option>
+                <option value="official">官方原文明确（需时区证据）</option>
+              </select>
             </label>
             <label>比赛开始日期
               <input id="adm-comp-start" type="date" />
@@ -475,11 +500,12 @@
             </label>
           </div>
           <div class="row">
+            <label class="check"><input id="adm-source-confirmed" type="checkbox" /> 已检查官网链接与通知来源</label>
             <label class="check"><input id="adm-team-required" type="checkbox" /> 需要组队</label>
           </div>
           <div class="row">
             <span class="label">参赛对象：</span>
-            <label class="check"><input class="adm-education" data-value="本科生" type="checkbox" checked /> 本科生</label>
+            <label class="check"><input class="adm-education" data-value="本科生" type="checkbox" /> 本科生</label>
             <label class="check"><input class="adm-education" data-value="研究生" type="checkbox" /> 研究生</label>
             <label class="check"><input class="adm-education" data-value="专科生" type="checkbox" /> 专科生</label>
             <label class="check"><input class="adm-education" data-value="高职高专生" type="checkbox" /> 高职高专生</label>
@@ -630,7 +656,12 @@
   </div>
 
   <div id="toast" class="toast hidden"></div>
+  <dialog id="source-dialog" class="source-dialog" aria-labelledby="source-dialog-title">
+    <header><h3 id="source-dialog-title">官方原文证据</h3><form method="dialog"><button aria-label="关闭证据" title="关闭证据">×</button></form></header>
+    <div id="source-dialog-body"></div>
+    <p class="muted">证据反映获取时的官方资料，报名请以官网最新通知为准。</p>
+  </dialog>
 
-  <script src="/static/app.js?v=20260919.01"></script>
+  <script src="/static/app.js?v=20261003.05"></script>
 </body>
 </html>

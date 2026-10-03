@@ -1,0 +1,65 @@
+{
+  "evaluation_type": "local_playwright_synthetic_user_observations",
+  "executed_date": "2026-10-03",
+  "base_url": "http://127.0.0.1:8014",
+  "database_isolation": "separate_temporary_browser_database",
+  "model_mode": "offline_rules",
+  "account": "test (demo account in isolated database)",
+  "api_case_totals_are_separate": true,
+  "observations": [
+    {
+      "id": "B01", "passed": true,
+      "scenario": "完整赛事名询问截止时间，打开引用证据弹窗",
+      "observed": "回答2026-10-23 12:00，明确校园时区假设；弹窗有第1页、官方原文、获取与来源检查日期、SHA-256及官方PDF链接。未访问远程PDF，不声称现场验证官网。",
+      "snapshot": ".playwright-cli/page-2026-10-03T04-01-18-089Z.yml"
+    },
+    {
+      "id": "B02", "passed": false,
+      "scenario": "自动识别模式先询问大数据赛截止，再追问这个比赛几个人一队",
+      "observed": "赛事下拉框仍为空，第二轮要求重新提供赛事名称；消息显示零条依据。",
+      "screenshot": "output/playwright/sim-user-context-desktop.png"
+    },
+    {
+      "id": "B03", "passed": false,
+      "scenario": "选定计算机能力挑战赛，要求制定一周备赛计划",
+      "observed": "返回机械/工程备赛四阶段，建议3至6个月，包含机械原理、SolidWorks和样机制作；未清晰展示该赛事证据不足的候选风险。",
+      "screenshot": "output/playwright/sim-user-candidate-plan-desktop.png"
+    },
+    {
+      "id": "B04", "passed": false,
+      "scenario": "候选赛事回答点击一键转为我的任务",
+      "observed": "按钮可点击，但后端HTTP 409，界面提示转任务失败：赛事当前不满足正式执行条件。应在点击前隐藏或禁用，并解释原因。",
+      "snapshot": ".playwright-cli/page-2026-10-03T04-02-37-958Z.yml"
+    },
+    {
+      "id": "B05", "passed": false,
+      "scenario": "画像学历切换为研究生后检查年级",
+      "observed": "年级仍仅大一、大二、大三、大四；不能选择研一。",
+      "screenshot": "output/playwright/sim-user-postgraduate-grade.png"
+    },
+    {
+      "id": "B06", "passed": true,
+      "scenario": "390x844手机视口检查问答布局",
+      "observed": "document与body宽度均390，无横向溢出，发送按钮可见；仅检查此屏，不代表全站移动端无问题。",
+      "screenshot": "output/playwright/sim-user-agent-mobile.png"
+    },
+    {
+      "id": "B07", "passed": true,
+      "scenario": "正式推荐加入项目，勾选首项任务，查看材料与导出ICS",
+      "observed": "能进入项目，任务完成后进度10%、下一依赖解锁，3项材料可见；实际下载project-1.ics，无下载错误，含DTSTART:20261023T040000Z。",
+      "screenshot": "output/playwright/sim-user-project-desktop.png",
+      "download": "output/playwright/sim-user-project.ics"
+    },
+    {
+      "id": "B08", "passed": false,
+      "scenario": "10月3日新用户打开自动任务计划",
+      "observed": "第一项计划为2026-10-02，创建时已过期；系统计划需要压缩或调整，不可修改官方截止日期。",
+      "snapshot": ".playwright-cli/page-2026-10-03T04-04-57-472Z.yml"
+    }
+  ],
+  "console": {
+    "uncaught_javascript_errors_observed": 0,
+    "expected_http_409_resource_errors": 1,
+    "non_error_messages": "password input outside form (browser verbose notice)"
+  }
+}

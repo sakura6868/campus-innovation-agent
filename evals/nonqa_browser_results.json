@@ -1,0 +1,26 @@
+{
+  "evaluation_type": "local_browser_nonqa_followup",
+  "evaluation_date": "2026-10-03",
+  "server": "isolated_local_sqlite",
+  "viewports": [[1280, 900], [390, 844]],
+  "paid_model_calls": 0,
+  "summary": {"passed": 9, "total": 9},
+  "results": [
+    {"id": "B01", "passed": true, "detail": "研一通过表单保存并重新加载"},
+    {"id": "B02", "passed": true, "detail": "四人画像详情无加入按钮，并展示个人门控原因"},
+    {"id": "B03", "passed": true, "detail": "直接创建项目返回409"},
+    {"id": "B04", "passed": true, "detail": "已有项目保留并提示资格状态变化"},
+    {"id": "B05", "passed": true, "detail": "候选可看官网但不能加入正式项目"},
+    {"id": "B06", "passed": true, "detail": "制作期已开始的数字媒体赛仍显示报名中"},
+    {"id": "B07", "passed": true, "detail": "新计划不早于创建日且阶段日期顺序一致"},
+    {"id": "B08", "passed": true, "detail": "390px手机年级控件无横向溢出"},
+    {"id": "B09", "passed": true, "detail": "浏览器拦截的候选模拟响应无转任务按钮；不测问答质量"}
+  ],
+  "artifacts": [
+    "output/playwright/nonqa-ineligible-desktop.png",
+    "output/playwright/nonqa-project-warning-desktop.png",
+    "output/playwright/nonqa-profile-mobile.png",
+    "output/playwright/nonqa-candidate-task-mobile.png"
+  ],
+  "limitations": ["非真人试用", "候选执行按钮使用模拟响应", "首次浏览器资源不足后重试完成", "资格请求409是预期拦截"]
+}

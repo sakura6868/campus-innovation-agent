@@ -50,6 +50,12 @@ def is_llm_enabled() -> bool:
     return bool(os.getenv("AGENT_LLM_API_KEY"))
 
 
+def configured_models() -> list[str]:
+    default = os.getenv("AGENT_LLM_MODEL") or "gpt-4o-mini"
+    optional = (os.getenv("AGENT_LLM_ALLOWED_MODELS") or "").split(",")
+    return list(dict.fromkeys([default] + [value.strip() for value in optional if value.strip()]))
+
+
 def _post_chat(system: str, user: str, model: Optional[str] = None) -> Optional[str]:
     """调用 OpenAI 兼容 /chat/completions；任何异常都返回 None（优雅降级）。
 
@@ -80,7 +86,7 @@ def _post_chat(system: str, user: str, model: Optional[str] = None) -> Optional[
         ],
     }
     try:
-        resp = requests.post(url, headers=headers, json=payload, timeout=20)
+        resp = requests.post(url, headers=headers, json=payload, timeout=20, allow_redirects=False)
         resp.raise_for_status()
         data = resp.json()
         return (data["choices"][0]["message"]["content"] or "").strip() or None

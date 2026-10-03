@@ -7,6 +7,9 @@ PORT="${1:-8000}"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 
 cd "$ROOT_DIR"
+if [ ! -f .env ]; then
+  cp .env.example .env
+fi
 if ! command -v "$PYTHON_BIN" >/dev/null 2>&1; then
   echo "未找到 $PYTHON_BIN，请先安装 Python 3.10 或更高版本。" >&2
   exit 1

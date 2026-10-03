@@ -61,8 +61,9 @@ from pydantic import BaseModel, Field
 
 import db
 from rag.store import get_rag, embedding_backend
-from recommendation.engine import recommend_for_user, recommend_teammates
+from recommendation.engine import eligibility_gate, recommend_for_user, recommend_teammates
 from trust import assess_recommendation_readiness, assess_source_readiness
+from contest_clock import contest_now
 from schemas import (
     Citation,
     AgentTaskCreate,
@@ -84,6 +85,8 @@ from schemas import (
     UserProject,
     TrustedLevel,
     UserProfile,
+    grades_for_education,
+    EducationLevel,
 )
 
 import parsing.pdf_extractor as pdf_extractor
@@ -97,6 +100,16 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 FRONTEND_DIR = PROJECT_ROOT / "frontend"
 UPLOAD_DIR = PROJECT_ROOT / "data" / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+_ADMIN_API_TOKEN = os.getenv("ADMIN_API_TOKEN", "").strip()
+_ADMIN_API_KEY = APIKeyHeader(name="X-Admin-Token", auto_error=False)
+
+
+def _require_admin_token(token: str | None = Depends(_ADMIN_API_KEY)) -> None:
+    if not _ADMIN_API_TOKEN or _ADMIN_API_TOKEN.startswith("replace-with-"):
+        raise HTTPException(status_code=503, detail="数据维护接口未启用")
+    if not token or not secrets.compare_digest(token, _ADMIN_API_TOKEN):
+        raise HTTPException(status_code=401, detail="管理员令牌无效")
 
 
 @asynccontextmanager
@@ -222,7 +235,7 @@ def health() -> dict:
         "status": "ok" if database_status == "connected" else "degraded",
         "mock": False,
         "database": database_status,
-        "date": date.today().isoformat(),
+        "date": contest_now().date().isoformat(),
         "embedding_backend": embedding_backend(),
         "llm_backend": "openai-compatible" if is_llm_enabled() else "disabled",
     }
@@ -245,13 +258,23 @@ def quality_dashboard() -> dict:
     regression_suite = formal.get("regression") or {}
     watches = db.list_source_watches()
     events = db.list_change_events(limit=200)
+    dataset_files = sorted((PROJECT_ROOT / "data/ground_truth/samples").glob("*.json"))
+    dataset_sha256 = hashlib.sha256(b"".join(path.read_bytes() for path in dataset_files)).hexdigest()
+    competitions = db.list_competitions()
+    from evaluation_provenance import evaluation_is_current
+
+    golden_current = evaluation_is_current(regression, PROJECT_ROOT, competitions)
     return {
         "evaluated_at": formal.get("evaluated_at"),
         "golden_set": {
+            "evaluation_type": "generated_template_regression",
             "cases": regression.get("total_cases", 0),
-            "intent_accuracy": regression.get("intent_acc"),
-            "citation_recall": regression.get("citation_recall"),
-            "gate_consistency": regression.get("gate_consistency"),
+            "passed": regression.get("passed", 0),
+            "current": golden_current,
+            "evaluated_at": regression.get("evaluated_at"),
+            "intent_accuracy": regression.get("intent_acc") if golden_current else None,
+            "citation_recall": regression.get("citation_recall") if golden_current else None,
+            "gate_consistency": regression.get("gate_consistency") if golden_current else None,
         },
         "formal_checks": formal.get("formal_summary", {}),
         "formal_metrics": formal.get("metrics", {}),
@@ -263,15 +286,21 @@ def quality_dashboard() -> dict:
             "successful": bool(regression_suite.get("successful")),
         },
         "environment": formal.get("environment", {}),
+        "dataset": {
+            "total": len(competitions),
+            "source_complete": sum(assess_recommendation_readiness(comp).ready for comp in competitions),
+            "registerable_ready": sum(assess_recommendation_readiness(comp, contest_now()).ready for comp in competitions),
+            "evaluation_dataset_matches": evaluation_is_current(formal, PROJECT_ROOT, competitions),
+        },
         "runtime": {
             "source_count": len(watches),
-            "healthy_sources": sum(1 for item in watches if item.get("health_score", 0) >= 80),
+            "healthy_sources": sum(1 for item in watches if item.get("health_status") == "healthy"),
             "pending_human_reviews": sum(1 for event in events if event.get("status") == "pending"),
             "manual_review_gate": True,
             "ssrf_protection": True,
             "signed_user_sessions": True,
         },
-        "note": "评测文件为冻结结果；运行态指标来自当前数据库，不将二者混算。",
+        "note": "冻结报告与运行态分开展示；模板问答并非人工金标，门控一致率不等同于独立资格准确率。模板结果仅在数据、源码与数据库快照一致时展示。",
     }
 
 
@@ -286,7 +315,7 @@ def list_competitions(
     """赛事目录；可按类别、年份与是否具备正式推荐资格过滤。
 
     分页为可选能力：不传 limit 时返回全量（前端本地过滤依赖此行为，保持兼容）；
-    传 limit 可显著降低单次序列化开销（190 条全量约 660ms，分页后个位数毫秒级）。
+    limit 限制返回记录数；可信判定仍覆盖筛选后的记录，不承诺延迟与分页大小线性变化。
     """
     # 兼容直接调用（测试/脚本未走 FastAPI 解析时，Query 默认值仍是 Query 对象）。
     category = category if isinstance(category, str) else None
@@ -297,7 +326,7 @@ def list_competitions(
         limit = None
     rows: list[dict] = []
     for comp in db.list_competitions(category=category, year=year):
-        assessment = assess_recommendation_readiness(comp, date.today())
+        assessment = assess_recommendation_readiness(comp, contest_now())
         if readiness == "ready" and not assessment.ready:
             continue
         if readiness == "candidate" and assessment.ready:
@@ -326,7 +355,7 @@ def list_users() -> list[dict]:
 
     只返回展示所需的轻量字段，不含敏感信息。
     """
-    users = db.list_user_profiles()
+    users = db.list_demo_profiles()
     return [
         {
             "user_id": u.user_id,
@@ -354,11 +383,34 @@ def get_profile(user_id: str) -> UserProfile:
     return profile
 
 
+@app.get("/api/profile/options", tags=["用户"])
+def profile_options() -> dict:
+    return {"grades_by_education": {level.value: [grade.value for grade in grades_for_education(level)]
+                                    for level in EducationLevel}}
+
+
+@app.get("/api/users/{user_id}/competitions/{competition_id}/eligibility", tags=["推荐"])
+def competition_eligibility(user_id: str, competition_id: str) -> dict:
+    profile = db.get_user_profile(user_id)
+    if profile is None:
+        raise HTTPException(status_code=404, detail="请先保存个人画像")
+    competition = db.get_competition(competition_id)
+    if competition is None:
+        raise HTTPException(status_code=404, detail="赛事不存在")
+    readiness = assess_recommendation_readiness(competition, contest_now())
+    if not readiness.ready:
+        return {"can_create_project": False, "eligible": None, "reasons": list(readiness.reasons)}
+    eligible, reasons = eligibility_gate(profile, competition, contest_now())
+    return {"can_create_project": eligible, "eligible": eligible, "reasons": [item.reason for item in reasons]}
+
+
 @app.post("/api/users/{user_id}/profile", response_model=UserProfile, tags=["用户"])
 def save_profile(user_id: str, profile: UserProfile) -> UserProfile:
     """保存用户画像；未勾选隐私授权时拒绝保存个性化数据。写入真正持久化。"""
     if user_id != profile.user_id:
         raise HTTPException(status_code=400, detail="路径 user_id 与请求体不一致")
+    if profile.grade not in grades_for_education(profile.education_level):
+        raise HTTPException(status_code=422, detail="请选择与学历层次相符的真实年级")
     if not profile.can_store_profile():
         raise HTTPException(
             status_code=403,
@@ -389,7 +441,7 @@ def recommendations(user_id: str) -> list[RecommendationResult]:
     comps = db.get_all_competitions()
     return [
         item
-        for item in recommend_for_user(profile, comps, date.today())
+        for item in recommend_for_user(profile, comps, contest_now())
         if item.eligible and item.score is not None
     ]
 
@@ -413,7 +465,7 @@ def optimize_user_portfolio(
         db.get_all_competitions(),
         db.list_user_projects(user_id),
         preferences,
-        date.today(),
+        contest_now(),
     )
 
 
@@ -431,7 +483,7 @@ def portfolio_map(user_id: str) -> dict:
         db.get_all_competitions(),
         db.list_user_projects(user_id),
         preferences,
-        date.today(),
+        contest_now(),
     )
     projects = db.list_user_projects(user_id)
     alerts = db.list_user_alerts(user_id)
@@ -483,7 +535,7 @@ def apply_user_portfolio(user_id: str, payload: PortfolioApplyRequest) -> dict:
     if len(ids) != len(payload.competition_ids):
         raise HTTPException(status_code=400, detail="组合中存在重复赛事")
     try:
-        created, failures = db.create_user_projects_atomic(user_id, ids, date.today())
+        created, failures = db.create_user_projects_atomic(user_id, ids, contest_now())
     except ValueError as exc:
         if str(exc) == "profile_required":
             raise HTTPException(status_code=404, detail="用户不存在") from exc
@@ -502,11 +554,12 @@ def user_teammates(user_id: str, top_k: int = Query(5, ge=1, le=20)) -> dict:
     seeker = db.get_user_profile(user_id)
     if seeker is None:
         raise HTTPException(status_code=404, detail="用户不存在")
-    candidates = db.list_user_profiles(exclude_user_id=user_id)
+    candidates = db.list_demo_profiles(exclude_user_id=user_id)
     matches = recommend_teammates(seeker, candidates, top_k=top_k)
     return {
         "user_id": user_id,
         "count": len(matches),
+        "demo_only": True,
         "matches": [m.model_dump(mode="json") for m in matches],
     }
 
@@ -570,7 +623,7 @@ def auth_login(payload: AuthLoginPayload) -> dict:
 @app.get("/api/student-types", tags=["认证"])
 def student_types() -> list[dict]:
     """测试账号可切换的学生类型（取自演示画像库，用于预览「千人千面」）。"""
-    users = db.list_user_profiles()
+    users = db.list_demo_profiles()
     return [
         {
             "user_id": u.user_id,
@@ -607,8 +660,9 @@ def join_project(user_id: str, payload: ProjectCreate) -> UserProject:
         errors = {
             "profile_required": (404, "请先保存个人画像"),
             "competition_not_found": (404, "赛事不存在"),
-            "competition_basic_info_incomplete": (409, "赛事缺少参赛对象或有效截止时间，暂不能新建项目"),
+            "competition_basic_info_incomplete": (409, "赛事官方来源或关键证据不完整，仅作为候选信息，暂不能新建项目"),
             "competition_expired": (409, "赛事报名已经截止，不能新建参赛项目"),
+            "profile_ineligible": (409, "你的学籍或团队条件不符合赛事要求，请先确认画像；暂不能创建参赛项目"),
         }
         status, message = errors.get(str(exc), (400, "无法加入项目"))
         raise HTTPException(status_code=status, detail=message)
@@ -709,6 +763,7 @@ def task_from_agent(user_id: str, payload: AgentTaskCreate) -> ProjectItem:
             "profile_required": "请先保存个人画像",
             "competition_not_found": "赛事不存在",
             "competition_not_ready": "赛事当前不满足正式执行条件",
+            "profile_ineligible": "你的学籍或团队条件不符合赛事要求，暂不能创建执行任务",
             "citation_not_in_project_competition": "引用与目标赛事不匹配",
         }
         raise HTTPException(status_code=409, detail=messages.get(str(exc), str(exc)))
@@ -722,7 +777,24 @@ def delete_project_item(user_id: str, project_id: int, item_id: int) -> dict:
 
 
 def _ics_escape(value: str) -> str:
+    value = value.replace("\r\n", "\n").replace("\r", "\n")
     return value.replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,").replace("\n", "\\n")
+
+
+def _ics_fold_line(line: str) -> list[str]:
+    """RFC 5545: fold at 75 UTF-8 octets without splitting a character."""
+    parts = []
+    current = ""
+    size = 0
+    for char in line:
+        width = len(char.encode("utf-8"))
+        if size + width > 75:
+            parts.append(current)
+            current, size = " ", 1
+        current += char
+        size += width
+    parts.append(current)
+    return parts
 
 
 @app.get("/api/users/{user_id}/projects/{project_id}/calendar.ics", tags=["我的项目"])
@@ -730,32 +802,41 @@ def export_project_calendar(user_id: str, project_id: int) -> Response:
     project = db.get_user_project(user_id, project_id)
     if project is None:
         raise HTTPException(status_code=404, detail="项目不存在")
-    events: list[tuple[str, date, str]] = []
+    events: list[tuple[str, date | datetime, str]] = []
+    timestamp_note = (
+        "准确时刻来自官方原文，时区以官方依据为准"
+        if project.deadline_timezone_basis == "official"
+        else "准确时刻来自官方原文，时区使用校园UTC+08:00假设；请向官网确认"
+    )
     if project.registration_deadline:
-        events.append(("赛事报名截止", project.registration_deadline, "来自已核验赛事主表"))
+        events.append(("赛事报名截止", project.registration_deadline_at or project.registration_deadline, timestamp_note if project.registration_deadline_at else "官网仅提供日期，准确时刻待确认；请以最新官网为准"))
     if project.submission_deadline:
-        events.append(("作品提交截止", project.submission_deadline, "来自已核验赛事主表"))
+        events.append(("作品提交截止", project.submission_deadline_at or project.submission_deadline, timestamp_note if project.submission_deadline_at else "官网仅提供日期，准确时刻待确认；请以最新官网为准"))
     for item in project.items:
         if item.due_date:
-            events.append((item.title, item.due_date, "项目任务" if item.item_type.value == "task" else "材料准备"))
+            events.append((item.title, item.due_date, "项目计划日期，不等于官方截止时刻"))
 
     lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Campus Innovation Agent//CN", "CALSCALE:GREGORIAN"]
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     for index, (title, event_date, description) in enumerate(events):
-        start = event_date.strftime("%Y%m%d")
-        end = (event_date + timedelta(days=1)).strftime("%Y%m%d")
+        if isinstance(event_date, datetime):
+            start = event_date.astimezone(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+            date_lines = [f"DTSTART:{start}", "DURATION:PT1M"]
+        else:
+            start = event_date.strftime("%Y%m%d")
+            end = (event_date + timedelta(days=1)).strftime("%Y%m%d")
+            date_lines = [f"DTSTART;VALUE=DATE:{start}", f"DTEND;VALUE=DATE:{end}"]
         lines.extend([
             "BEGIN:VEVENT",
             f"UID:project-{project_id}-{index}@campus-agent",
             f"DTSTAMP:{stamp}",
-            f"DTSTART;VALUE=DATE:{start}",
-            f"DTEND;VALUE=DATE:{end}",
+            *date_lines,
             f"SUMMARY:{_ics_escape(project.competition_name + ' · ' + title)}",
             f"DESCRIPTION:{_ics_escape(description)}",
             "END:VEVENT",
         ])
     lines.append("END:VCALENDAR")
-    content = "\r\n".join(lines) + "\r\n"
+    content = "\r\n".join(part for line in lines for part in _ics_fold_line(line)) + "\r\n"
     return Response(
         content=content,
         media_type="text/calendar; charset=utf-8",
@@ -784,7 +865,7 @@ def rag_search(
     return get_rag().query(competition_id, q, document_year=year, doc_version=doc_version, top_k=top_k)
 
 
-@app.post("/api/rag/reseed", tags=["RAG"])
+@app.post("/api/rag/reseed", tags=["RAG"], dependencies=[Depends(_require_admin_token)])
 def rag_reseed() -> dict:
     """从数据库重新灌库（幂等，按 competition_id 覆盖）。人工修订标注后可调用。"""
     stats = get_rag().seed_from_db()
@@ -796,7 +877,7 @@ def rag_reseed() -> dict:
     }
 
 
-@app.post("/api/competitions/{competition_id}/ingest", tags=["RAG"])
+@app.post("/api/competitions/{competition_id}/ingest", tags=["RAG"], dependencies=[Depends(_require_admin_token)])
 def rag_ingest_one(competition_id: str) -> dict:
     """把单个赛事重新灌入其隔离集合（人工修订某赛事后局部刷新）。"""
     comp = db.get_competition(competition_id)
@@ -814,6 +895,7 @@ def agent_ask(
     question: str = Query(..., description="用户自然语言问题"),
     user_id: str | None = Query(None, description="用户ID，用于画像驱动的推荐/门控/文案"),
     competition_id: str | None = Query(None, description="可选：前端直接指定目标赛事，否则由路由自动锁定"),
+    context_competition_id: str | None = Query(None, description="当前对话上一轮赛事，仅用于自然追问"),
     top_k: int = Query(4, ge=1, le=10, description="隔离检索返回条数"),
     model: str | None = Query(None, description="可选：请求级覆盖默认 LLM 模型（如 qwen-plus/qwen-max/qwen-turbo），仅同源 key 可用"),
 ) -> dict:
@@ -821,8 +903,12 @@ def agent_ask(
 
     问答自动带引用：答案文本内嵌 [1][2]… 角标，citations 提供可点击来源。
     """
+    from agent.llm import configured_models
+    if model and model not in configured_models():
+        raise HTTPException(status_code=400, detail="所选模型未由服务端配置，请刷新模型列表")
     try:
-        result = run_agent(question, user_id=user_id, competition_id=competition_id, top_k=top_k, model=model)
+        result = run_agent(question, user_id=user_id, competition_id=competition_id, top_k=top_k,
+                           model=model, context_competition_id=context_competition_id)
         result["user_id"] = user_id
         db.save_agent_run(result)
         return result
@@ -833,12 +919,13 @@ def agent_ask(
 @app.get("/api/agent/llm-status", tags=["Agent"])
 def agent_llm_status() -> dict:
     """返回 LLM 润色层 + 联网搜索层的启用状态，供前端展示能力指示。"""
-    from agent.llm import is_llm_enabled
+    from agent.llm import is_llm_enabled, configured_models
     from agent.web_search import is_web_search_enabled
 
     return {
         "enabled": is_llm_enabled(),
         "model": os.getenv("AGENT_LLM_MODEL") or "gpt-4o-mini",
+        "models": configured_models(),
         "provider": os.getenv("AGENT_LLM_PROVIDER") or "",
         "web_search_enabled": is_web_search_enabled(),
         "web_search_provider": (os.getenv("WEB_SEARCH_PROVIDER") or "duckduckgo") if is_web_search_enabled() else "",
@@ -872,18 +959,6 @@ def replay_agent_run(run_id: str) -> dict:
 # ---------------------------------------------------------------------------
 # 数据维护闭环（上传 → 解析 → 来源确认 → 入库）
 # ---------------------------------------------------------------------------
-_ADMIN_API_TOKEN = os.getenv("ADMIN_API_TOKEN", "").strip()
-_ADMIN_API_KEY = APIKeyHeader(name="X-Admin-Token", auto_error=False)
-
-
-def _require_admin_token(token: str | None = Depends(_ADMIN_API_KEY)) -> None:
-    if not _ADMIN_API_TOKEN:
-        raise HTTPException(status_code=503, detail="数据维护接口未启用")
-    if not token or not secrets.compare_digest(token, _ADMIN_API_TOKEN):
-        raise HTTPException(status_code=401, detail="管理员令牌无效")
-
-
-
 @app.post("/api/auth/dev-admin-login", tags=["认证"], include_in_schema=False)
 def dev_admin_login(request: Request) -> dict:
     """仅供本机调试的一键管理员入口；必须显式设置开关，线上默认不存在。"""
@@ -905,6 +980,7 @@ def dev_admin_login(request: Request) -> dict:
 def radar_status() -> dict:
     """公开展示雷达运行状态；待审核变化明确标注，不作为正式事实。"""
     watches = db.list_source_watches()
+    assessed = [item for item in watches if item.get("health_status") not in {"unknown", "paused"}]
     events = db.list_change_events(limit=20)
     public_watches = [
         {key: value for key, value in item.items() if key not in {"etag", "last_modified", "last_error"}}
@@ -912,11 +988,11 @@ def radar_status() -> dict:
     ]
     return {
         "watch_count": len(watches),
-        "healthy_count": sum(1 for item in watches if item["last_status"] in {"new", "ok"}),
+        "healthy_count": sum(1 for item in watches if item.get("health_status") == "healthy"),
         "pending_count": sum(1 for item in events if item["status"] == "pending"),
         "average_health_score": round(
-            sum(item.get("health_score", 0) for item in watches) / max(1, len(watches)), 1
-        ),
+            sum(item.get("health_score", 0) for item in assessed) / len(assessed), 1
+        ) if assessed else None,
         "next_scan_at": min(
             (item["next_scan_at"] for item in watches if item.get("next_scan_at")),
             default=None,
@@ -950,13 +1026,8 @@ def user_alert_action(user_id: str, alert_id: int, payload: RadarAlertAction) ->
 
 
 @app.post("/api/admin/verify", tags=["数据维护"])
-def admin_verify(payload: dict) -> dict:
+def admin_verify(_: None = Depends(_require_admin_token)) -> dict:
     """校验管理员令牌；前端据此决定是否显示「数据维护」入口。"""
-    token = (payload or {}).get("token")
-    if not _ADMIN_API_TOKEN:
-        raise HTTPException(status_code=503, detail="数据维护接口未启用")
-    if not token or not secrets.compare_digest(token, _ADMIN_API_TOKEN):
-        raise HTTPException(status_code=401, detail="管理员令牌无效")
     return {"ok": True}
 
 
@@ -1016,14 +1087,8 @@ def admin_review_radar_event(
 
 
 def _classify_submitted_competition(comp: Competition) -> tuple[Competition, list[str]]:
-    """Normalize evidence metadata, then derive trust status from the shared rules."""
-    checked_at = date.today().isoformat()
-    comp.official_source_status = "found" if comp.official_source_url else "not_found"
-    comp.last_verified_at = checked_at
-    for item in comp.evidence:
-        item.source_url = item.source_url or comp.official_source_url
-        item.acquired_date = item.acquired_date or comp.source_acquired_date or checked_at
-        item.last_verified_at = item.last_verified_at or checked_at
+    """Derive trust without inventing missing source metadata."""
+    comp = comp.model_copy(deep=True)
 
     # Assess the strongest possible state; incomplete evidence is immediately downgraded.
     comp.data_status = DataStatus.VERIFIED
@@ -1044,10 +1109,14 @@ class AdminUploadPayload(BaseModel):
 def admin_upload(payload: AdminUploadPayload, _: None = Depends(_require_admin_token)) -> dict:
     """上传官方通知 PDF/Word（前端 base64 上传，避免依赖 python-multipart），落盘到 data/uploads。"""
     ext = Path(payload.filename or "file.bin").suffix.lower()
-    if ext not in (".pdf", ".docx", ".doc"):
+    if ext not in (".pdf", ".docx"):
         raise HTTPException(status_code=400, detail="仅支持 PDF / Word(.docx) 文件")
     try:
-        raw = base64.b64decode(payload.content_base64)
+        if len(payload.content_base64) > 20 * 1024 * 1024:
+            raise HTTPException(status_code=413, detail="文件超过 15MB 安全上限")
+        raw = base64.b64decode(payload.content_base64, validate=True)
+    except HTTPException:
+        raise
     except Exception:
         raise HTTPException(status_code=400, detail="文件内容 base64 解码失败")
     if not raw:
@@ -1065,6 +1134,7 @@ def admin_upload(payload: AdminUploadPayload, _: None = Depends(_require_admin_t
         "ext": ext,
         "saved_as": save_path.name,
         "document_id": document["document_id"],
+        "sha256": document["sha256"],
     }
 
 
@@ -1074,6 +1144,8 @@ def admin_parse(payload: dict, _: None = Depends(_require_admin_token)) -> dict:
     file_id = payload.get("file_id")
     if not file_id:
         raise HTTPException(status_code=400, detail="缺少 file_id，请先上传")
+    if not isinstance(file_id, str) or not re.fullmatch(r"\d{8}_\d{6}_[0-9a-f]{8}", file_id):
+        raise HTTPException(status_code=400, detail="file_id 格式无效")
     candidates = sorted(UPLOAD_DIR.glob(f"{file_id}.*"))
     if not candidates:
         raise HTTPException(status_code=404, detail="上传文件不存在，请重新上传")
@@ -1104,6 +1176,8 @@ def admin_parse(payload: dict, _: None = Depends(_require_admin_token)) -> dict:
             "page": b.page,
             "paragraph_index": b.paragraph_index,
             "text": b.text,
+            "rects": [rect.model_dump() for rect in b.rects],
+            "anchor_quality": b.anchor_quality,
         }
         for i, b in enumerate(result.blocks)
     ]

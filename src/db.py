@@ -69,6 +69,8 @@ from schemas import (
 )
 from fact_formatting import format_team_size
 from trust import assess_recommendation_readiness, assess_source_readiness, is_registerable_now
+from contest_clock import contest_now
+from recommendation.engine import eligibility_gate
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 GROUND_TRUTH_DIR = PROJECT_ROOT / "data" / "ground_truth" / "samples"
@@ -119,6 +121,9 @@ class CompetitionModel(Base):
     # 时间相关
     registration_deadline: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     submission_deadline: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    registration_deadline_at: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    submission_deadline_at: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    deadline_timezone_basis: Mapped[str] = mapped_column(String, default="campus_default")
     result_announcement_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     competition_start_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     competition_end_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
@@ -786,10 +791,13 @@ def _competition_to_pydantic(m: CompetitionModel) -> Competition:
         allowed_grades=allowed_grades,
         allowed_majors=allowed_majors,
         team_required=m.team_required,
-        team_min=m.team_min if m.team_min is not None else (1 if (m.team_required or m.team_max is not None) else None),
+        team_min=m.team_min,
         team_max=m.team_max,
         registration_deadline=m.registration_deadline,
         submission_deadline=m.submission_deadline,
+        registration_deadline_at=m.registration_deadline_at,
+        submission_deadline_at=m.submission_deadline_at,
+        deadline_timezone_basis=m.deadline_timezone_basis or "campus_default",
         result_announcement_date=m.result_announcement_date,
         competition_start_date=m.competition_start_date,
         competition_end_date=m.competition_end_date,
@@ -906,7 +914,7 @@ DEMO_USERS: list[UserProfile] = [
     UserProfile(
         user_id="stu_grad",
         education_level=EducationLevel.POSTGRADUATE,
-        grade=Grade.SENIOR,
+        grade=Grade.MASTER_FIRST,
         major="人工智能",
         skills=["深度学习", "PyTorch", "论文写作", "Python", "NLP"],
         experiences=["发表 SCI 论文", "研究生数学建模竞赛"],
@@ -967,6 +975,8 @@ def _upsert_competition_from_raw(raw: dict, session) -> None:
     cid = raw.get("competition_id") or Path(raw.get("_source_file", "")).stem
     if not cid:
         return
+    if raw.get("registration_deadline_at") or raw.get("submission_deadline_at"):
+        Competition.model_validate({**raw, "competition_id": cid})
     cols = {
         "competition_id": cid,
         "competition_name": raw["competition_name"],
@@ -977,10 +987,13 @@ def _upsert_competition_from_raw(raw: dict, session) -> None:
         "allowed_grades": None if raw.get("allowed_grades") is None else _dump_json(raw["allowed_grades"]),
         "allowed_majors": None if raw.get("allowed_majors") is None else _dump_json(raw["allowed_majors"]),
         "team_required": bool(raw.get("team_required", False)),
-        "team_min": raw.get("team_min") if raw.get("team_min") is not None else (1 if (raw.get("team_required") or raw.get("team_max") is not None) else None),
+        "team_min": raw.get("team_min"),
         "team_max": raw.get("team_max"),
         "registration_deadline": _to_date(raw.get("registration_deadline")),
         "submission_deadline": _to_date(raw.get("submission_deadline")),
+        "registration_deadline_at": raw.get("registration_deadline_at"),
+        "submission_deadline_at": raw.get("submission_deadline_at"),
+        "deadline_timezone_basis": raw.get("deadline_timezone_basis") or "campus_default",
         "result_announcement_date": _to_date(raw.get("result_announcement_date")),
         "competition_start_date": _to_date(raw.get("competition_start_date")),
         "competition_end_date": _to_date(raw.get("competition_end_date")),
@@ -1168,7 +1181,7 @@ def seed_demo_project(session) -> None:
     exists = session.query(UserProjectModel).filter(UserProjectModel.user_id == user_id).first()
     if exists is not None:
         return
-    comp = (
+    candidates = (
         session.query(CompetitionModel)
         .filter(
             CompetitionModel.data_status == DataStatus.VERIFIED.value,
@@ -1177,11 +1190,12 @@ def seed_demo_project(session) -> None:
             CompetitionModel.registration_deadline.is_not(None),
         )
         .order_by(CompetitionModel.competition_id)
-        .first()
+        .all()
     )
-    if comp is None:
-        return
-    _get_or_create_project_model(session, user_id, comp)
+    for comp in candidates:
+        if assess_recommendation_readiness(_competition_to_pydantic(comp), contest_now()).ready:
+            _get_or_create_project_model(session, user_id, comp)
+            return
 
 
 def seed_all() -> int:
@@ -1271,7 +1285,7 @@ def get_competition_detail(competition_id: str) -> Optional[CompetitionDetail]:
         )
     ]
 
-    readiness = assess_recommendation_readiness(comp, date.today())
+    readiness = assess_recommendation_readiness(comp, contest_now())
     verification = Verification(
         status=comp.data_status,
         last_verified_at=comp.last_verified_at,
@@ -1298,7 +1312,7 @@ def _user_to_pydantic(m: UserProfileModel) -> UserProfile:
     return UserProfile(
         user_id=m.user_id,
         education_level=EducationLevel(m.education_level),
-        grade=_to_enum(Grade, m.grade, Grade.FRESHMAN),
+        grade=_to_enum(Grade, m.grade, Grade.UNKNOWN),
         major=m.major,
         skills=_load_json(m.skills),
         experiences=_load_json(m.experiences),
@@ -1317,6 +1331,11 @@ def get_user_profile(user_id: str) -> Optional[UserProfile]:
         if m is None:
             return None
         return _user_to_pydantic(m)
+
+
+def list_demo_profiles(exclude_user_id: Optional[str] = None) -> list[UserProfile]:
+    """Public demonstrations use immutable fictitious fixtures, never registered profiles."""
+    return [profile.model_copy(deep=True) for profile in DEMO_USERS if profile.user_id != exclude_user_id]
 
 
 def list_user_profiles(exclude_user_id: Optional[str] = None) -> list[UserProfile]:
@@ -1368,7 +1387,12 @@ def delete_user_profile(user_id: str) -> dict:
 
 def _project_to_pydantic(m: UserProjectModel) -> UserProject:
     comp = m.competition
-    readiness = assess_recommendation_readiness(_competition_to_pydantic(comp), date.today())
+    readiness = assess_recommendation_readiness(_competition_to_pydantic(comp), contest_now())
+    profile = get_user_profile(m.user_id)
+    eligible, gate_reasons = eligibility_gate(profile, _competition_to_pydantic(comp), contest_now()) if profile and readiness.ready else (False, [])
+    readiness_reasons = list(readiness.reasons) + [r.reason for r in gate_reasons]
+    if profile is None:
+        readiness_reasons.append("个人画像不存在")
     ordered = sorted(m.items, key=lambda item: (item.sort_order, item.item_id))
     statuses = {item.item_id: item.status for item in ordered}
     payload_items: list[ProjectItem] = []
@@ -1408,10 +1432,10 @@ def _project_to_pydantic(m: UserProjectModel) -> UserProject:
     blocked_count = sum(1 for item in payload_items if item.is_blocked)
     overdue = sum(
         1 for item in payload_items
-        if item.due_date and item.due_date < date.today() and item.status not in {ProjectItemStatus.DONE, ProjectItemStatus.SKIPPED}
+        if item.due_date and item.due_date < contest_now().date() and item.status not in {ProjectItemStatus.DONE, ProjectItemStatus.SKIPPED}
     )
-    risk_level = "high" if overdue or blocked_count >= 2 or not readiness.ready else (
-        "medium" if blocked_count or (comp.registration_deadline and (comp.registration_deadline - date.today()).days <= 14) else "low"
+    risk_level = "high" if overdue or blocked_count >= 2 or not readiness.ready or not eligible else (
+        "medium" if blocked_count or (comp.registration_deadline and (comp.registration_deadline - contest_now().date()).days <= 14) else "low"
     )
     return UserProject(
         project_id=m.project_id,
@@ -1422,10 +1446,13 @@ def _project_to_pydantic(m: UserProjectModel) -> UserProject:
         # 截止日期始终从赛事主表读取，项目表不保存副本。
         registration_deadline=comp.registration_deadline,
         submission_deadline=comp.submission_deadline,
+        registration_deadline_at=comp.registration_deadline_at,
+        submission_deadline_at=comp.submission_deadline_at,
+        deadline_timezone_basis=comp.deadline_timezone_basis or "campus_default",
         status=ProjectStatus(m.status),
         created_at=m.created_at.isoformat(),
-        recommendation_ready=readiness.ready,
-        readiness_reasons=list(readiness.reasons),
+        recommendation_ready=readiness.ready and eligible,
+        readiness_reasons=readiness_reasons,
         items=payload_items,
         progress_percent=progress,
         blocked_count=blocked_count,
@@ -1478,6 +1505,7 @@ def _get_or_create_project_model(session, user_id: str, comp: CompetitionModel) 
         user_id=user_id,
         competition_id=comp.competition_id,
         status=ProjectStatus.PLANNED.value,
+        created_at=contest_now().astimezone(timezone.utc).replace(tzinfo=None),
     )
     session.add(project)
     session.flush()
@@ -1486,8 +1514,11 @@ def _get_or_create_project_model(session, user_id: str, comp: CompetitionModel) 
     return project
 
 
-def _safe_due(base: Optional[date], days_before: int = 0) -> Optional[date]:
-    return base - timedelta(days=days_before) if base else None
+def _safe_due(base: Optional[date], days_before: int = 0, not_before: Optional[date] = None) -> Optional[date]:
+    if base is None:
+        return None
+    due = base - timedelta(days=days_before)
+    return min(base, max(due, not_before)) if not_before else due
 
 
 def _defense_due(comp: CompetitionModel) -> Optional[date]:
@@ -1519,13 +1550,23 @@ def _ensure_project_template(session, project: UserProjectModel, comp: Competiti
                 item.phase = phase
                 used_legacy_phases.add(phase)
                 break
+    created = project.created_at
+    created = created.replace(tzinfo=timezone.utc) if created.tzinfo is None else created
+    start = created.astimezone(contest_now().tzinfo).date()
+    # Finish registration before the suggested design milestone, even when
+    # official registration and submission close on the same day.
+    registration_due = _safe_due(comp.registration_deadline, 7, start)
+    solution_due = _safe_due(comp.submission_deadline, 42, start)
+    if registration_due and solution_due:
+        registration_due = min(registration_due, solution_due)
+    production_start = max(start, registration_due or start)
     template = [
-        ("qualification", "01 · 资格核对与官方证据确认", _safe_due(comp.registration_deadline, 21), 2.0),
-        ("team_topic", "02 · 组队分工与选题冻结", _safe_due(comp.registration_deadline, 14), 6.0),
-        ("registration", "03 · 完成报名与队伍信息确认", comp.registration_deadline, 2.0),
-        ("solution", "04 · 方案设计与评审指标映射", _safe_due(comp.submission_deadline, 42), 12.0),
-        ("production", "05 · 作品制作与中期验收", _safe_due(comp.submission_deadline, 14), 36.0),
-        ("submission", "06 · 提交前合规检查", comp.submission_deadline or comp.registration_deadline, 4.0),
+        ("qualification", "01 · 资格核对与官方证据确认", _safe_due(registration_due, 14, start), 2.0),
+        ("team_topic", "02 · 组队分工与选题冻结", _safe_due(registration_due, 7, start), 6.0),
+        ("registration", "03 · 完成报名与队伍信息确认", registration_due, 2.0),
+        ("solution", "04 · 方案设计与评审指标映射", _safe_due(comp.submission_deadline, 42, production_start), 12.0),
+        ("production", "05 · 作品制作与中期验收", _safe_due(comp.submission_deadline, 14, production_start), 36.0),
+        ("submission", "06 · 提交前合规检查", comp.submission_deadline, 4.0),
         ("defense", "07 · 答辩演练与证据包准备", _defense_due(comp), 8.0),
     ]
     canonical_titles = {title for _phase, title, _due, _hours in template}
@@ -1580,7 +1621,7 @@ def _ensure_project_template(session, project: UserProjectModel, comp: Competiti
             session.add(item)
             session.flush()
             next_order += 1
-        elif item.title == title:
+        elif item.title == title and item.status not in {ProjectItemStatus.DONE.value, ProjectItemStatus.SKIPPED.value}:
             # 同步修复既有系统模板的日期；用户自行新增的任务不覆盖。
             item.due_date = due_date
         if previous is not None and (
@@ -1605,7 +1646,7 @@ def _ensure_project_template(session, project: UserProjectModel, comp: Competiti
         # 系统模板任务只能依赖前一阶段任务，不允许引用材料或后续阶段。
         task.depends_on_item_id = expected.item_id if expected else None
 
-    material_due = comp.submission_deadline or comp.registration_deadline
+    material_due = comp.submission_deadline
     existing_materials = {item.title for item in all_items if item.item_type == ProjectItemType.MATERIAL.value}
     material_dependency = task_by_phase.get("production")
     for material in _load_json(comp.required_materials):
@@ -1631,6 +1672,13 @@ def _ensure_project_template(session, project: UserProjectModel, comp: Competiti
         ProjectItemModel.item_type == ProjectItemType.MATERIAL.value,
     ):
         item.depends_on_item_id = material_dependency.item_id if material_dependency else None
+        if (
+            comp.submission_deadline is None
+            and item.phase == "submission"
+            and item.title in _load_json(comp.required_materials)
+            and item.due_date == comp.registration_deadline
+        ):
+            item.due_date = None
     _repair_project_dependency_cycles(session, project.project_id)
 
 
@@ -1668,17 +1716,20 @@ def _hydrate_projects(session, projects: list[UserProjectModel]) -> list[UserPro
 
 def create_user_project(user_id: str, competition_id: str) -> UserProject:
     with session_scope() as session:
-        if session.get(UserProfileModel, user_id) is None:
+        profile = session.get(UserProfileModel, user_id)
+        if profile is None:
             raise ValueError("profile_required")
         comp = session.get(CompetitionModel, competition_id)
         if comp is None:
             raise ValueError("competition_not_found")
         competition = _competition_to_pydantic(comp)
-        # 来源核验状态是提示信息，不再阻止用户基于已有基础资料创建项目。
+        # Keep existing downgraded projects, but do not create new ones from candidates.
         if not assess_source_readiness(competition).ready:
             raise ValueError("competition_basic_info_incomplete")
-        if not is_registerable_now(competition, date.today()):
+        if not is_registerable_now(competition, contest_now()):
             raise ValueError("competition_expired")
+        if not eligibility_gate(_user_to_pydantic(profile), competition, contest_now())[0]:
+            raise ValueError("profile_ineligible")
         return _hydrate_projects(
             session, [_get_or_create_project_model(session, user_id, comp)]
         )[0]
@@ -1687,10 +1738,10 @@ def create_user_project(user_id: str, competition_id: str) -> UserProject:
 def create_user_projects_atomic(
     user_id: str,
     competition_ids: list[str],
-    current: Optional[date] = None,
+    current: date | datetime | None = None,
 ) -> tuple[list[UserProject], list[dict]]:
     """在一个事务内重新校验并采用整个组合；任一项失败则不写入任何项目。"""
-    current = current or date.today()
+    current = current or contest_now()
     with session_scope() as session:
         profile = (
             session.query(UserProfileModel)
@@ -1726,6 +1777,10 @@ def create_user_projects_atomic(
                         "reason": "；".join(readiness.reasons),
                     }
                 )
+            else:
+                eligible, reasons = eligibility_gate(_user_to_pydantic(profile), _competition_to_pydantic(comp), current)
+                if not eligible:
+                    failures.append({"competition_id": competition_id, "reason": "；".join(r.reason for r in reasons)})
         if failures:
             return [], failures
 
@@ -1928,7 +1983,10 @@ def upsert_competition(comp: Competition) -> Competition:
         existing.team_min = comp.team_min
         existing.team_max = comp.team_max
         existing.registration_deadline = comp.registration_deadline
+        existing.registration_deadline_at = comp.registration_deadline_at.isoformat() if comp.registration_deadline_at else None
         existing.submission_deadline = comp.submission_deadline
+        existing.submission_deadline_at = comp.submission_deadline_at.isoformat() if comp.submission_deadline_at else None
+        existing.deadline_timezone_basis = comp.deadline_timezone_basis
         existing.result_announcement_date = comp.result_announcement_date
         existing.competition_start_date = comp.competition_start_date
         existing.competition_end_date = comp.competition_end_date
@@ -2112,10 +2170,18 @@ def _watch_dict(item: SourceWatchModel, competition_name: Optional[str] = None) 
     age_hours = None
     if item.last_success_at:
         age_hours = round(max(0.0, (now - item.last_success_at).total_seconds() / 3600), 1)
-    if item.last_status in {"new", "ok"} and item.consecutive_failures == 0:
-        health_score = 100 if item.last_success_at else 80
+    if not item.enabled:
+        health_score, health_status = 0, "paused"
+    elif item.last_status == "new" or (not item.last_success_at and item.consecutive_failures == 0):
+        health_score, health_status = 0, "unknown"
+    elif item.last_status == "ok" and item.consecutive_failures == 0:
+        health_score = 65 if age_hours is None or age_hours > item.interval_hours * 2 else 100
+        health_status = "healthy" if health_score >= 80 else "degraded"
     else:
-        health_score = max(0, 80 - item.consecutive_failures * 22)
+        health_score = max(0, min(79, 80 - item.consecutive_failures * 22))
+        health_status = "degraded" if health_score >= 45 else "critical"
+    def utc_iso(value):
+        return value.replace(tzinfo=timezone.utc).isoformat() if value else None
     return {
         "watch_id": item.watch_id,
         "competition_id": item.competition_id,
@@ -2131,20 +2197,20 @@ def _watch_dict(item: SourceWatchModel, competition_name: Optional[str] = None) 
         "timezone": item.timezone_name,
         "interval_hours": item.interval_hours,
         "enabled": item.enabled,
-        "last_checked_at": item.last_checked_at.isoformat() if item.last_checked_at else None,
+        "last_checked_at": utc_iso(item.last_checked_at),
         "etag": item.etag,
         "last_modified": item.last_modified,
         "last_content_hash": item.last_content_hash,
         "last_status": item.last_status,
         "consecutive_failures": item.consecutive_failures,
         "last_error": item.last_error,
-        "last_success_at": item.last_success_at.isoformat() if item.last_success_at else None,
-        "next_scan_at": item.next_scan_at.isoformat() if item.next_scan_at else None,
+        "last_success_at": utc_iso(item.last_success_at),
+        "next_scan_at": utc_iso(item.next_scan_at),
         "last_latency_ms": item.last_latency_ms,
         "last_content_bytes": item.last_content_bytes,
         "age_hours": age_hours,
         "health_score": health_score,
-        "health_status": "healthy" if health_score >= 80 else ("degraded" if health_score >= 45 else "critical"),
+        "health_status": health_status,
         "connector_pipeline": ["discover", "fetch", "normalize", "snapshot", "diff", "review"],
     }
 
@@ -2409,7 +2475,7 @@ def review_change_event(event_id: int, action: str, note: Optional[str] = None) 
         comp = session.get(CompetitionModel, watch.competition_id)
         if action == "approve":
             proposed = json.loads(event.proposed_changes or "{}")
-            checked_at = date.today().isoformat()
+            checked_at = contest_now().date().isoformat()
             for field, change in proposed.items():
                 if field not in {"registration_deadline", "submission_deadline"}:
                     continue
@@ -2418,6 +2484,13 @@ def review_change_event(event_id: int, action: str, note: Optional[str] = None) 
                 except (ValueError, TypeError):
                     continue
                 setattr(comp, field, value)
+                # A date-only change cannot carry forward the old document's clock or anchors.
+                setattr(comp, field + "_at", None)
+                comp.data_status = DataStatus.UNVERIFIED.value
+                comp.trusted_level = TrustedLevel.B.value
+                for old in comp.citations:
+                    if old.field in {field, field + "_at"}:
+                        old.anchor_status = "needs_review"
                 citation = next((c for c in comp.citations if c.field == field), None)
                 if citation is None:
                     citation = CitationModel(competition_id=comp.competition_id, field=field)
@@ -2430,6 +2503,14 @@ def review_change_event(event_id: int, action: str, note: Optional[str] = None) 
                 citation.last_verified_at = checked_at
                 citation.trusted_level = comp.trusted_level
                 citation.anchor_quality = "approximate"
+                citation.anchor_status = "needs_review"
+                citation.document_id = None
+                citation.document_sha256 = None
+                citation.page_rects = "[]"
+                citation.text_exact = citation.source_text
+                citation.text_prefix = citation.text_suffix = None
+                citation.text_start = citation.text_end = None
+                citation.anchor_confidence = 0.0
             comp.last_verified_at = checked_at
             comp.doc_version = f"{comp.document_year}_radar_{event.event_id}"
             project_users = (
@@ -2580,14 +2661,17 @@ def create_task_from_agent(
 ) -> ProjectItem:
     """把 Agent 建议转为可执行任务，并保留所用引用。"""
     with session_scope() as session:
-        if session.get(UserProfileModel, user_id) is None:
+        profile = session.get(UserProfileModel, user_id)
+        if profile is None:
             raise ValueError("profile_required")
         comp = session.get(CompetitionModel, competition_id)
         if comp is None:
             raise ValueError("competition_not_found")
         competition = _competition_to_pydantic(comp)
-        if not assess_recommendation_readiness(competition, date.today()).ready:
+        if not assess_recommendation_readiness(competition, contest_now()).ready:
             raise ValueError("competition_not_ready")
+        if not eligibility_gate(_user_to_pydantic(profile), competition, contest_now())[0]:
+            raise ValueError("profile_ineligible")
         if source_citation_id is not None:
             citation = session.get(CitationModel, source_citation_id)
             if citation is None or citation.competition_id != competition_id:

@@ -1,0 +1,103 @@
+{
+  "generated_at": "2026-10-03T09:38:21.909230+00:00",
+  "mode": "clean extracted release, fresh Python venv, offline HTTP",
+  "archive_sha256": "df97fb0dcc77916e7b126e88f407143e508e31f93f22db02cea839562c679cc3",
+  "records": 194,
+  "registerable": 4,
+  "checks": [
+    {
+      "name": "final_video_only",
+      "passed": true
+    },
+    {
+      "name": "pytest_configuration",
+      "passed": true
+    },
+    {
+      "name": "no_private_environment",
+      "passed": true
+    },
+    {
+      "name": "no_database",
+      "passed": true
+    },
+    {
+      "name": "no_local_secrets",
+      "passed": true
+    },
+    {
+      "name": "health_connected",
+      "passed": true
+    },
+    {
+      "name": "health_no_connection_information",
+      "passed": true
+    },
+    {
+      "name": "frontend_available",
+      "passed": true
+    },
+    {
+      "name": "model_disabled",
+      "passed": true
+    },
+    {
+      "name": "194_records_initialized",
+      "passed": true
+    },
+    {
+      "name": "catalog_partition",
+      "passed": true
+    },
+    {
+      "name": "demo_login",
+      "passed": true
+    },
+    {
+      "name": "only_formal_recommendations",
+      "passed": true
+    },
+    {
+      "name": "join_formal_project",
+      "passed": true
+    },
+    {
+      "name": "tasks_and_materials",
+      "passed": true
+    },
+    {
+      "name": "calendar_export",
+      "passed": true
+    },
+    {
+      "name": "project_delete",
+      "passed": true
+    },
+    {
+      "name": "candidate_project_blocked",
+      "passed": true
+    },
+    {
+      "name": "admin_closed_upload",
+      "passed": true
+    },
+    {
+      "name": "admin_closed_parse",
+      "passed": true
+    },
+    {
+      "name": "admin_closed_competitions",
+      "passed": true
+    },
+    {
+      "name": "admin_closed_competitions/bulk",
+      "passed": true
+    },
+    {
+      "name": "canonical_deadline",
+      "passed": true
+    }
+  ],
+  "passed": 23,
+  "total": 23
+}

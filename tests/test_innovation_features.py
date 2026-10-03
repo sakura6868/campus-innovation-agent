@@ -68,6 +68,8 @@ def _ready_comp(index: int, deadline_days: int, skills: list[str]) -> Competitio
         document_year=date.today().year,
         category=(CompetitionCategory.SOFTWARE if index % 2 else CompetitionCategory.MODELING),
         eligible_students=[EducationLevel.UNDERGRADUATE],
+        team_min=1,
+        team_max=3,
         registration_deadline=date.today() + timedelta(days=deadline_days),
         required_skills=skills,
         required_materials=["报名表", "作品"],

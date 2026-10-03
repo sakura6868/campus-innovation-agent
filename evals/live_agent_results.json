@@ -1,0 +1,1340 @@
+{
+  "executed_at": "2026-10-03T17:07:14.106952+08:00",
+  "mode": "local_http_live_model",
+  "provider": "tokenrhythm",
+  "model": "qwen3.8-flash",
+  "limitations": [
+    "Automated smoke check, not human feedback or online deployment verification",
+    "Only public contest evidence; no personal student profile sent",
+    "Two advice cases use paid model calls; critical facts use deterministic rules"
+  ],
+  "summary": {
+    "passed": 7,
+    "total": 7
+  },
+  "cases": [
+    {
+      "id": "LIVE-01",
+      "question": "报名截止和比赛结束分别是什么时候？",
+      "response": {
+        "run_id": "agent_a07c4c3c34d541c4b6f669d52fa55ec7",
+        "question": "报名截止和比赛结束分别是什么时候？",
+        "intent": "qa",
+        "resolved_competition": "mathorcup_data_2026",
+        "resolved_name": "2026年第七届MathorCup数学应用挑战赛（大数据竞赛）",
+        "answer": "竞赛初赛时间为2026年 10月23日18:00 至2026年 10月30日 20:00。[2]\n报名截止：2026-10-23 12:00（UTC+08:00，校园时区假设）[1]。\n\n——— 引用来源 ———\n[1] mathorcup_data_2026_official.pdf·第1页·A级：报名截止日期为 2026 年 10 月 23 日 12:00，报名截止后不能再更改报名信息。\n[2] mathorcup_data_2026_official.pdf·第1页·A级：竞赛初赛时间为2026年 10月23日18:00 至2026年 10月30日 20:00。",
+        "citations": [
+          {
+            "citation_id": 5304,
+            "field": "registration_deadline",
+            "page": 1,
+            "source_text": "报名截止日期为 2026 年 10 月 23 日 12:00，报名截止后不能再更改报名信息。",
+            "document_name": "mathorcup_data_2026_official.pdf",
+            "source_url": "https://files.mathorcup.org/uploads/files/20260903/1788430033944665.pdf",
+            "acquired_date": "2026-10-03",
+            "last_verified_at": "2026-10-03",
+            "trusted_level": "A",
+            "document_id": null,
+            "document_sha256": "a45b950e7284ede52ea3dd1ceb11da83982fa34eebbd23147fc69676eec3a9f0",
+            "rects": [],
+            "anchor_quality": "page_only",
+            "text_exact": "报名截止日期为 2026 年 10 月 23 日 12:00，报名截止后不能再更改报名信息。",
+            "text_prefix": null,
+            "text_suffix": null,
+            "text_start": null,
+            "text_end": null,
+            "anchor_confidence": 0.45,
+            "anchor_status": "original"
+          },
+          {
+            "citation_id": 5309,
+            "field": "competition_end_date",
+            "page": 1,
+            "source_text": "竞赛初赛时间为2026年 10月23日18:00 至2026年 10月30日 20:00。",
+            "document_name": "mathorcup_data_2026_official.pdf",
+            "source_url": "https://files.mathorcup.org/uploads/files/20260903/1788430033944665.pdf",
+            "acquired_date": "2026-10-03",
+            "last_verified_at": "2026-10-03",
+            "trusted_level": "A",
+            "document_id": null,
+            "document_sha256": "a45b950e7284ede52ea3dd1ceb11da83982fa34eebbd23147fc69676eec3a9f0",
+            "rects": [],
+            "anchor_quality": "page_only",
+            "text_exact": "竞赛初赛时间为2026年 10月23日18:00 至2026年 10月30日 20:00。",
+            "text_prefix": null,
+            "text_suffix": null,
+            "text_start": null,
+            "text_end": null,
+            "anchor_confidence": 0.45,
+            "anchor_status": "original"
+          }
+        ],
+        "gate": {
+          "skipped": true
+        },
+        "score": {
+          "skipped": true
+        },
+        "recommendations": [],
+        "teammate_matches": [],
+        "pending_review": false,
+        "data_version": "mathorcup_data_2026:2026_data_official_20261003@2026-10-03",
+        "trace": [
+          {
+            "node": "route_intent",
+            "label": "意图识别与赛事锁定",
+            "status": "succeeded",
+            "duration_ms": 30.333,
+            "evidence_count": 0,
+            "data_version": "mathorcup_data_2026:2026_data_official_20261003@2026-10-03",
+            "detail": "意图路由：intent=qa，锁定赛事=2026年第七届MathorCup数学应用挑战赛（大数据竞赛）",
+            "fallback": false
+          },
+          {
+            "node": "retrieve",
+            "label": "可信证据检索",
+            "status": "succeeded",
+            "duration_ms": 5.442,
+            "evidence_count": 2,
+            "data_version": "mathorcup_data_2026:2026_data_official_20261003@2026-10-03",
+            "detail": "隔离检索：报名截止问题仅保留 registration_deadline 单一证据；隔离检索：collection=rag_mathorcup_data_2026，命中 2 条证据",
+            "fallback": false
+          },
+          {
+            "node": "web_augment",
+            "label": "联网信息补充",
+            "status": "skipped",
+            "duration_ms": 2.147,
+            "evidence_count": 2,
+            "data_version": "mathorcup_data_2026:2026_data_official_20261003@2026-10-03",
+            "detail": "联网补充未触发或按当前策略跳过",
+            "fallback": false
+          },
+          {
+            "node": "gate",
+            "label": "资格与来源门控",
+            "status": "skipped",
+            "duration_ms": 3.396,
+            "evidence_count": 2,
+            "data_version": "mathorcup_data_2026:2026_data_official_20261003@2026-10-03",
+            "detail": "硬性门控：跳过（缺用户画像或赛事）",
+            "fallback": false
+          },
+          {
+            "node": "score",
+            "label": "适配度评分",
+            "status": "skipped",
+            "duration_ms": 1.998,
+            "evidence_count": 2,
+            "data_version": "mathorcup_data_2026:2026_data_official_20261003@2026-10-03",
+            "detail": "软性评分：跳过（缺用户画像或赛事）",
+            "fallback": false
+          },
+          {
+            "node": "compose",
+            "label": "答案组装与引用校验",
+            "status": "succeeded",
+            "duration_ms": 3.213,
+            "evidence_count": 2,
+            "data_version": "mathorcup_data_2026:2026_data_official_20261003@2026-10-03",
+            "detail": "组装答案：按所问字段返回官方原文与唯一结构化日期",
+            "fallback": false
+          }
+        ],
+        "trace_legacy": [
+          "意图路由：intent=qa，锁定赛事=2026年第七届MathorCup数学应用挑战赛（大数据竞赛）",
+          "隔离检索：报名截止问题仅保留 registration_deadline 单一证据；隔离检索：collection=rag_mathorcup_data_2026，命中 2 条证据",
+          "联网补充未触发或按当前策略跳过",
+          "硬性门控：跳过（缺用户画像或赛事）",
+          "软性评分：跳过（缺用户画像或赛事）",
+          "组装答案：按所问字段返回官方原文与唯一结构化日期"
+        ],
+        "trace_summary": {
+          "status": "succeeded",
+          "total_steps": 6,
+          "succeeded_steps": 3,
+          "skipped_steps": 3,
+          "degraded_steps": 0,
+          "failed_steps": 0,
+          "fallback_steps": 0,
+          "evidence_count": 2,
+          "path": [
+            "route_intent",
+            "retrieve",
+            "web_augment",
+            "gate",
+            "score",
+            "compose"
+          ],
+          "labels": [
+            "意图识别与赛事锁定",
+            "可信证据检索",
+            "联网信息补充",
+            "资格与来源门控",
+            "适配度评分",
+            "答案组装与引用校验"
+          ]
+        },
+        "metrics": {
+          "status": "succeeded",
+          "total_duration_ms": 83.244,
+          "node_duration_ms": 46.529,
+          "step_count": 6,
+          "evidence_count": 2,
+          "evidence_fields": [
+            "competition_end_date",
+            "registration_deadline"
+          ],
+          "fallback_count": 0,
+          "pending_review": false,
+          "data_version": "mathorcup_data_2026:2026_data_official_20261003@2026-10-03",
+          "engine": "shim"
+        },
+        "web_results": [],
+        "error": null,
+        "user_id": null
+      },
+      "elapsed_ms": 108.18,
+      "assertions": [
+        {
+          "expectation": "two distinct official times",
+          "passed": true
+        },
+        {
+          "expectation": "no other-field citations",
+          "passed": true
+        }
+      ],
+      "passed": true
+    },
+    {
+      "id": "LIVE-02",
+      "question": "这个比赛几个人一队？",
+      "response": {
+        "run_id": "agent_2b1ff60b94ef4bd4a4a853c9fa46146b",
+        "question": "这个比赛几个人一队？",
+        "intent": "qa",
+        "resolved_competition": "mathorcup_data_2026",
+        "resolved_name": "2026年第七届MathorCup数学应用挑战赛（大数据竞赛）",
+        "answer": "沿用当前对话赛事：2026年第七届MathorCup数学应用挑战赛（大数据竞赛）（2026）。\n\n可以自由组队参赛，每个参赛队伍人数可为 1–3人，参赛队员必须全部为在校生，允许跨年级、跨专业、跨校组队。[2]\n可以自由组队参赛，每个参赛队伍人数可为 1–3人，参赛队员必须全部为在校生，允许跨年级、跨专业、跨校组队。[1]\n\n——— 引用来源 ———\n[1] mathorcup_data_2026_official.pdf·第4页·A级：可以自由组队参赛，每个参赛队伍人数可为 1–3人，参赛队员必须全部为在校生，允许跨年级、跨专业、跨校组队。\n[2] mathorcup_data_2026_official.pdf·第4页·A级：可以自由组队参赛，每个参赛队伍人数可为 1–3人，参赛队员必须全部为在校生，允许跨年级、跨专业、跨校组队。",
+        "citations": [
+          {
+            "citation_id": 5306,
+            "field": "team_min",
+            "page": 4,
+            "source_text": "可以自由组队参赛，每个参赛队伍人数可为 1–3人，参赛队员必须全部为在校生，允许跨年级、跨专业、跨校组队。",
+            "document_name": "mathorcup_data_2026_official.pdf",
+            "source_url": "https://files.mathorcup.org/uploads/files/20260903/1788430033944665.pdf",
+            "acquired_date": "2026-10-03",
+            "last_verified_at": "2026-10-03",
+            "trusted_level": "A",
+            "document_id": null,
+            "document_sha256": "a45b950e7284ede52ea3dd1ceb11da83982fa34eebbd23147fc69676eec3a9f0",
+            "rects": [],
+            "anchor_quality": "page_only",
+            "text_exact": "可以自由组队参赛，每个参赛队伍人数可为 1–3人，参赛队员必须全部为在校生，允许跨年级、跨专业、跨校组队。",
+            "text_prefix": null,
+            "text_suffix": null,
+            "text_start": null,
+            "text_end": null,
+            "anchor_confidence": 0.45,
+            "anchor_status": "original"
+          },
+          {
+            "citation_id": 5307,
+            "field": "team_max",
+            "page": 4,
+            "source_text": "可以自由组队参赛，每个参赛队伍人数可为 1–3人，参赛队员必须全部为在校生，允许跨年级、跨专业、跨校组队。",
+            "document_name": "mathorcup_data_2026_official.pdf",
+            "source_url": "https://files.mathorcup.org/uploads/files/20260903/1788430033944665.pdf",
+            "acquired_date": "2026-10-03",
+            "last_verified_at": "2026-10-03",
+            "trusted_level": "A",
+            "document_id": null,
+            "document_sha256": "a45b950e7284ede52ea3dd1ceb11da83982fa34eebbd23147fc69676eec3a9f0",
+            "rects": [],
+            "anchor_quality": "page_only",
+            "text_exact": "可以自由组队参赛，每个参赛队伍人数可为 1–3人，参赛队员必须全部为在校生，允许跨年级、跨专业、跨校组队。",
+            "text_prefix": null,
+            "text_suffix": null,
+            "text_start": null,
+            "text_end": null,
+            "anchor_confidence": 0.45,
+            "anchor_status": "original"
+          }
+        ],
+        "gate": {
+          "skipped": true
+        },
+        "score": {
+          "skipped": true
+        },
+        "recommendations": [],
+        "teammate_matches": [],
+        "pending_review": false,
+        "data_version": "mathorcup_data_2026:2026_data_official_20261003@2026-10-03",
+        "trace": [
+          {
+            "node": "route_intent",
+            "label": "意图识别与赛事锁定",
+            "status": "succeeded",
+            "duration_ms": 27.999,
+            "evidence_count": 0,
+            "data_version": "mathorcup_data_2026:2026_data_official_20261003@2026-10-03",
+            "detail": "意图路由：intent=qa，锁定赛事=2026年第七届MathorCup数学应用挑战赛（大数据竞赛）",
+            "fallback": false
+          },
+          {
+            "node": "retrieve",
+            "label": "可信证据检索",
+            "status": "succeeded",
+            "duration_ms": 3.54,
+            "evidence_count": 2,
+            "data_version": "mathorcup_data_2026:2026_data_official_20261003@2026-10-03",
+            "detail": "隔离检索：团队人数问题仅保留 team_min/team_max 对应证据；隔离检索：collection=rag_mathorcup_data_2026，命中 2 条证据",
+            "fallback": false
+          },
+          {
+            "node": "web_augment",
+            "label": "联网信息补充",
+            "status": "skipped",
+            "duration_ms": 1.506,
+            "evidence_count": 2,
+            "data_version": "mathorcup_data_2026:2026_data_official_20261003@2026-10-03",
+            "detail": "联网补充未触发或按当前策略跳过",
+            "fallback": false
+          },
+          {
+            "node": "gate",
+            "label": "资格与来源门控",
+            "status": "skipped",
+            "duration_ms": 2.332,
+            "evidence_count": 2,
+            "data_version": "mathorcup_data_2026:2026_data_official_20261003@2026-10-03",
+            "detail": "硬性门控：跳过（缺用户画像或赛事）",
+            "fallback": false
+          },
+          {
+            "node": "score",
+            "label": "适配度评分",
+            "status": "skipped",
+            "duration_ms": 1.464,
+            "evidence_count": 2,
+            "data_version": "mathorcup_data_2026:2026_data_official_20261003@2026-10-03",
+            "detail": "软性评分：跳过（缺用户画像或赛事）",
+            "fallback": false
+          },
+          {
+            "node": "compose",
+            "label": "答案组装与引用校验",
+            "status": "succeeded",
+            "duration_ms": 2.249,
+            "evidence_count": 2,
+            "data_version": "mathorcup_data_2026:2026_data_official_20261003@2026-10-03",
+            "detail": "组装答案：按所问字段返回官方原文与唯一结构化日期",
+            "fallback": false
+          }
+        ],
+        "trace_legacy": [
+          "意图路由：intent=qa，锁定赛事=2026年第七届MathorCup数学应用挑战赛（大数据竞赛）",
+          "隔离检索：团队人数问题仅保留 team_min/team_max 对应证据；隔离检索：collection=rag_mathorcup_data_2026，命中 2 条证据",
+          "联网补充未触发或按当前策略跳过",
+          "硬性门控：跳过（缺用户画像或赛事）",
+          "软性评分：跳过（缺用户画像或赛事）",
+          "组装答案：按所问字段返回官方原文与唯一结构化日期"
+        ],
+        "trace_summary": {
+          "status": "succeeded",
+          "total_steps": 6,
+          "succeeded_steps": 3,
+          "skipped_steps": 3,
+          "degraded_steps": 0,
+          "failed_steps": 0,
+          "fallback_steps": 0,
+          "evidence_count": 2,
+          "path": [
+            "route_intent",
+            "retrieve",
+            "web_augment",
+            "gate",
+            "score",
+            "compose"
+          ],
+          "labels": [
+            "意图识别与赛事锁定",
+            "可信证据检索",
+            "联网信息补充",
+            "资格与来源门控",
+            "适配度评分",
+            "答案组装与引用校验"
+          ]
+        },
+        "metrics": {
+          "status": "succeeded",
+          "total_duration_ms": 69.564,
+          "node_duration_ms": 39.09,
+          "step_count": 6,
+          "evidence_count": 2,
+          "evidence_fields": [
+            "team_max",
+            "team_min"
+          ],
+          "fallback_count": 0,
+          "pending_review": false,
+          "data_version": "mathorcup_data_2026:2026_data_official_20261003@2026-10-03",
+          "engine": "shim"
+        },
+        "web_results": [],
+        "error": null,
+        "user_id": null
+      },
+      "elapsed_ms": 77.98,
+      "assertions": [
+        {
+          "expectation": "followup context retained",
+          "passed": true
+        },
+        {
+          "expectation": "official team quote",
+          "passed": true
+        }
+      ],
+      "passed": true
+    },
+    {
+      "id": "LIVE-03",
+      "question": "MathorCup大数据今年怎么报名？",
+      "response": {
+        "run_id": "agent_f2b437afe4cb4ba4858f5082d5c8d952",
+        "question": "MathorCup大数据今年怎么报名？",
+        "intent": "qa",
+        "resolved_competition": "mathorcup_data_2026",
+        "resolved_name": "2026年第七届MathorCup数学应用挑战赛（大数据竞赛）",
+        "answer": "今年这场 MathorCup 大数据竞赛，报名上你先抓住几个关键点：\n\n- 报名截止时间是 **2026 年 10 月 23 日 12:00**，而且报名截止后就不能再更改报名信息了 [1]。现在距离截止还有时间，但别拖到最后一刻。\n- 组队方面，可以 **1–3 人自由组队**，参赛队员必须全部是在校生，允许跨年级、跨专业、跨校组队 [3]。\n- 官方文件链接在这里：https://files.mathorcup.org/uploads/files/20260903/1788430033944665.pdf [1]。\n\n至于具体“从哪个页面点报名、要填哪些材料、是否要导师确认”这些细节，目前能看到的证据里没有统一说明，建议你直接去官网/官方通知里确认报名入口和材料要求。\n\n我的建议是：先把队友定下来，确认每个人都是在校生身份；提交前仔细核对姓名、学校、联系方式这些信息，因为截止后不能改 [1]。\n\n——— 引用来源 ———\n[1] mathorcup_data_2026_official.pdf·第1页·A级：报名截止日期为 2026 年 10 月 23 日 12:00，报名截止后不能再更改报名信息。\n[2] mathorcup_data_2026_official.pdf·第1页·A级：报名截止日期为 2026 年 10 月 23 日 12:00，报名截止后不能再更改报名信息。\n[3] mathorcup_data_2026_official.pdf·第4页·A级：可以自由组队参赛，每个参赛队伍人数可为 1–3人，参赛队员必须全部为在校生，允许跨年级、跨专业、跨校组队。\n[4] mathorcup_data_2026_official.pdf·第4页·A级：可以自由组队参赛，每个参赛队伍人数可为 1–3人，参赛队员必须全部为在校生，允许跨年级、跨专业、跨校组队。",
+        "citations": [
+          {
+            "citation_id": 5303,
+            "field": "registration_deadline_at",
+            "page": 1,
+            "source_text": "报名截止日期为 2026 年 10 月 23 日 12:00，报名截止后不能再更改报名信息。",
+            "document_name": "mathorcup_data_2026_official.pdf",
+            "source_url": "https://files.mathorcup.org/uploads/files/20260903/1788430033944665.pdf",
+            "acquired_date": "2026-10-03",
+            "last_verified_at": "2026-10-03",
+            "trusted_level": "A",
+            "document_id": null,
+            "document_sha256": "a45b950e7284ede52ea3dd1ceb11da83982fa34eebbd23147fc69676eec3a9f0",
+            "rects": [],
+            "anchor_quality": "page_only",
+            "text_exact": "报名截止日期为 2026 年 10 月 23 日 12:00，报名截止后不能再更改报名信息。",
+            "text_prefix": null,
+            "text_suffix": null,
+            "text_start": null,
+            "text_end": null,
+            "anchor_confidence": 0.45,
+            "anchor_status": "original"
+          },
+          {
+            "citation_id": 5304,
+            "field": "registration_deadline",
+            "page": 1,
+            "source_text": "报名截止日期为 2026 年 10 月 23 日 12:00，报名截止后不能再更改报名信息。",
+            "document_name": "mathorcup_data_2026_official.pdf",
+            "source_url": "https://files.mathorcup.org/uploads/files/20260903/1788430033944665.pdf",
+            "acquired_date": "2026-10-03",
+            "last_verified_at": "2026-10-03",
+            "trusted_level": "A",
+            "document_id": null,
+            "document_sha256": "a45b950e7284ede52ea3dd1ceb11da83982fa34eebbd23147fc69676eec3a9f0",
+            "rects": [],
+            "anchor_quality": "page_only",
+            "text_exact": "报名截止日期为 2026 年 10 月 23 日 12:00，报名截止后不能再更改报名信息。",
+            "text_prefix": null,
+            "text_suffix": null,
+            "text_start": null,
+            "text_end": null,
+            "anchor_confidence": 0.45,
+            "anchor_status": "original"
+          },
+          {
+            "citation_id": 5306,
+            "field": "team_min",
+            "page": 4,
+            "source_text": "可以自由组队参赛，每个参赛队伍人数可为 1–3人，参赛队员必须全部为在校生，允许跨年级、跨专业、跨校组队。",
+            "document_name": "mathorcup_data_2026_official.pdf",
+            "source_url": "https://files.mathorcup.org/uploads/files/20260903/1788430033944665.pdf",
+            "acquired_date": "2026-10-03",
+            "last_verified_at": "2026-10-03",
+            "trusted_level": "A",
+            "document_id": null,
+            "document_sha256": "a45b950e7284ede52ea3dd1ceb11da83982fa34eebbd23147fc69676eec3a9f0",
+            "rects": [],
+            "anchor_quality": "page_only",
+            "text_exact": "可以自由组队参赛，每个参赛队伍人数可为 1–3人，参赛队员必须全部为在校生，允许跨年级、跨专业、跨校组队。",
+            "text_prefix": null,
+            "text_suffix": null,
+            "text_start": null,
+            "text_end": null,
+            "anchor_confidence": 0.45,
+            "anchor_status": "original"
+          },
+          {
+            "citation_id": 5307,
+            "field": "team_max",
+            "page": 4,
+            "source_text": "可以自由组队参赛，每个参赛队伍人数可为 1–3人，参赛队员必须全部为在校生，允许跨年级、跨专业、跨校组队。",
+            "document_name": "mathorcup_data_2026_official.pdf",
+            "source_url": "https://files.mathorcup.org/uploads/files/20260903/1788430033944665.pdf",
+            "acquired_date": "2026-10-03",
+            "last_verified_at": "2026-10-03",
+            "trusted_level": "A",
+            "document_id": null,
+            "document_sha256": "a45b950e7284ede52ea3dd1ceb11da83982fa34eebbd23147fc69676eec3a9f0",
+            "rects": [],
+            "anchor_quality": "page_only",
+            "text_exact": "可以自由组队参赛，每个参赛队伍人数可为 1–3人，参赛队员必须全部为在校生，允许跨年级、跨专业、跨校组队。",
+            "text_prefix": null,
+            "text_suffix": null,
+            "text_start": null,
+            "text_end": null,
+            "anchor_confidence": 0.45,
+            "anchor_status": "original"
+          }
+        ],
+        "gate": {
+          "skipped": true
+        },
+        "score": {
+          "skipped": true
+        },
+        "recommendations": [],
+        "teammate_matches": [],
+        "pending_review": false,
+        "data_version": "mathorcup_data_2026:2026_data_official_20261003@2026-10-03",
+        "trace": [
+          {
+            "node": "route_intent",
+            "label": "意图识别与赛事锁定",
+            "status": "succeeded",
+            "duration_ms": 24.868,
+            "evidence_count": 0,
+            "data_version": "mathorcup_data_2026:2026_data_official_20261003@2026-10-03",
+            "detail": "意图路由：intent=qa，锁定赛事=2026年第七届MathorCup数学应用挑战赛（大数据竞赛）",
+            "fallback": false
+          },
+          {
+            "node": "retrieve",
+            "label": "可信证据检索",
+            "status": "succeeded",
+            "duration_ms": 3.189,
+            "evidence_count": 4,
+            "data_version": "mathorcup_data_2026:2026_data_official_20261003@2026-10-03",
+            "detail": "隔离检索：collection=rag_mathorcup_data_2026，命中 4 条证据",
+            "fallback": false
+          },
+          {
+            "node": "web_augment",
+            "label": "联网信息补充",
+            "status": "skipped",
+            "duration_ms": 1.547,
+            "evidence_count": 4,
+            "data_version": "mathorcup_data_2026:2026_data_official_20261003@2026-10-03",
+            "detail": "联网补充未触发或按当前策略跳过",
+            "fallback": false
+          },
+          {
+            "node": "gate",
+            "label": "资格与来源门控",
+            "status": "skipped",
+            "duration_ms": 2.389,
+            "evidence_count": 4,
+            "data_version": "mathorcup_data_2026:2026_data_official_20261003@2026-10-03",
+            "detail": "硬性门控：跳过（缺用户画像或赛事）",
+            "fallback": false
+          },
+          {
+            "node": "score",
+            "label": "适配度评分",
+            "status": "skipped",
+            "duration_ms": 1.477,
+            "evidence_count": 4,
+            "data_version": "mathorcup_data_2026:2026_data_official_20261003@2026-10-03",
+            "detail": "软性评分：跳过（缺用户画像或赛事）",
+            "fallback": false
+          },
+          {
+            "node": "compose",
+            "label": "答案组装与引用校验",
+            "status": "succeeded",
+            "duration_ms": 12728.544,
+            "evidence_count": 4,
+            "data_version": "mathorcup_data_2026:2026_data_official_20261003@2026-10-03",
+            "detail": "组装答案：LLM 基于证据自由撰写（带 [n] 引用）",
+            "fallback": false
+          }
+        ],
+        "trace_legacy": [
+          "意图路由：intent=qa，锁定赛事=2026年第七届MathorCup数学应用挑战赛（大数据竞赛）",
+          "隔离检索：collection=rag_mathorcup_data_2026，命中 4 条证据",
+          "联网补充未触发或按当前策略跳过",
+          "硬性门控：跳过（缺用户画像或赛事）",
+          "软性评分：跳过（缺用户画像或赛事）",
+          "组装答案：LLM 基于证据自由撰写（带 [n] 引用）"
+        ],
+        "trace_summary": {
+          "status": "succeeded",
+          "total_steps": 6,
+          "succeeded_steps": 3,
+          "skipped_steps": 3,
+          "degraded_steps": 0,
+          "failed_steps": 0,
+          "fallback_steps": 0,
+          "evidence_count": 4,
+          "path": [
+            "route_intent",
+            "retrieve",
+            "web_augment",
+            "gate",
+            "score",
+            "compose"
+          ],
+          "labels": [
+            "意图识别与赛事锁定",
+            "可信证据检索",
+            "联网信息补充",
+            "资格与来源门控",
+            "适配度评分",
+            "答案组装与引用校验"
+          ]
+        },
+        "metrics": {
+          "status": "succeeded",
+          "total_duration_ms": 12785.768,
+          "node_duration_ms": 12762.014,
+          "step_count": 6,
+          "evidence_count": 4,
+          "evidence_fields": [
+            "registration_deadline",
+            "registration_deadline_at",
+            "team_max",
+            "team_min"
+          ],
+          "fallback_count": 0,
+          "pending_review": false,
+          "data_version": "mathorcup_data_2026:2026_data_official_20261003@2026-10-03",
+          "engine": "shim"
+        },
+        "web_results": [],
+        "error": null,
+        "user_id": null
+      },
+      "elapsed_ms": 12795.1,
+      "assertions": [
+        {
+          "expectation": "independent track correctly resolved",
+          "passed": true
+        }
+      ],
+      "passed": true
+    },
+    {
+      "id": "LIVE-04",
+      "question": "帮我为这个比赛制定一周备赛计划",
+      "response": {
+        "run_id": "agent_d4ab1dee7c104bbd80e98834d949f550",
+        "question": "帮我为这个比赛制定一周备赛计划",
+        "intent": "chat",
+        "resolved_competition": "cocr_2026",
+        "resolved_name": "全国高校计算机能力挑战赛",
+        "answer": "「全国高校计算机能力挑战赛（2026）」一周准备建议（不是官方赛程）：\n第1天：阅读官网规则，确认个人资格、人数、截止和材料。\n第2天：盘点现有技能与样题，确定目标和分工。\n第3至4天：完成最小可运行方案或练习，记录问题与结果。\n第5天：补短板并复核结果，整理文档。\n第6天：按官方材料要求做一次完整演练。\n第7天：校对材料、备份并核对官网最新通知；不把建议日期当作官方截止。\n\nℹ️ 可信边界：上述事实已关联官方原文，但该赛事的关键字段证据尚未齐全，目前仅作为候选信息；不构成资格判断或推荐评分，请以官网最新通知为准。\n\n——— 引用来源 ———\n[1] 2026年第八届全国高校计算机能力挑战赛 通知·未定位页码·A级：主办单位:全国高等学校计算机教育研究会",
+        "citations": [
+          {
+            "citation_id": 4762,
+            "field": "organizer",
+            "page": null,
+            "source_text": "主办单位:全国高等学校计算机教育研究会",
+            "document_name": "2026年第八届全国高校计算机能力挑战赛 通知",
+            "source_url": "http://www.ncccu.org.cn/",
+            "acquired_date": "2026-07-18",
+            "last_verified_at": "2026-07-18",
+            "trusted_level": "A",
+            "document_id": null,
+            "document_sha256": null,
+            "rects": [],
+            "anchor_quality": "page_only",
+            "text_exact": "主办单位:全国高等学校计算机教育研究会",
+            "text_prefix": null,
+            "text_suffix": null,
+            "text_start": null,
+            "text_end": null,
+            "anchor_confidence": 0.45,
+            "anchor_status": "original"
+          }
+        ],
+        "gate": {
+          "skipped": true
+        },
+        "score": {
+          "skipped": true
+        },
+        "recommendations": [],
+        "teammate_matches": [],
+        "pending_review": true,
+        "data_version": "cocr_2026:2026_v1@2026-07-18",
+        "trace": [
+          {
+            "node": "route_intent",
+            "label": "意图识别与赛事锁定",
+            "status": "succeeded",
+            "duration_ms": 26.877,
+            "evidence_count": 0,
+            "data_version": "cocr_2026:2026_v1@2026-07-18",
+            "detail": "意图路由：intent=chat，锁定赛事=全国高校计算机能力挑战赛",
+            "fallback": false
+          },
+          {
+            "node": "retrieve",
+            "label": "可信证据检索",
+            "status": "succeeded",
+            "duration_ms": 2.794,
+            "evidence_count": 1,
+            "data_version": "cocr_2026:2026_v1@2026-07-18",
+            "detail": "隔离检索：collection=rag_cocr_2026，命中 1 条证据",
+            "fallback": false
+          },
+          {
+            "node": "web_augment",
+            "label": "联网信息补充",
+            "status": "skipped",
+            "duration_ms": 1.5,
+            "evidence_count": 1,
+            "data_version": "cocr_2026:2026_v1@2026-07-18",
+            "detail": "联网补充未触发或按当前策略跳过",
+            "fallback": false
+          },
+          {
+            "node": "gate",
+            "label": "资格与来源门控",
+            "status": "skipped",
+            "duration_ms": 2.099,
+            "evidence_count": 1,
+            "data_version": "cocr_2026:2026_v1@2026-07-18",
+            "detail": "硬性门控：跳过（缺用户画像或赛事）",
+            "fallback": false
+          },
+          {
+            "node": "score",
+            "label": "适配度评分",
+            "status": "skipped",
+            "duration_ms": 1.454,
+            "evidence_count": 1,
+            "data_version": "cocr_2026:2026_v1@2026-07-18",
+            "detail": "软性评分：跳过（缺用户画像或赛事）",
+            "fallback": false
+          },
+          {
+            "node": "compose",
+            "label": "答案组装与引用校验",
+            "status": "succeeded",
+            "duration_ms": 3.407,
+            "evidence_count": 1,
+            "data_version": "cocr_2026:2026_v1@2026-07-18",
+            "detail": "组装答案：按一周期限生成通用准备建议",
+            "fallback": false
+          }
+        ],
+        "trace_legacy": [
+          "意图路由：intent=chat，锁定赛事=全国高校计算机能力挑战赛",
+          "隔离检索：collection=rag_cocr_2026，命中 1 条证据",
+          "联网补充未触发或按当前策略跳过",
+          "硬性门控：跳过（缺用户画像或赛事）",
+          "软性评分：跳过（缺用户画像或赛事）",
+          "组装答案：按一周期限生成通用准备建议"
+        ],
+        "trace_summary": {
+          "status": "degraded",
+          "total_steps": 6,
+          "succeeded_steps": 3,
+          "skipped_steps": 3,
+          "degraded_steps": 0,
+          "failed_steps": 0,
+          "fallback_steps": 0,
+          "evidence_count": 1,
+          "path": [
+            "route_intent",
+            "retrieve",
+            "web_augment",
+            "gate",
+            "score",
+            "compose"
+          ],
+          "labels": [
+            "意图识别与赛事锁定",
+            "可信证据检索",
+            "联网信息补充",
+            "资格与来源门控",
+            "适配度评分",
+            "答案组装与引用校验"
+          ]
+        },
+        "metrics": {
+          "status": "degraded",
+          "total_duration_ms": 71.663,
+          "node_duration_ms": 38.131,
+          "step_count": 6,
+          "evidence_count": 1,
+          "evidence_fields": [
+            "organizer"
+          ],
+          "fallback_count": 0,
+          "pending_review": true,
+          "data_version": "cocr_2026:2026_v1@2026-07-18",
+          "engine": "shim"
+        },
+        "web_results": [],
+        "error": null,
+        "user_id": null
+      },
+      "elapsed_ms": 80.32,
+      "assertions": [
+        {
+          "expectation": "candidate notice and no score",
+          "passed": true
+        },
+        {
+          "expectation": "one week rather than months",
+          "passed": true
+        }
+      ],
+      "passed": true
+    },
+    {
+      "id": "LIVE-05",
+      "question": "明年宇宙高校创新杯报名要多少钱？",
+      "response": {
+        "run_id": "agent_01d1985dc23d40a5bca6637a9fdb3549",
+        "question": "明年宇宙高校创新杯报名要多少钱？",
+        "intent": "chat",
+        "resolved_competition": null,
+        "resolved_name": null,
+        "answer": "未能确认你提到的赛事名称或版本，请提供完整名称、年份或官方链接；不能用另一赛事的规则代答。",
+        "citations": [],
+        "gate": {
+          "skipped": true
+        },
+        "score": {
+          "skipped": true
+        },
+        "recommendations": [],
+        "teammate_matches": [],
+        "pending_review": false,
+        "data_version": "catalog:194@2026-10-03",
+        "trace": [
+          {
+            "node": "route_intent",
+            "label": "意图识别与赛事锁定",
+            "status": "succeeded",
+            "duration_ms": 45.895,
+            "evidence_count": 0,
+            "data_version": "catalog:194@2026-10-03",
+            "detail": "意图路由：intent=chat，未锁定具体赛事",
+            "fallback": false
+          },
+          {
+            "node": "retrieve",
+            "label": "可信证据检索",
+            "status": "skipped",
+            "duration_ms": 0.008,
+            "evidence_count": 0,
+            "data_version": "catalog:194@2026-10-03",
+            "detail": "隔离检索：跳过（赛事版本尚未明确）",
+            "fallback": false
+          },
+          {
+            "node": "web_augment",
+            "label": "联网信息补充",
+            "status": "skipped",
+            "duration_ms": 0.006,
+            "evidence_count": 0,
+            "data_version": "catalog:194@2026-10-03",
+            "detail": "联网补充未触发或按当前策略跳过",
+            "fallback": false
+          },
+          {
+            "node": "gate",
+            "label": "资格与来源门控",
+            "status": "skipped",
+            "duration_ms": 0.009,
+            "evidence_count": 0,
+            "data_version": "catalog:194@2026-10-03",
+            "detail": "硬性门控：跳过（缺用户画像或赛事）",
+            "fallback": false
+          },
+          {
+            "node": "score",
+            "label": "适配度评分",
+            "status": "skipped",
+            "duration_ms": 0.009,
+            "evidence_count": 0,
+            "data_version": "catalog:194@2026-10-03",
+            "detail": "软性评分：跳过（缺用户画像或赛事）",
+            "fallback": false
+          },
+          {
+            "node": "compose",
+            "label": "答案组装与引用校验",
+            "status": "degraded",
+            "duration_ms": 0.012,
+            "evidence_count": 0,
+            "data_version": "catalog:194@2026-10-03",
+            "detail": "组装答案：歧义澄清（需用户明确年份/版本）",
+            "fallback": true
+          }
+        ],
+        "trace_legacy": [
+          "意图路由：intent=chat，未锁定具体赛事",
+          "隔离检索：跳过（赛事版本尚未明确）",
+          "联网补充未触发或按当前策略跳过",
+          "硬性门控：跳过（缺用户画像或赛事）",
+          "软性评分：跳过（缺用户画像或赛事）",
+          "组装答案：歧义澄清（需用户明确年份/版本）"
+        ],
+        "trace_summary": {
+          "status": "degraded",
+          "total_steps": 6,
+          "succeeded_steps": 1,
+          "skipped_steps": 4,
+          "degraded_steps": 1,
+          "failed_steps": 0,
+          "fallback_steps": 1,
+          "evidence_count": 0,
+          "path": [
+            "route_intent",
+            "retrieve",
+            "web_augment",
+            "gate",
+            "score",
+            "compose"
+          ],
+          "labels": [
+            "意图识别与赛事锁定",
+            "可信证据检索",
+            "联网信息补充",
+            "资格与来源门控",
+            "适配度评分",
+            "答案组装与引用校验"
+          ]
+        },
+        "metrics": {
+          "status": "degraded",
+          "total_duration_ms": 81.088,
+          "node_duration_ms": 45.939,
+          "step_count": 6,
+          "evidence_count": 0,
+          "evidence_fields": [],
+          "fallback_count": 1,
+          "pending_review": false,
+          "data_version": "catalog:194@2026-10-03",
+          "engine": "shim"
+        },
+        "web_results": [],
+        "error": null,
+        "user_id": null
+      },
+      "elapsed_ms": 89.58,
+      "assertions": [
+        {
+          "expectation": "unknown event cannot inherit context",
+          "passed": true
+        }
+      ],
+      "passed": true
+    },
+    {
+      "id": "LIVE-06",
+      "question": "请用三句话建议我如何准备这个比赛，不要重复官方截止日期。",
+      "response": {
+        "run_id": "agent_9efe04c8f0de485f8edb7f7e46438fc7",
+        "question": "请用三句话建议我如何准备这个比赛，不要重复官方截止日期。",
+        "intent": "chat",
+        "resolved_competition": "mathorcup_data_2026",
+        "resolved_name": "2026年第七届MathorCup数学应用挑战赛（大数据竞赛）",
+        "answer": "先确认自己和队友都符合参赛身份，这个比赛面向境内外高校在读的研究生、本科生和专科生[3]。\n\n然后尽快组一支1—3人的互补队伍，允许跨年级、跨专业、跨校组队，队员必须全部是在校生[4]。\n\n备赛时重点练数据清洗、模型选择、结果解释和论文写作，报名前把队伍信息反复核对清楚，因为截止后不能再改报名信息[1]。\n\n——— 引用来源 ———\n[1] mathorcup_data_2026_official.pdf·第1页·A级：报名截止日期为 2026 年 10 月 23 日 12:00，报名截止后不能再更改报名信息。\n[2] mathorcup_data_2026_official.pdf·第1页·A级：报名截止日期为 2026 年 10 月 23 日 12:00，报名截止后不能再更改报名信息。\n[3] mathorcup_data_2026_official.pdf·第4页·A级：竞赛面向境内外各高校在读的研究生、本科生和专科生，具体要求如下：\n[4] mathorcup_data_2026_official.pdf·第4页·A级：可以自由组队参赛，每个参赛队伍人数可为 1–3人，参赛队员必须全部为在校生，允许跨年级、跨专业、跨校组队。",
+        "citations": [
+          {
+            "citation_id": 5303,
+            "field": "registration_deadline_at",
+            "page": 1,
+            "source_text": "报名截止日期为 2026 年 10 月 23 日 12:00，报名截止后不能再更改报名信息。",
+            "document_name": "mathorcup_data_2026_official.pdf",
+            "source_url": "https://files.mathorcup.org/uploads/files/20260903/1788430033944665.pdf",
+            "acquired_date": "2026-10-03",
+            "last_verified_at": "2026-10-03",
+            "trusted_level": "A",
+            "document_id": null,
+            "document_sha256": "a45b950e7284ede52ea3dd1ceb11da83982fa34eebbd23147fc69676eec3a9f0",
+            "rects": [],
+            "anchor_quality": "page_only",
+            "text_exact": "报名截止日期为 2026 年 10 月 23 日 12:00，报名截止后不能再更改报名信息。",
+            "text_prefix": null,
+            "text_suffix": null,
+            "text_start": null,
+            "text_end": null,
+            "anchor_confidence": 0.45,
+            "anchor_status": "original"
+          },
+          {
+            "citation_id": 5304,
+            "field": "registration_deadline",
+            "page": 1,
+            "source_text": "报名截止日期为 2026 年 10 月 23 日 12:00，报名截止后不能再更改报名信息。",
+            "document_name": "mathorcup_data_2026_official.pdf",
+            "source_url": "https://files.mathorcup.org/uploads/files/20260903/1788430033944665.pdf",
+            "acquired_date": "2026-10-03",
+            "last_verified_at": "2026-10-03",
+            "trusted_level": "A",
+            "document_id": null,
+            "document_sha256": "a45b950e7284ede52ea3dd1ceb11da83982fa34eebbd23147fc69676eec3a9f0",
+            "rects": [],
+            "anchor_quality": "page_only",
+            "text_exact": "报名截止日期为 2026 年 10 月 23 日 12:00，报名截止后不能再更改报名信息。",
+            "text_prefix": null,
+            "text_suffix": null,
+            "text_start": null,
+            "text_end": null,
+            "anchor_confidence": 0.45,
+            "anchor_status": "original"
+          },
+          {
+            "citation_id": 5305,
+            "field": "eligible_students",
+            "page": 4,
+            "source_text": "竞赛面向境内外各高校在读的研究生、本科生和专科生，具体要求如下：",
+            "document_name": "mathorcup_data_2026_official.pdf",
+            "source_url": "https://files.mathorcup.org/uploads/files/20260903/1788430033944665.pdf",
+            "acquired_date": "2026-10-03",
+            "last_verified_at": "2026-10-03",
+            "trusted_level": "A",
+            "document_id": null,
+            "document_sha256": "a45b950e7284ede52ea3dd1ceb11da83982fa34eebbd23147fc69676eec3a9f0",
+            "rects": [],
+            "anchor_quality": "page_only",
+            "text_exact": "竞赛面向境内外各高校在读的研究生、本科生和专科生，具体要求如下：",
+            "text_prefix": null,
+            "text_suffix": null,
+            "text_start": null,
+            "text_end": null,
+            "anchor_confidence": 0.45,
+            "anchor_status": "original"
+          },
+          {
+            "citation_id": 5306,
+            "field": "team_min",
+            "page": 4,
+            "source_text": "可以自由组队参赛，每个参赛队伍人数可为 1–3人，参赛队员必须全部为在校生，允许跨年级、跨专业、跨校组队。",
+            "document_name": "mathorcup_data_2026_official.pdf",
+            "source_url": "https://files.mathorcup.org/uploads/files/20260903/1788430033944665.pdf",
+            "acquired_date": "2026-10-03",
+            "last_verified_at": "2026-10-03",
+            "trusted_level": "A",
+            "document_id": null,
+            "document_sha256": "a45b950e7284ede52ea3dd1ceb11da83982fa34eebbd23147fc69676eec3a9f0",
+            "rects": [],
+            "anchor_quality": "page_only",
+            "text_exact": "可以自由组队参赛，每个参赛队伍人数可为 1–3人，参赛队员必须全部为在校生，允许跨年级、跨专业、跨校组队。",
+            "text_prefix": null,
+            "text_suffix": null,
+            "text_start": null,
+            "text_end": null,
+            "anchor_confidence": 0.45,
+            "anchor_status": "original"
+          }
+        ],
+        "gate": {
+          "skipped": true
+        },
+        "score": {
+          "skipped": true
+        },
+        "recommendations": [],
+        "teammate_matches": [],
+        "pending_review": false,
+        "data_version": "mathorcup_data_2026:2026_data_official_20261003@2026-10-03",
+        "trace": [
+          {
+            "node": "route_intent",
+            "label": "意图识别与赛事锁定",
+            "status": "succeeded",
+            "duration_ms": 42.155,
+            "evidence_count": 0,
+            "data_version": "mathorcup_data_2026:2026_data_official_20261003@2026-10-03",
+            "detail": "意图路由：intent=chat，锁定赛事=2026年第七届MathorCup数学应用挑战赛（大数据竞赛）",
+            "fallback": false
+          },
+          {
+            "node": "retrieve",
+            "label": "可信证据检索",
+            "status": "succeeded",
+            "duration_ms": 3.736,
+            "evidence_count": 4,
+            "data_version": "mathorcup_data_2026:2026_data_official_20261003@2026-10-03",
+            "detail": "隔离检索：collection=rag_mathorcup_data_2026，命中 4 条证据",
+            "fallback": false
+          },
+          {
+            "node": "web_augment",
+            "label": "联网信息补充",
+            "status": "skipped",
+            "duration_ms": 1.692,
+            "evidence_count": 4,
+            "data_version": "mathorcup_data_2026:2026_data_official_20261003@2026-10-03",
+            "detail": "联网补充未触发或按当前策略跳过",
+            "fallback": false
+          },
+          {
+            "node": "gate",
+            "label": "资格与来源门控",
+            "status": "skipped",
+            "duration_ms": 2.854,
+            "evidence_count": 4,
+            "data_version": "mathorcup_data_2026:2026_data_official_20261003@2026-10-03",
+            "detail": "硬性门控：跳过（缺用户画像或赛事）",
+            "fallback": false
+          },
+          {
+            "node": "score",
+            "label": "适配度评分",
+            "status": "skipped",
+            "duration_ms": 1.723,
+            "evidence_count": 4,
+            "data_version": "mathorcup_data_2026:2026_data_official_20261003@2026-10-03",
+            "detail": "软性评分：跳过（缺用户画像或赛事）",
+            "fallback": false
+          },
+          {
+            "node": "compose",
+            "label": "答案组装与引用校验",
+            "status": "succeeded",
+            "duration_ms": 12310.469,
+            "evidence_count": 4,
+            "data_version": "mathorcup_data_2026:2026_data_official_20261003@2026-10-03",
+            "detail": "组装答案：LLM 基于证据自由撰写（带 [n] 引用）",
+            "fallback": false
+          }
+        ],
+        "trace_legacy": [
+          "意图路由：intent=chat，锁定赛事=2026年第七届MathorCup数学应用挑战赛（大数据竞赛）",
+          "隔离检索：collection=rag_mathorcup_data_2026，命中 4 条证据",
+          "联网补充未触发或按当前策略跳过",
+          "硬性门控：跳过（缺用户画像或赛事）",
+          "软性评分：跳过（缺用户画像或赛事）",
+          "组装答案：LLM 基于证据自由撰写（带 [n] 引用）"
+        ],
+        "trace_summary": {
+          "status": "succeeded",
+          "total_steps": 6,
+          "succeeded_steps": 3,
+          "skipped_steps": 3,
+          "degraded_steps": 0,
+          "failed_steps": 0,
+          "fallback_steps": 0,
+          "evidence_count": 4,
+          "path": [
+            "route_intent",
+            "retrieve",
+            "web_augment",
+            "gate",
+            "score",
+            "compose"
+          ],
+          "labels": [
+            "意图识别与赛事锁定",
+            "可信证据检索",
+            "联网信息补充",
+            "资格与来源门控",
+            "适配度评分",
+            "答案组装与引用校验"
+          ]
+        },
+        "metrics": {
+          "status": "succeeded",
+          "total_duration_ms": 12401.445,
+          "node_duration_ms": 12362.629,
+          "step_count": 6,
+          "evidence_count": 4,
+          "evidence_fields": [
+            "eligible_students",
+            "registration_deadline",
+            "registration_deadline_at",
+            "team_min"
+          ],
+          "fallback_count": 0,
+          "pending_review": false,
+          "data_version": "mathorcup_data_2026:2026_data_official_20261003@2026-10-03",
+          "engine": "shim"
+        },
+        "web_results": [],
+        "error": null,
+        "user_id": null
+      },
+      "elapsed_ms": 12408.09,
+      "assertions": [
+        {
+          "expectation": "real model was used, not just configured",
+          "passed": true
+        },
+        {
+          "expectation": "answer and official evidence returned",
+          "passed": true
+        }
+      ],
+      "passed": true
+    },
+    {
+      "id": "LIVE-07",
+      "question": "请用三句话说明这个比赛怎么准备，不要给资格结论。",
+      "response": {
+        "run_id": "agent_eb4bfc0eb3dc41e2918b5daad8bba041",
+        "question": "请用三句话说明这个比赛怎么准备，不要给资格结论。",
+        "intent": "chat",
+        "resolved_competition": "cocr_2026",
+        "resolved_name": "全国高校计算机能力挑战赛",
+        "answer": "先打基础：把数据结构、算法、编程语言和常见题型练熟，每天保持手写代码和限时练习。\n\n再做模拟：找同类型真题或模拟题，按比赛节奏练审题、调试和复盘，把易错点整理成清单。\n\n最后盯官方：具体报名、赛制、提交要求以官网最新通知为准，别把往年经验当成今年规则。\n\nℹ️ 可信边界：该赛事已收录官方来源链接，但缺少可确认本次问题的官方原文，目前仅作为候选信息；不构成资格判断或推荐评分，请以官网最新通知为准。",
+        "citations": [],
+        "gate": {
+          "skipped": true
+        },
+        "score": {
+          "skipped": true
+        },
+        "recommendations": [],
+        "teammate_matches": [],
+        "pending_review": true,
+        "data_version": "cocr_2026:2026_v1@2026-07-18",
+        "trace": [
+          {
+            "node": "route_intent",
+            "label": "意图识别与赛事锁定",
+            "status": "succeeded",
+            "duration_ms": 27.713,
+            "evidence_count": 0,
+            "data_version": "cocr_2026:2026_v1@2026-07-18",
+            "detail": "意图路由：intent=chat，锁定赛事=全国高校计算机能力挑战赛",
+            "fallback": false
+          },
+          {
+            "node": "retrieve",
+            "label": "可信证据检索",
+            "status": "succeeded",
+            "duration_ms": 2.874,
+            "evidence_count": 0,
+            "data_version": "cocr_2026:2026_v1@2026-07-18",
+            "detail": "隔离检索：collection=rag_cocr_2026，命中 0 条证据",
+            "fallback": false
+          },
+          {
+            "node": "web_augment",
+            "label": "联网信息补充",
+            "status": "skipped",
+            "duration_ms": 1.28,
+            "evidence_count": 0,
+            "data_version": "cocr_2026:2026_v1@2026-07-18",
+            "detail": "联网补充未触发或按当前策略跳过",
+            "fallback": false
+          },
+          {
+            "node": "gate",
+            "label": "资格与来源门控",
+            "status": "skipped",
+            "duration_ms": 1.941,
+            "evidence_count": 0,
+            "data_version": "cocr_2026:2026_v1@2026-07-18",
+            "detail": "硬性门控：跳过（缺用户画像或赛事）",
+            "fallback": false
+          },
+          {
+            "node": "score",
+            "label": "适配度评分",
+            "status": "skipped",
+            "duration_ms": 1.271,
+            "evidence_count": 0,
+            "data_version": "cocr_2026:2026_v1@2026-07-18",
+            "detail": "软性评分：跳过（缺用户画像或赛事）",
+            "fallback": false
+          },
+          {
+            "node": "compose",
+            "label": "答案组装与引用校验",
+            "status": "succeeded",
+            "duration_ms": 8233.136,
+            "evidence_count": 0,
+            "data_version": "cocr_2026:2026_v1@2026-07-18",
+            "detail": "组装答案：LLM 基于证据自由撰写（带 [n] 引用）",
+            "fallback": false
+          }
+        ],
+        "trace_legacy": [
+          "意图路由：intent=chat，锁定赛事=全国高校计算机能力挑战赛",
+          "隔离检索：collection=rag_cocr_2026，命中 0 条证据",
+          "联网补充未触发或按当前策略跳过",
+          "硬性门控：跳过（缺用户画像或赛事）",
+          "软性评分：跳过（缺用户画像或赛事）",
+          "组装答案：LLM 基于证据自由撰写（带 [n] 引用）"
+        ],
+        "trace_summary": {
+          "status": "degraded",
+          "total_steps": 6,
+          "succeeded_steps": 3,
+          "skipped_steps": 3,
+          "degraded_steps": 0,
+          "failed_steps": 0,
+          "fallback_steps": 0,
+          "evidence_count": 0,
+          "path": [
+            "route_intent",
+            "retrieve",
+            "web_augment",
+            "gate",
+            "score",
+            "compose"
+          ],
+          "labels": [
+            "意图识别与赛事锁定",
+            "可信证据检索",
+            "联网信息补充",
+            "资格与来源门控",
+            "适配度评分",
+            "答案组装与引用校验"
+          ]
+        },
+        "metrics": {
+          "status": "degraded",
+          "total_duration_ms": 8296.773,
+          "node_duration_ms": 8268.215,
+          "step_count": 6,
+          "evidence_count": 0,
+          "evidence_fields": [],
+          "fallback_count": 0,
+          "pending_review": true,
+          "data_version": "cocr_2026:2026_v1@2026-07-18",
+          "engine": "shim"
+        },
+        "web_results": [],
+        "error": null,
+        "user_id": null
+      },
+      "elapsed_ms": 8303.83,
+      "assertions": [
+        {
+          "expectation": "real model was used",
+          "passed": true
+        },
+        {
+          "expectation": "candidate boundary retained",
+          "passed": true
+        }
+      ],
+      "passed": true
+    }
+  ]
+}

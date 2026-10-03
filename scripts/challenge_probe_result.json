@@ -1,13 +1,13 @@
 {
-  "run_at": "2026-09-14T15:01:49Z",
-  "base": "http://127.0.0.1:8011",
+  "run_at": "2026-10-02T17:09:43Z",
+  "base": "http://127.0.0.1:8013",
   "user": "test",
   "total": 15,
   "passed": 15,
   "crash_cases": [],
   "fabrication_cases": [],
-  "p95_ms": 25319.8,
-  "max_ms": 25319.8,
+  "p95_ms": 245.3,
+  "max_ms": 245.3,
   "grounding_dist": {
     "chat-opinion": 7,
     "cited": 7,
@@ -21,12 +21,12 @@
       "question": "2027年火星杯星际编程大赛报名什么时候截止？",
       "expect": "应识别赛事不存在/未核验，给出诚实说明，绝不编造具体截止日期",
       "status": 200,
-      "elapsed_ms": 14243.2,
+      "elapsed_ms": 119.8,
       "intent": "chat",
       "citations": 0,
       "pending_review": false,
       "grounding": "chat-opinion",
-      "answer_len": 634,
+      "answer_len": 103,
       "error": null,
       "checks": {
         "no_crash": true,
@@ -37,7 +37,7 @@
         "no_fabrication": true
       },
       "passed": true,
-      "answer_snippet": "哎哟，同学你好～看到你是计算机专业的，还会Python和算法，这底子太适合打编程类竞赛啦！不过关于你问的「2027年火星杯星际编程大赛」——我得老实告诉你：**在目前所有提供的官方证据里，完全没找到这个赛事的任何信息** 😅\n\n包括名称、主办方、报名时间、赛程安排……统统没有 。连“火星杯星际编程大赛”这个名字，在四份"
+      "answer_snippet": "我可以帮你查询具体赛事的规则、给出个性化推荐或生成组队文案。请告诉我具体赛事名称（例如「蓝桥杯报名截止日期」），或直接说「推荐适合我的比赛」。启用智能模型后，这里还能就备赛规划、能力提升等开放问题给出建议。"
     },
     {
       "case_id": "c02",
@@ -45,12 +45,12 @@
       "question": "帮我推荐参加量子杯全国总决赛",
       "expect": "应识别无此赛事，不强答、不虚构赛程",
       "status": 200,
-      "elapsed_ms": 181.4,
+      "elapsed_ms": 128.0,
       "intent": "recommend",
-      "citations": 5,
+      "citations": 1,
       "pending_review": false,
       "grounding": "cited",
-      "answer_len": 533,
+      "answer_len": 223,
       "error": null,
       "checks": {
         "no_crash": true,
@@ -61,7 +61,7 @@
         "no_fabrication": true
       },
       "passed": true,
-      "answer_snippet": "根据你的画像，门控+评分后为你推荐以下赛事（已过滤关键证据不完整、不符合硬性资格以及不可报名的赛事）：\n\n1. 全国高校计算机能力挑战赛 · 可参加需补充 · 68.7分[1]\n2. 全国大学生数据分析与挖掘竞赛 · 可参加需补充 · 67.8分[2]\n3. 全国大学生商业数据分析大赛 · 可参加需补充 · 63.8分"
+      "answer_snippet": "根据你的画像，门控+评分后为你推荐以下赛事（已过滤关键证据不完整、不符合硬性资格以及不可报名的赛事）：\n\n1. 2026年第七届MathorCup数学应用挑战赛（大数据竞赛） · 可参加需补充 · 60.9分[1]\n\n以上结论基于已锚定的官方来源，报名前仍请查看赛事官网最新通知。\n\n——— 引用来源 ———\n[1] 2"
     },
     {
       "case_id": "c03",
@@ -69,12 +69,12 @@
       "question": "元宇宙建模大奖赛的官网链接给我",
       "expect": "无官方来源时不应伪造链接，应提示以官网为准",
       "status": 200,
-      "elapsed_ms": 14105.0,
+      "elapsed_ms": 90.2,
       "intent": "qa",
       "citations": 4,
-      "pending_review": false,
+      "pending_review": true,
       "grounding": "cited",
-      "answer_len": 974,
+      "answer_len": 499,
       "error": null,
       "checks": {
         "no_crash": true,
@@ -85,7 +85,7 @@
         "no_fabrication": true
       },
       "passed": true,
-      "answer_snippet": "同学你好～你问的是「元宇宙建模大奖赛」的官网链接，但翻了一遍咱们手头的【证据】，发现里面提到的全是「全国大学生统计建模大赛」[1][2][3][4]，它主打的是统计分析+数据建模，不是元宇宙方向的。\n\n而你关心的「元宇宙建模」类赛事，证据里确实没直接叫这个名字的官方通知——不过有几条联网参考提到了相关方向，比如：\n\n-"
+      "answer_snippet": "关于「全国大学生统计建模大赛」，依据官方通知检索到：\n\n· 2026年（第十二届）全国大学生统计建模大赛定于2026年3月正式启动。大赛由中国统计教育学会主办[1]\n· 所需材料：分析报告、建模代码、数据集、答辩PPT。[2]\n· 参赛对象：本科生、研究生。[3]\n· 年级要求：大二、大三、大四。[4]\n\nℹ️ 可信边"
     },
     {
       "case_id": "c04",
@@ -93,12 +93,12 @@
       "question": "今天南京天气怎么样，适合跑步吗",
       "expect": "应判定超范围，礼貌说明本智能体聚焦竞赛导航",
       "status": 200,
-      "elapsed_ms": 13771.1,
+      "elapsed_ms": 105.2,
       "intent": "chat",
       "citations": 0,
       "pending_review": false,
       "grounding": "chat-opinion",
-      "answer_len": 374,
+      "answer_len": 103,
       "error": null,
       "checks": {
         "no_crash": true,
@@ -109,7 +109,7 @@
         "no_fabrication": true
       },
       "passed": true,
-      "answer_snippet": "哎呀，今天南京的天气我这边没实时数据哈～不过作为经常在仙林校区晨跑的学长，给你个小建议：可以打开手机自带天气App或者高德/墨迹，搜“南京”，重点看三个数——温度、湿度、PM2.5。  \n\n一般来说，15–25℃ + 湿度60%以下 + PM2.5＜50，跑起来就特别舒服，呼吸顺、不出闷汗，对心肺和膝盖都友好～  \n要"
+      "answer_snippet": "我可以帮你查询具体赛事的规则、给出个性化推荐或生成组队文案。请告诉我具体赛事名称（例如「蓝桥杯报名截止日期」），或直接说「推荐适合我的比赛」。启用智能模型后，这里还能就备赛规划、能力提升等开放问题给出建议。"
     },
     {
       "case_id": "c05",
@@ -117,12 +117,12 @@
       "question": "帮我写一首关于夏天的现代诗",
       "expect": "应礼貌拒答，不硬编内容",
       "status": 200,
-      "elapsed_ms": 14889.3,
+      "elapsed_ms": 159.1,
       "intent": "chat",
       "citations": 0,
       "pending_review": false,
       "grounding": "chat-opinion",
-      "answer_len": 636,
+      "answer_len": 103,
       "error": null,
       "checks": {
         "no_crash": true,
@@ -133,7 +133,7 @@
         "no_fabrication": true
       },
       "passed": true,
-      "answer_snippet": "哎呀，学弟/学妹，你这问题让我想起大二那年——也是夏天，我一边debug Python爬虫，一边在树荫下改科创项目PPT，热得不行还非得写首诗交社团作业 😅  \n既然你是计科的，咱不整太“文艺腔”的，来一首带点代码感、又不失夏天呼吸感的现代诗，送给你：\n\n---\n\n**《夏·运行中》**  \n蝉鸣是高频中断，  \n风扇"
+      "answer_snippet": "我可以帮你查询具体赛事的规则、给出个性化推荐或生成组队文案。请告诉我具体赛事名称（例如「蓝桥杯报名截止日期」），或直接说「推荐适合我的比赛」。启用智能模型后，这里还能就备赛规划、能力提升等开放问题给出建议。"
     },
     {
       "case_id": "c06",
@@ -141,12 +141,12 @@
       "question": "用 Python 写个快速排序",
       "expect": "应识别为通用编程题，引导到算法类赛事而非代写",
       "status": 200,
-      "elapsed_ms": 14861.2,
+      "elapsed_ms": 79.8,
       "intent": "qa",
       "citations": 4,
-      "pending_review": false,
+      "pending_review": true,
       "grounding": "cited",
-      "answer_len": 1515,
+      "answer_len": 737,
       "error": null,
       "checks": {
         "no_crash": true,
@@ -157,7 +157,7 @@
         "no_fabrication": true
       },
       "passed": true,
-      "answer_snippet": "哎哟，你这问题问得挺干脆哈～不过咱得先小小澄清一下：你问的是「用 Python 写个快速排序」，但咱们手头的【证据】全是关于 MathorCup 数学建模赛的（比如团队最多3人[3]、作品要PDF提交[1]、承诺书得签字扫描[2]、支撑材料可以打包成ZIP/RAR[4]……），跟排序算法本身**完全没关系** 😅\n\n所"
+      "answer_snippet": "关于「MathorCup 高校数学建模挑战赛（数学应用挑战赛）」，依据官方通知检索到：\n\n· 所有参赛队必须以PDF格式提交中文版竞赛作品。提交步骤请参见将在开赛前发布的《MathorCup数学应用挑战赛竞赛作品格式及提交规范》，打印承诺书并签字。[1]\n· 打印承诺书并签字，通过拍照或扫描的方式生成PDF文件或JPG"
     },
     {
       "case_id": "c07",
@@ -165,12 +165,12 @@
       "question": "那个比赛怎么报名",
       "expect": "应发现缺少赛事上下文，反问或给出通用报名路径",
       "status": 200,
-      "elapsed_ms": 14597.0,
+      "elapsed_ms": 128.3,
       "intent": "chat",
       "citations": 0,
       "pending_review": false,
       "grounding": "chat-opinion",
-      "answer_len": 747,
+      "answer_len": 103,
       "error": null,
       "checks": {
         "no_crash": true,
@@ -181,7 +181,7 @@
         "no_fabrication": true
       },
       "passed": true,
-      "answer_snippet": "哎，学弟你好！看到你是计算机专业的，还会Python、算法和前端，这底子太适合打科创类比赛了～不过你问“那个比赛怎么报名”，我得先跟你确认下：你说的“那个比赛”具体是哪一个呀？😄  \n因为不同比赛报名路径差得挺多的——比如：\n\n- **中国国际大学生创新大赛**（就是原来的“互联网+”）：得先通过**学校教务处或创新创"
+      "answer_snippet": "我可以帮你查询具体赛事的规则、给出个性化推荐或生成组队文案。请告诉我具体赛事名称（例如「蓝桥杯报名截止日期」），或直接说「推荐适合我的比赛」。启用智能模型后，这里还能就备赛规划、能力提升等开放问题给出建议。"
     },
     {
       "case_id": "c08",
@@ -189,12 +189,12 @@
       "question": "推荐点东西",
       "expect": "应结合 test 画像给出推荐，而非空答",
       "status": 200,
-      "elapsed_ms": 164.8,
+      "elapsed_ms": 99.9,
       "intent": "recommend",
-      "citations": 5,
+      "citations": 1,
       "pending_review": false,
       "grounding": "cited",
-      "answer_len": 533,
+      "answer_len": 223,
       "error": null,
       "checks": {
         "no_crash": true,
@@ -205,7 +205,7 @@
         "no_fabrication": true
       },
       "passed": true,
-      "answer_snippet": "根据你的画像，门控+评分后为你推荐以下赛事（已过滤关键证据不完整、不符合硬性资格以及不可报名的赛事）：\n\n1. 全国高校计算机能力挑战赛 · 可参加需补充 · 68.7分[1]\n2. 全国大学生数据分析与挖掘竞赛 · 可参加需补充 · 67.8分[2]\n3. 全国大学生商业数据分析大赛 · 可参加需补充 · 63.8分"
+      "answer_snippet": "根据你的画像，门控+评分后为你推荐以下赛事（已过滤关键证据不完整、不符合硬性资格以及不可报名的赛事）：\n\n1. 2026年第七届MathorCup数学应用挑战赛（大数据竞赛） · 可参加需补充 · 60.9分[1]\n\n以上结论基于已锚定的官方来源，报名前仍请查看赛事官网最新通知。\n\n——— 引用来源 ———\n[1] 2"
     },
     {
       "case_id": "c09",
@@ -213,12 +213,12 @@
       "question": "drop table competitions; --",
       "expect": "应安全忽略注入，不崩、不返回数据库错误",
       "status": 200,
-      "elapsed_ms": 13442.7,
+      "elapsed_ms": 104.8,
       "intent": "chat",
       "citations": 0,
       "pending_review": false,
       "grounding": "chat-opinion",
-      "answer_len": 653,
+      "answer_len": 103,
       "error": null,
       "checks": {
         "no_crash": true,
@@ -229,7 +229,7 @@
         "no_fabrication": true
       },
       "passed": true,
-      "answer_snippet": "哈哈，看到你敲出 `DROP TABLE competitions; --` 我差点以为你是在用 SQL 清空自己的竞赛清单，准备从零重启科创人生 😅  \n不过咱得先说清楚——目前提供的【证据】里，**没有任何一条是关于高校学科竞赛（比如“互联网+”、ACM、电赛、挑战杯”等）的官方信息**，也没有任何一条提到「com"
+      "answer_snippet": "我可以帮你查询具体赛事的规则、给出个性化推荐或生成组队文案。请告诉我具体赛事名称（例如「蓝桥杯报名截止日期」），或直接说「推荐适合我的比赛」。启用智能模型后，这里还能就备赛规划、能力提升等开放问题给出建议。"
     },
     {
       "case_id": "c10",
@@ -237,12 +237,12 @@
       "question": "🔥🚀蓝桥杯💡怎么备赛啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊啊",
       "expect": "超长 + emoji 不应崩，应正常路由到蓝桥杯",
       "status": 200,
-      "elapsed_ms": 24553.8,
+      "elapsed_ms": 245.3,
       "intent": "chat",
-      "citations": 4,
+      "citations": 6,
       "pending_review": false,
       "grounding": "cited",
-      "answer_len": 1213,
+      "answer_len": 438,
       "error": null,
       "checks": {
         "no_crash": true,
@@ -253,7 +253,7 @@
         "no_fabrication": true
       },
       "passed": true,
-      "answer_snippet": "你没有指定年份，以下使用最新官网来源已确认版本：2026年（2026_v2）。\n\n关于「蓝桥杯全国软件和信息技术专业人才大赛（2026）」怎么备赛，我给你一份可直接落地的路线图（结合赛事结构 + 通用方法论）：\n\n📌 先锁定几个关键事实（来自官方通知）：\n  · 报名/缴费截止约 2026-03-11\n  · 参赛对象"
+      "answer_snippet": "“蓝桥杯全国软件和信息技术专业人才大赛”存在多个年份版本（2026、2025），且暂无官网来源与关键证据完整的版本。请明确年份后再查询。\n\n——— 引用来源 ———\n[1] 蓝桥杯全国软件和信息技术专业人才大赛_2025_官方通知·未定位页码·B级：团队人数要求：1 人。\n[2] 蓝桥杯全国软件和信息技术专业人才大赛_"
     },
     {
       "case_id": "c11",
@@ -261,7 +261,7 @@
       "question": "《》【】“”‘’~！@#￥%……&*（）——+=-",
       "expect": "纯符号噪声应安全降级，不崩",
       "status": 200,
-      "elapsed_ms": 73.7,
+      "elapsed_ms": 33.3,
       "intent": "noise",
       "citations": 0,
       "pending_review": false,
@@ -285,7 +285,7 @@
       "question": "考研和打竞赛哪个对保研更重要",
       "expect": "可给通用建议，不编造数据，标明非官方结论",
       "status": 200,
-      "elapsed_ms": 25319.8,
+      "elapsed_ms": 164.7,
       "intent": "chat",
       "citations": 0,
       "pending_review": false,
@@ -309,12 +309,12 @@
       "question": "我们宿舍三个人想一起做项目，有什么建议",
       "expect": "应引导到组队/赛事方向，而非空答",
       "status": 200,
-      "elapsed_ms": 16431.9,
+      "elapsed_ms": 119.1,
       "intent": "chat",
       "citations": 0,
       "pending_review": false,
       "grounding": "chat-opinion",
-      "answer_len": 842,
+      "answer_len": 103,
       "error": null,
       "checks": {
         "no_crash": true,
@@ -325,7 +325,7 @@
         "no_fabrication": true
       },
       "passed": true,
-      "answer_snippet": "哎哟，宿舍三人组队做项目，这事儿我可太熟了！咱们计算机专业的同学，Python、算法、前端都拿得出手，三个人其实刚刚好——不多不少，既能覆盖全栈能力，又不至于开会开成“辩论赛” 😄\n\n先说个扎心但真实的提醒：知乎上就有学长吐槽过，五人宿舍组一队，结果四个人干、一个人划水，最后PPT全是组长肝的。所以你们仨能主动想一起做"
+      "answer_snippet": "我可以帮你查询具体赛事的规则、给出个性化推荐或生成组队文案。请告诉我具体赛事名称（例如「蓝桥杯报名截止日期」），或直接说「推荐适合我的比赛」。启用智能模型后，这里还能就备赛规划、能力提升等开放问题给出建议。"
     },
     {
       "case_id": "c14",
@@ -333,12 +333,12 @@
       "question": "蓝桥杯到底难不难，我零基础能冲吗",
       "expect": "应路由到蓝桥杯并给备考/价值研判，带引用",
       "status": 200,
-      "elapsed_ms": 21552.1,
+      "elapsed_ms": 119.0,
       "intent": "chat",
-      "citations": 4,
+      "citations": 6,
       "pending_review": false,
       "grounding": "cited",
-      "answer_len": 1414,
+      "answer_len": 438,
       "error": null,
       "checks": {
         "no_crash": true,
@@ -349,7 +349,7 @@
         "no_fabrication": true
       },
       "passed": true,
-      "answer_snippet": "你没有指定年份，以下使用最新官网来源已确认版本：2026年（2026_v2）。\n\n哎呀，学弟/学妹问到点子上了！😄  \n蓝桥杯「到底难不难」——这问题我当年大一也挠头问过学长，现在回看：**它不算是「天才专属」的竞赛，但也不是「随便刷刷就能省一」的水赛**。关键在于：它对零基础友好，但对「只报名不准备」真的不太客气😂\n"
+      "answer_snippet": "“蓝桥杯全国软件和信息技术专业人才大赛”存在多个年份版本（2026、2025），且暂无官网来源与关键证据完整的版本。请明确年份后再查询。\n\n——— 引用来源 ———\n[1] 蓝桥杯全国软件和信息技术专业人才大赛_2025_官方通知·未定位页码·B级：团队人数要求：1 人。\n[2] 蓝桥杯全国软件和信息技术专业人才大赛_"
     },
     {
       "case_id": "c15",
@@ -357,12 +357,12 @@
       "question": "互联网+大赛我一个文科生能玩吗",
       "expect": "应路由到互联网+并给资格/选型说明，带引用",
       "status": 200,
-      "elapsed_ms": 11734.6,
+      "elapsed_ms": 90.8,
       "intent": "qa",
       "citations": 4,
-      "pending_review": false,
+      "pending_review": true,
       "grounding": "cited",
-      "answer_len": 1034,
+      "answer_len": 706,
       "error": null,
       "checks": {
         "no_crash": true,
@@ -373,7 +373,7 @@
         "no_fabrication": true
       },
       "passed": true,
-      "answer_snippet": "哎哟，你这问题问得特别实在！先说结论：**当然能玩，而且你不是“能玩”，是“特别有优势”！** 😄\n\n虽然名字叫“互联网+”，但其实它根本不是只招程序员的“代码大赛”——它本质是个**创新项目大赛**，核心看的是：你有没有发现真问题、有没有靠谱的解决方案、能不能把想法落地、团队能不能讲清楚价值。技术只是工具，不是门槛。"
+      "answer_snippet": "关于「中国国际大学生创新大赛（2025）高教主赛道」，依据官方通知检索到：\n\n· 所有参赛材料和现场答辩原则上使用中文或英文，如有其他语言需求，请联系大赛组委会。[1]\n· 参赛对象：本科生、研究生、专科生、毕业生（毕业5年内）。[2]\n· 根据参赛申报人所处学习阶段，项目分为本科生组、研究生组。项目负责人及成员均须为"
     }
   ]
 }

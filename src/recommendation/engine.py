@@ -9,7 +9,7 @@
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 import re
 
 from schemas import (
@@ -20,9 +20,13 @@ from schemas import (
     RecommendationResult,
     TeammateMatch,
     UserProfile,
+    EducationLevel,
+    Grade,
+    grades_for_education,
 )
 from fact_formatting import format_team_size
 from trust import assess_source_readiness, is_registerable_now
+from contest_clock import calendar_date
 
 
 # ---------------------------------------------------------------------------
@@ -41,18 +45,29 @@ def data_validity_check(comp: Competition, current: date) -> list[str]:
 
 
 def eligibility_gate(
-    user: UserProfile, comp: Competition, current: date
+    user: UserProfile, comp: Competition, current: date | datetime
 ) -> tuple[bool, list[GateReason]]:
     """资格与时间硬条件。任一不满足即一票否决。"""
     reasons: list[GateReason] = []
 
     effective_deadline = comp.registration_deadline or comp.submission_deadline
-    if effective_deadline is not None and effective_deadline < current:
+    if effective_deadline is not None and effective_deadline < calendar_date(current):
         reason = "报名已经截止" if comp.registration_deadline else "作品提交已经截止"
         reasons.append(GateReason(reason=reason))
 
-    if user.education_level not in comp.eligible_students:
+    # Normalize only known academic synonyms; never change the stored identity.
+    academic_levels = {
+        EducationLevel.VOCATIONAL_COLLEGE: EducationLevel.JUNIOR_COLLEGE,
+        EducationLevel.VOCATIONAL_COLLEGE_STUDENT: EducationLevel.JUNIOR_COLLEGE,
+        EducationLevel.VOCATIONAL_UNDERGRADUATE: EducationLevel.UNDERGRADUATE,
+    }
+    user_level = academic_levels.get(user.education_level, user.education_level)
+    allowed_levels = {academic_levels.get(level, level) for level in comp.eligible_students}
+    if user_level not in allowed_levels:
         reasons.append(GateReason(reason="学历层次不符合要求"))
+
+    if user.grade == Grade.UNKNOWN or user.grade not in grades_for_education(user.education_level):
+        reasons.append(GateReason(reason="学历与年级信息不一致或待确认", possible_action="请在能力画像中确认真实学籍与年级"))
 
     if comp.allowed_grades and user.grade not in comp.allowed_grades:
         reasons.append(
@@ -75,6 +90,10 @@ def eligibility_gate(
 
     if comp.team_required and user.expected_team_size > (comp.team_max or 999):
         reasons.append(GateReason(reason="预计团队人数超过上限"))
+    if comp.team_required and comp.team_min is not None and user.expected_team_size < comp.team_min:
+        reasons.append(GateReason(reason="预计团队人数低于下限"))
+    if not is_registerable_now(comp, current) and not any("截止" in r.reason for r in reasons):
+        reasons.append(GateReason(reason="赛事当前已不可报名"))
 
     return len(reasons) == 0, reasons
 
@@ -224,12 +243,12 @@ def estimate_competition_workload(comp: Competition) -> float:
 
 
 def soft_match_score(
-    user: UserProfile, comp: Competition, current: date
+    user: UserProfile, comp: Competition, current: date | datetime
 ) -> MatchBreakdown:
     s = _skill_score(user, comp)
     e = _experience_score(user, comp)
     r = _resource_score(user, comp)
-    w = _workload_score(user, comp, current)
+    w = _workload_score(user, comp, calendar_date(current))
     total = round(0.40 * s + 0.25 * e + 0.20 * r + 0.15 * w, 1)
     return MatchBreakdown(
         skill_score=s, experience_score=e, resource_score=r,
@@ -253,11 +272,11 @@ def _status_from_score(score: float) -> RecommendationResult.recommendation_stat
 
 
 def _build_explanation(
-    user: UserProfile, comp: Competition, breakdown: MatchBreakdown, current: date
+    user: UserProfile, comp: Competition, breakdown: MatchBreakdown, current: date | datetime
 ) -> dict:
     skill_gap = [s for s in comp.required_skills if s not in user.skills]
     effective_deadline = comp.registration_deadline or comp.submission_deadline
-    remaining_weeks = ((effective_deadline - current).days / 7.0 if effective_deadline else None)
+    remaining_weeks = ((effective_deadline - calendar_date(current)).days / 7.0 if effective_deadline else None)
     return {
         "资格": "符合硬性资格与时间要求",
         "能力匹配": f"技能匹配度 {breakdown.skill_score}，经历匹配度 {breakdown.experience_score}",
@@ -280,10 +299,11 @@ def _build_explanation(
 
 
 def recommend_for_user(
-    user: UserProfile, competitions: list[Competition], current: date
+    user: UserProfile, competitions: list[Competition], current: date | datetime
 ) -> list[RecommendationResult]:
     """对全部赛事执行三层推荐，返回排序后的结果列表。"""
     results: list[RecommendationResult] = []
+    day = calendar_date(current)
 
     for comp in competitions:
         # 时间问题属于明确的一票否决，保留结果以便 API / 评测解释 score=null。
@@ -300,32 +320,12 @@ def recommend_for_user(
             )
             continue
         source_readiness = assess_source_readiness(comp)
-        # 核验标识保留为透明提示，但不再作为是否评分的门槛。
-        pending = comp.data_status != DataStatus.VERIFIED
-        # 第一层：基础字段完整性；来源核验状态仅作为透明提示，不阻断推荐。
-        problems = data_validity_check(comp, current)
+        pending = not source_readiness.ready
+        problems = list(source_readiness.reasons)
         if problems:
-            # 基础字段不足时只展示候选信息，避免在资格或时间未知时误导用户。
-            eligible, reasons = eligibility_gate(user, comp, current)
-            if not eligible:
-                results.append(
-                    RecommendationResult(
-                        competition_id=comp.competition_id,
-                        competition_name=comp.competition_name,
-                        recommendation_status="ineligible",
-                        eligible=False,
-                        gate_reasons=reasons,
-                        explanation={
-                            "资格": "不满足硬性资格或时间要求，一票否决",
-                            "原因": [r.reason for r in reasons],
-                            "数据状态": "来源待核实",
-                        },
-                        pending_review=pending,
-                    )
-                )
-                continue
+            # Candidate facts must not be used to assert personal eligibility.
             effective_deadline = comp.registration_deadline or comp.submission_deadline
-            urgent = effective_deadline is not None and 0 <= (effective_deadline - current).days <= 14
+            urgent = effective_deadline is not None and 0 <= (effective_deadline - day).days <= 14
             results.append(
                 RecommendationResult(
                     competition_id=comp.competition_id,
@@ -367,7 +367,7 @@ def recommend_for_user(
         breakdown = soft_match_score(user, comp, current)
         status = _status_from_score(breakdown.total)
         effective_deadline = comp.registration_deadline or comp.submission_deadline
-        urgent = effective_deadline is not None and 0 <= (effective_deadline - current).days <= 14
+        urgent = effective_deadline is not None and 0 <= (effective_deadline - day).days <= 14
         results.append(
             RecommendationResult(
                 competition_id=comp.competition_id,
@@ -382,7 +382,7 @@ def recommend_for_user(
             )
         )
 
-    # 排序原则：资格与匹配度优先；来源待复核仅是提示，不能压过画像匹配结果。
+    # Only formally eligible events have a match score.
     results.sort(
         key=lambda r: (
             0 if r.eligible else 1,

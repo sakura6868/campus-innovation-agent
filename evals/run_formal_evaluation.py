@@ -3,17 +3,21 @@
 from __future__ import annotations
 
 import hashlib
+import atexit
 import io
 import json
 import platform
+import os
 import re
 import subprocess
 import sys
 import unittest
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Callable
+from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -22,6 +26,14 @@ GT_DIR = PROJECT_ROOT / "data" / "ground_truth" / "samples"
 RESULT_PATH = PROJECT_ROOT / "evals" / "formal_results.json"
 REPORT_PATH = PROJECT_ROOT / "docs" / "QUANTITATIVE_EVALUATION.md"
 sys.path.insert(0, str(SRC_DIR))
+
+EVALUATION_DATE = date(2026, 10, 3)
+_workspace = TemporaryDirectory(prefix="campus-agent-formal-")
+os.environ["DATABASE_URL"] = "sqlite:///" + _workspace.name.replace("\\", "/") + "/formal.db"
+os.environ["RAG_USE_ST"] = "0"
+os.environ["AGENT_LLM"] = "0"
+os.environ["WEB_SEARCH_PROVIDER"] = "none"
+os.environ["WEB_SEARCH_API_KEY"] = ""
 
 import db  # noqa: E402
 from agent.graph import run_agent  # noqa: E402
@@ -39,11 +51,21 @@ from schemas import (  # noqa: E402
 )
 
 
+from trust import REQUIRED_EVIDENCE_FIELDS, _evidence_is_complete
+
+
+def _cleanup_workspace():
+    db.get_engine().dispose()
+    _workspace.cleanup()
+
+
+atexit.register(_cleanup_workspace)
+
 METRIC_LABELS = {
     "deadline_consistency": "截止日期一致率",
     "eligibility_accuracy": "资格判断准确率",
     "citation_accuracy": "官方证据引用正确率",
-    "basic_data_availability": "基础资料可用率",
+    "unverified_interception": "未核验赛事拦截率",
     "insufficient_refusal_rate": "证据不足安全处理率",
 }
 
@@ -70,28 +92,31 @@ def profile(user_id: str = "formal_eval_user") -> UserProfile:
 
 
 def synthetic_competition(**overrides) -> Competition:
-    checked_at = date.today().isoformat()
+    checked_at = EVALUATION_DATE.isoformat()
     source_url = "https://example.edu/formal-evaluation"
     evidence = [
         Citation(
             field=field,
             page=None,
-            source_text=f"官方评测原文：{field}",
+            source_text=f"合成测试夹具（非真实官方原文）：{field}",
             document_name="formal-evaluation.html",
             source_url=source_url,
             acquired_date=checked_at,
             last_verified_at=checked_at,
             trusted_level=TrustedLevel.A,
         )
-        for field in ("registration_deadline", "eligible_students", "team_max", "required_materials")
+        for field in REQUIRED_EVIDENCE_FIELDS
     ]
     values = {
         "competition_id": "formal_eval_competition",
         "competition_name": "正式评测赛事",
-        "document_year": date.today().year,
+        "document_year": EVALUATION_DATE.year,
         "category": CompetitionCategory.SOFTWARE,
         "eligible_students": [EducationLevel.UNDERGRADUATE],
-        "registration_deadline": date.today() + timedelta(days=30),
+        "team_min": 1,
+        "team_max": 3,
+        "required_materials": ["报名表"],
+        "registration_deadline": EVALUATION_DATE + timedelta(days=30),
         "official_source_url": source_url,
         "official_source_status": "found",
         "source_acquired_date": checked_at,
@@ -123,6 +148,9 @@ def deadline_registration_matches() -> str:
         actual = comp.registration_deadline.isoformat() if comp.registration_deadline else None
         if actual != raw.get("registration_deadline"):
             raise AssertionError(f"{path.name}: {actual} != {raw.get('registration_deadline')}")
+        expected_at = datetime.fromisoformat(raw["registration_deadline_at"]) if raw.get("registration_deadline_at") else None
+        if comp.registration_deadline_at != expected_at:
+            raise AssertionError(f"{path.name}: 精确报名时刻不一致")
     return f"{len(rows)}/{len(rows)} 项报名截止日期与 Ground Truth 一致"
 
 
@@ -132,31 +160,38 @@ def deadline_submission_matches() -> str:
         actual = comp.submission_deadline.isoformat() if comp.submission_deadline else None
         if actual != raw.get("submission_deadline"):
             raise AssertionError(f"{path.name}: {actual} != {raw.get('submission_deadline')}")
+        expected_at = datetime.fromisoformat(raw["submission_deadline_at"]) if raw.get("submission_deadline_at") else None
+        if comp.submission_deadline_at != expected_at:
+            raise AssertionError(f"{path.name}: 精确提交时刻不一致")
     return f"{len(rows)}/{len(rows)} 项提交截止日期与 Ground Truth 一致"
 
 
 def agent_uses_unique_canonical_deadline() -> str:
-    core_ids = ("china_softcup_2026", "mathorcup_2026", "mcm_cn_2026", "mai_qihang_2026")
+    core_ids = ("china_softcup_2026", "mathorcup_2026", "mcm_cn_2026", "mai_qihang_2026", "mathorcup_data_2026")
     for competition_id in core_ids:
         comp = db.get_competition(competition_id)
         result = run_agent("报名截止日期是什么时候", competition_id=competition_id, top_k=4)
-        dates = re.findall(r"报名截止日期：(\d{4}-\d{2}-\d{2})", result["answer"])
+        dates = re.findall(r"报名截止(?:日期|时间)：(\d{4}-\d{2}-\d{2})", result["answer"])
         expected = comp.registration_deadline.isoformat()
         if dates != [expected]:
             raise AssertionError(f"{competition_id}: {dates} != [{expected}]")
-    return "4/4 个核心赛事仅输出一个规范报名截止日期"
+        if comp.registration_deadline_at is not None:
+            expected_time = comp.registration_deadline_at.strftime("%Y-%m-%d %H:%M")
+            if expected_time not in result["answer"] or "校园时区假设" not in result["answer"]:
+                raise AssertionError(f"{competition_id}: 精确截止时间或时区假设未披露")
+    return f"{len(core_ids)}/{len(core_ids)} 个核心赛事仅输出一个规范报名截止日期，保留官方时刻与时区假设"
 
 
 def eligible_open_competition_is_scored() -> str:
-    result = recommend_for_user(profile(), [synthetic_competition()], date.today())[0]
+    result = recommend_for_user(profile(), [synthetic_competition()], EVALUATION_DATE)[0]
     if not result.eligible or result.score is None or result.recommendation_status == "ineligible":
         raise AssertionError("已核验开放赛事未进入正式评分")
     return f"开放且符合资格的赛事进入正式评分，score={result.score}"
 
 
 def expired_registration_is_rejected() -> str:
-    comp = synthetic_competition(registration_deadline=date.today() - timedelta(days=1))
-    result = recommend_for_user(profile(), [comp], date.today())[0]
+    comp = synthetic_competition(registration_deadline=EVALUATION_DATE - timedelta(days=1))
+    result = recommend_for_user(profile(), [comp], EVALUATION_DATE)[0]
     if result.eligible or result.score is not None or result.recommendation_status != "ineligible":
         raise AssertionError("报名已截止赛事未被正确拒绝")
     return "报名已截止赛事为 ineligible，score=null"
@@ -165,9 +200,9 @@ def expired_registration_is_rejected() -> str:
 def expired_submission_fallback_is_rejected() -> str:
     comp = synthetic_competition(
         registration_deadline=None,
-        submission_deadline=date.today() - timedelta(days=1),
+        submission_deadline=EVALUATION_DATE - timedelta(days=1),
     )
-    result = recommend_for_user(profile(), [comp], date.today())[0]
+    result = recommend_for_user(profile(), [comp], EVALUATION_DATE)[0]
     if result.eligible or result.score is not None or result.recommendation_status != "ineligible":
         raise AssertionError("缺少报名日时未按提交截止日期拒绝")
     return "报名日缺失时使用提交截止日判断，score=null"
@@ -179,18 +214,20 @@ def load_core_evidence() -> list[tuple[str, dict]]:
         raw = json.loads(path.read_text(encoding="utf-8"))
         if raw.get("data_status") == "verified":
             records.append((path.stem, raw))
+    if not records:
+        raise AssertionError("没有推荐级证据，不能以空集合宣称引用正确率100%")
     return records
 
 
 def core_fields_have_evidence() -> str:
-    required = {"registration_deadline", "eligible_students", "team_max", "required_materials"}
+    required = REQUIRED_EVIDENCE_FIELDS
     for competition_id, raw in load_core_evidence():
-        fields = {item["field"] for item in raw.get("evidence", [])}
+        fields = {item["field"] for item in raw.get("evidence", []) if _evidence_is_complete(Citation.model_validate(item))}
         missing = required - fields
         if missing:
             raise AssertionError(f"{competition_id} 缺少字段证据: {sorted(missing)}")
     count = len(load_core_evidence())
-    return f"{count}/{count} 个已核验赛事的4类关键字段均有关联证据"
+    return f"{count}/{count} 个官网来源已确认赛事的5类关键字段均有完整证据"
 
 
 def core_evidence_metadata_is_complete() -> str:
@@ -198,6 +235,8 @@ def core_evidence_metadata_is_complete() -> str:
     for competition_id, raw in load_core_evidence():
         for item in raw.get("evidence", []):
             checked += 1
+            if not _evidence_is_complete(Citation.model_validate(item)):
+                raise AssertionError(f"{competition_id}.{item.get('field')} 未通过统一证据完整性规则")
             is_pdf = str(item.get("document_name", "")).lower().endswith(".pdf") or ".pdf" in str(item.get("source_url", "")).lower()
             if is_pdf and not isinstance(item.get("page"), int):
                 raise AssertionError(f"{competition_id}.{item.get('field')} 的 PDF 证据缺少页码")
@@ -209,7 +248,7 @@ def core_evidence_metadata_is_complete() -> str:
 
 
 def rag_deadline_citations_are_official() -> str:
-    core_ids = ("china_softcup_2026", "mathorcup_2026", "mcm_cn_2026", "mai_qihang_2026")
+    core_ids = ("china_softcup_2026", "mathorcup_2026", "mcm_cn_2026", "mai_qihang_2026", "mathorcup_data_2026")
     for competition_id in core_ids:
         citations = get_rag().query(competition_id, "报名截止日期是什么时候", top_k=4)
         deadline_hits = [item for item in citations if item.field == "registration_deadline"]
@@ -217,72 +256,74 @@ def rag_deadline_citations_are_official() -> str:
             raise AssertionError(f"{competition_id} 未召回报名截止证据")
         if any(not item.source_url.startswith("http") or not item.source_text for item in deadline_hits):
             raise AssertionError(f"{competition_id} 召回证据缺少官方链接或原文")
-    return "4/4 个核心赛事的截止日期检索命中官方原文和链接"
+        originals = {item.source_text for item in db.get_competition(competition_id).evidence}
+        if any(item.source_text not in originals or not item.citation_id for item in deadline_hits):
+            raise AssertionError(f"{competition_id} 召回了非原始证据")
+    return f"{len(core_ids)}/{len(core_ids)} 个核心赛事的截止检索命中保存的原文证据、证据ID和官方链接"
 
 
-def basic_data_can_be_recommended_without_evidence_gate() -> str:
+def unverified_data_cannot_be_recommended() -> str:
     comp = synthetic_competition(
         data_status=DataStatus.UNVERIFIED,
         trusted_level=TrustedLevel.B,
         last_verified_at=None,
     )
-    result = recommend_for_user(profile(), [comp], date.today())[0]
-    if not result.eligible or result.score is None:
-        raise AssertionError("基础资料完整的赛事未进入正式推荐")
-    return "基础资料完整的赛事可推荐，来源状态仅作提示"
+    result = recommend_for_user(profile(), [comp], EVALUATION_DATE)[0]
+    if result.eligible or result.score is not None or result.recommendation_status != "candidate_only":
+        raise AssertionError("未核验赛事错误进入正式推荐")
+    return "未核验赛事为 candidate_only，eligible=false，score=null"
 
 
-def pick_registerable_competition():
-    """挑一个「基础资料完整且当天仍可报名」的赛事。
-
-    原用例固定用 baidu_star_2026，随报名时间自然过期后必然失败（competition_expired），
-    属于用例夹具腐烂而非产品缺陷：create_user_project 明确拦截已截止赛事（409）。
-    改为动态挑选，使本条检查始终验证它真正想验证的事——
-    「来源核验状态只是提示，不再阻止基于基础资料创建项目」。
-    """
-    from trust import assess_source_readiness, is_registerable_now
-
-    for comp in db.list_competitions():
-        if assess_source_readiness(comp).ready and is_registerable_now(comp, date.today()):
-            return comp
-    return None
-
-
-def basic_data_project_creation_is_allowed() -> str:
-    comp = pick_registerable_competition()
-    if comp is None:
-        raise AssertionError("未找到基础资料完整且仍可报名的赛事，无法验证建项目能力")
+def unverified_project_creation_is_blocked() -> str:
+    comp = synthetic_competition(
+        competition_id="formal_eval_candidate", data_status=DataStatus.UNVERIFIED,
+        trusted_level=TrustedLevel.B, registration_deadline=date(2099, 1, 1),
+    )
+    db.upsert_competition(comp)
     user_id = "formal_eval_block_user"
     db.delete_user_profile(user_id)
     db.save_user_profile(profile(user_id))
     try:
-        project = db.create_user_project(user_id, comp.competition_id)
-        if project.competition_id != comp.competition_id:
-            raise AssertionError("基础资料完整的赛事未能创建项目")
+        try:
+            db.create_user_project(user_id, comp.competition_id)
+        except ValueError as exc:
+            if str(exc) != "competition_basic_info_incomplete":
+                raise
+        else:
+            raise AssertionError("未核验赛事错误创建项目")
     finally:
         db.delete_user_profile(user_id)
-    return f"基础资料完整且仍可报名的赛事 {comp.competition_id} 允许创建项目"
+    return "独立未核验夹具不能创建新项目"
 
 
-def unverified_agent_uses_basic_data() -> str:
-    result = run_agent("2026年蓝桥杯报名截止", competition_id="lanqiao_2026", top_k=4)
-    if "2026" not in result["answer"] or not result["answer"].strip():
-        raise AssertionError("Agent 未返回基础资料")
-    return "Agent 可基于基础资料回答，同时保留来源状态提示"
+def unverified_agent_marks_candidate() -> str:
+    comp = synthetic_competition(competition_id="formal_eval_agent_candidate", data_status=DataStatus.UNVERIFIED, trusted_level=TrustedLevel.B)
+    db.upsert_competition(comp)
+    result = run_agent("报名截止日期是什么时候", competition_id=comp.competition_id, top_k=4)
+    if not result["pending_review"] or "候选信息" not in result["answer"]:
+        raise AssertionError("Agent 未明确标注候选边界")
+    return "Agent 明确说明候选信息不构成资格判断或推荐评分"
 
 
 def missing_national_deadline_is_not_invented() -> str:
-    result = run_agent("报名截止日期是什么时候", competition_id="jsj_sj_2026", top_k=4)
-    if "未给出全国统一报名截止日期" not in result["answer"]:
-        raise AssertionError("未明确说明官方文件缺少全国统一日期")
-    if re.search(r"报名截止日期：\d{4}-\d{2}-\d{2}", result["answer"]):
+    comp = synthetic_competition(competition_id="formal_missing_deadline", registration_deadline=None,
+                                 evidence=[], data_status=DataStatus.UNVERIFIED, trusted_level=TrustedLevel.B)
+    db.upsert_competition(comp)
+    result = run_agent("报名截止日期是什么时候", competition_id=comp.competition_id, top_k=4)
+    if "不能确认截止时间" not in result["answer"] or result["citations"]:
+        raise AssertionError("缺少证据时未拒答或伪造了引用")
+    if "官方文件未给出" in result["answer"] or re.search(r"\d{4}-\d{2}-\d{2}", result["answer"]):
         raise AssertionError("Agent 编造了报名截止日期")
-    return "官方未给日期时明确拒绝给出日期"
+    return "独立缺证据夹具：不能确认日期，不伪造原文或断言官网没有日期"
 
 
 def ambiguous_versions_declare_latest_official_source() -> str:
-    result = run_agent("蓝桥杯报名截止")
-    if result["resolved_competition"] != "lanqiao_2026":
+    comps = [synthetic_competition(competition_id=f"formal_version_{year}", competition_name="正式版本测试赛事", document_year=year) for year in (2025, 2026)]
+    for comp in comps:
+        db.upsert_competition(comp)
+    with patch.object(db, "get_all_competitions", return_value=comps):
+        result = run_agent("正式版本测试赛事报名截止")
+    if result["resolved_competition"] != "formal_version_2026":
         raise AssertionError("同名多年份赛事未选中最新官方来源版本")
     if "你没有指定年份" not in result["answer"] or "2026年" not in result["answer"]:
         raise AssertionError("默认版本未在答案中显式声明")
@@ -309,9 +350,9 @@ def build_cases() -> list[FormalCase]:
         FormalCase("FE-07", "citation_accuracy", "核心字段均有证据", core_fields_have_evidence),
         FormalCase("FE-08", "citation_accuracy", "证据元数据完整", core_evidence_metadata_is_complete),
         FormalCase("FE-09", "citation_accuracy", "RAG 命中官方截止证据", rag_deadline_citations_are_official),
-        FormalCase("FE-10", "basic_data_availability", "基础资料完整赛事可推荐", basic_data_can_be_recommended_without_evidence_gate),
-        FormalCase("FE-11", "basic_data_availability", "基础资料完整赛事可建项目", basic_data_project_creation_is_allowed),
-        FormalCase("FE-12", "basic_data_availability", "Agent 使用基础资料回答", unverified_agent_uses_basic_data),
+        FormalCase("FE-10", "unverified_interception", "未核验赛事不评分", unverified_data_cannot_be_recommended),
+        FormalCase("FE-11", "unverified_interception", "未核验赛事不能新建项目", unverified_project_creation_is_blocked),
+        FormalCase("FE-12", "unverified_interception", "Agent 明确标注候选", unverified_agent_marks_candidate),
         FormalCase("FE-13", "insufficient_refusal_rate", "官方未给日期时不编造", missing_national_deadline_is_not_invented),
         FormalCase("FE-14", "insufficient_refusal_rate", "同名多年份显式声明默认版本", ambiguous_versions_declare_latest_official_source),
         FormalCase("FE-15", "insufficient_refusal_rate", "域外问题拒绝生成赛事事实", out_of_domain_question_is_refused),
@@ -403,7 +444,7 @@ def render_report(payload: dict) -> str:
         "执行命令：",
         "",
         "```powershell",
-        ".\\venv\\Scripts\\python.exe -m unittest discover -s tests -v",
+        ".\\venv\\Scripts\\python.exe -m pytest tests -q",
         "```",
         "",
         f"本次实际运行 {payload['regression']['tests_run']} 项，通过 {payload['regression']['passed']} 项，"
@@ -431,6 +472,9 @@ def render_report(payload: dict) -> str:
 
 def main() -> int:
     db.init_db()
+    from evaluation_provenance import code_sha256, competition_snapshot_sha256
+
+    initial_snapshot_sha256 = competition_snapshot_sha256(db.list_competitions())
     results = []
     for case in build_cases():
         try:
@@ -467,7 +511,11 @@ def main() -> int:
         "metrics": metrics,
         "cases": results,
         "regression": regression,
-        "freeze": latest_freeze(),
+        "freeze": None,
+        "fixture_date": EVALUATION_DATE.isoformat(),
+        "dataset_sha256": hashlib.sha256(b"".join(path.read_bytes() for path in sorted(GT_DIR.glob("*.json")))).hexdigest(),
+        "code_sha256": code_sha256(PROJECT_ROOT),
+        "competition_snapshot_sha256": initial_snapshot_sha256,
     }
     RESULT_PATH.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     REPORT_PATH.write_text(render_report(payload), encoding="utf-8")

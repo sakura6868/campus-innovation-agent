@@ -7,6 +7,7 @@ import math
 from datetime import date, datetime, timezone
 
 from recommendation.engine import estimate_competition_workload, recommend_for_user
+from contest_clock import calendar_date, contest_now
 from schemas import (
     Competition,
     PortfolioItem,
@@ -308,18 +309,19 @@ def optimize_portfolios(
     competitions: list[Competition],
     projects: list[UserProject],
     preferences: PortfolioPreferences,
-    current: date | None = None,
+    current: date | datetime | None = None,
 ) -> PortfolioOptimizeResponse:
-    current = current or date.today()
+    moment = current or contest_now()
+    current = calendar_date(moment)
     comp_map = {comp.competition_id: comp for comp in competitions}
     base_load, existing_ids = _existing_load(
         user, projects, comp_map, current, preferences.horizon_weeks
     )
-    recommendations = recommend_for_user(user, competitions, current)
+    recommendations = recommend_for_user(user, competitions, moment)
     rec_map = {
         item.competition_id: item
         for item in recommendations
-        # 基础资料完整即可参与组合；来源待复核只在前端提示，不再排除机会。
+        # Only source-ready, personally eligible and still-open events enter plans.
         if item.eligible and item.score is not None
     }
     candidates: list[dict] = []

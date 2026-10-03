@@ -1,5 +1,5 @@
 {
-  "evaluated_at": "2026-09-17",
+  "evaluated_at": "2026-10-03",
   "environment": {
     "python": "3.13.14",
     "platform": "Windows-11-10.0.26200-SP0"
@@ -24,7 +24,7 @@
       "total": 3,
       "rate": 100.0
     },
-    "basic_data_availability": {
+    "unverified_interception": {
       "passed": 3,
       "total": 3,
       "rate": 100.0
@@ -41,21 +41,21 @@
       "metric": "deadline_consistency",
       "scenario": "报名日期与 Ground Truth 一致",
       "passed": true,
-      "detail": "190/190 项报名截止日期与 Ground Truth 一致"
+      "detail": "194/194 项报名截止日期与 Ground Truth 一致"
     },
     {
       "case_id": "FE-02",
       "metric": "deadline_consistency",
       "scenario": "提交日期与 Ground Truth 一致",
       "passed": true,
-      "detail": "190/190 项提交截止日期与 Ground Truth 一致"
+      "detail": "194/194 项提交截止日期与 Ground Truth 一致"
     },
     {
       "case_id": "FE-03",
       "metric": "deadline_consistency",
       "scenario": "Agent 仅输出规范截止日期",
       "passed": true,
-      "detail": "4/4 个核心赛事仅输出一个规范报名截止日期"
+      "detail": "5/5 个核心赛事仅输出一个规范报名截止日期，保留官方时刻与时区假设"
     },
     {
       "case_id": "FE-04",
@@ -83,49 +83,49 @@
       "metric": "citation_accuracy",
       "scenario": "核心字段均有证据",
       "passed": true,
-      "detail": "15/15 个已核验赛事的4类关键字段均有关联证据"
+      "detail": "10/10 个官网来源已确认赛事的5类关键字段均有完整证据"
     },
     {
       "case_id": "FE-08",
       "metric": "citation_accuracy",
       "scenario": "证据元数据完整",
       "passed": true,
-      "detail": "104/104 条推荐级证据具备定位信息、原文、链接、获取和来源检查日期"
+      "detail": "76/76 条推荐级证据具备定位信息、原文、链接、获取和来源检查日期"
     },
     {
       "case_id": "FE-09",
       "metric": "citation_accuracy",
       "scenario": "RAG 命中官方截止证据",
       "passed": true,
-      "detail": "4/4 个核心赛事的截止日期检索命中官方原文和链接"
+      "detail": "5/5 个核心赛事的截止检索命中保存的原文证据、证据ID和官方链接"
     },
     {
       "case_id": "FE-10",
-      "metric": "basic_data_availability",
-      "scenario": "基础资料完整赛事可推荐",
+      "metric": "unverified_interception",
+      "scenario": "未核验赛事不评分",
       "passed": true,
-      "detail": "基础资料完整的赛事可推荐，来源状态仅作提示"
+      "detail": "未核验赛事为 candidate_only，eligible=false，score=null"
     },
     {
       "case_id": "FE-11",
-      "metric": "basic_data_availability",
-      "scenario": "基础资料完整赛事可建项目",
+      "metric": "unverified_interception",
+      "scenario": "未核验赛事不能新建项目",
       "passed": true,
-      "detail": "基础资料完整且仍可报名的赛事 2026年大学生AI信息素养大赛_2026 允许创建项目"
+      "detail": "独立未核验夹具不能创建新项目"
     },
     {
       "case_id": "FE-12",
-      "metric": "basic_data_availability",
-      "scenario": "Agent 使用基础资料回答",
+      "metric": "unverified_interception",
+      "scenario": "Agent 明确标注候选",
       "passed": true,
-      "detail": "Agent 可基于基础资料回答，同时保留来源状态提示"
+      "detail": "Agent 明确说明候选信息不构成资格判断或推荐评分"
     },
     {
       "case_id": "FE-13",
       "metric": "insufficient_refusal_rate",
       "scenario": "官方未给日期时不编造",
       "passed": true,
-      "detail": "官方未给日期时明确拒绝给出日期"
+      "detail": "独立缺证据夹具：不能确认日期，不伪造原文或断言官网没有日期"
     },
     {
       "case_id": "FE-14",
@@ -143,17 +143,17 @@
     }
   ],
   "regression": {
-    "tests_run": 59,
-    "passed": 59,
+    "tests_run": 147,
+    "passed": 147,
     "failures": 0,
     "errors": 0,
-    "subtests_passed": 13,
+    "subtests_passed": 26,
     "successful": true,
-    "output": "59 passed, 13 subtests passed in 135.70s (0:02:15)"
+    "output": "147 passed, 26 subtests passed in 8.50s"
   },
-  "freeze": {
-    "path": "backups/campus-agent-freeze-20260716-235411.zip",
-    "bytes": 32782454,
-    "sha256": "677e8fcc3939d5a0ac65a62fcb06e6daefed3912d5af0a6114cc413fefd7d438"
-  }
+  "freeze": null,
+  "fixture_date": "2026-10-03",
+  "dataset_sha256": "0d6cb3c5b0de18a1d37db2c654629a6593cada66191dbb47db3007b50063b43f",
+  "code_sha256": "d9978f3802433ee2037f557e4142103ec2a7476b1b4f6d32bd9fd4f7fa393306",
+  "competition_snapshot_sha256": "d2ed4386dafeb3680b39b0dad1a43ed132a238e63371d671dd61f959e1cff8ae"
 }

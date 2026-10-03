@@ -81,6 +81,17 @@ def remove_security_test_competition() -> None:
 
 
 class SecurityAndReadinessTests(unittest.TestCase):
+    def test_public_identity_lists_exclude_real_profiles(self) -> None:
+        real = profile().model_copy(update={"user_id": "private_registered_student", "major": "private-major"})
+        with patch.object(db, "list_user_profiles", return_value=[real]):
+            for users in (api.list_users(), api.student_types()):
+                self.assertNotIn(real.user_id, {item["user_id"] for item in users})
+                self.assertNotIn("private-major", str(users))
+        first = db.list_demo_profiles()[0]
+        original = first.major
+        first.major = "mutated"
+        self.assertEqual(db.list_demo_profiles()[0].major, original)
+
     def test_health_never_exposes_database_url(self) -> None:
         payload = api.health()
         serialized = str(payload).lower()
@@ -131,14 +142,14 @@ class SecurityAndReadinessTests(unittest.TestCase):
                 response = client.post("/api/admin/upload", json={})
         self.assertEqual(response.status_code, 503)
 
-    def test_not_found_source_with_complete_basics_can_be_scored(self) -> None:
+    def test_not_found_source_cannot_be_scored(self) -> None:
         comp = ready_competition().model_copy(update={"official_source_status": "not_found"})
         result = recommend_for_user(profile(), [comp], date.today())[0]
-        self.assertNotEqual(result.recommendation_status, "candidate_only")
-        self.assertIsNotNone(result.score)
-        self.assertTrue(result.eligible)
+        self.assertEqual(result.recommendation_status, "candidate_only")
+        self.assertIsNone(result.score)
+        self.assertFalse(result.eligible)
 
-    def test_missing_evidence_field_does_not_block_scoring(self) -> None:
+    def test_each_missing_evidence_field_blocks_scoring(self) -> None:
         base = ready_competition()
         for missing in REQUIRED_EVIDENCE_FIELDS:
             with self.subTest(field=missing):
@@ -146,15 +157,50 @@ class SecurityAndReadinessTests(unittest.TestCase):
                     update={"evidence": [item for item in base.evidence if item.field != missing]}
                 )
                 assessment = assess_source_readiness(comp)
-                self.assertTrue(assessment.ready)
+                self.assertFalse(assessment.ready)
+                result = recommend_for_user(profile(), [comp], date.today())[0]
+                self.assertEqual(result.recommendation_status, "candidate_only")
+                self.assertIsNone(result.score)
 
     def test_catalog_filters_use_shared_readiness(self) -> None:
-        ready = api.list_competitions(category=None, year=None, readiness="ready")
-        candidates = api.list_competitions(category=None, year=None, readiness="candidate")
+        base = ready_competition()
+        candidate = base.model_copy(update={"competition_id": "candidate", "data_status": DataStatus.UNVERIFIED})
+        with patch.object(db, "list_competitions", return_value=[base, candidate]):
+            ready = api.list_competitions(category=None, year=None, readiness="ready")
+            candidates = api.list_competitions(category=None, year=None, readiness="candidate")
         self.assertTrue(ready)
         self.assertTrue(candidates)
         self.assertTrue(all(item["recommendation_ready"] for item in ready))
         self.assertTrue(all(not item["recommendation_ready"] for item in candidates))
+
+    def test_invalid_evidence_metadata_cannot_be_used(self) -> None:
+        base = ready_competition()
+        variants = (
+            {"source_text": " "}, {"source_url": "https://www.baidu.com/s?wd=test"},
+            {"acquired_date": None}, {"last_verified_at": None},
+            {"acquired_date": "not-a-date"}, {"last_verified_at": "2000-01-01"},
+            {"trusted_level": TrustedLevel.B}, {"anchor_status": "invalid"},
+            {"document_name": "notice.pdf", "page": None},
+            {"document_name": "notice.pdf", "page": 0},
+        )
+        for changes in variants:
+            with self.subTest(changes=changes):
+                evidence = [item.model_copy(update=changes) if item.field == "registration_deadline" else item for item in base.evidence]
+                self.assertFalse(assess_source_readiness(base.model_copy(update={"evidence": evidence})).ready)
+
+    def test_admin_classification_never_fabricates_metadata(self) -> None:
+        comp = ready_competition()
+        comp.evidence[0].acquired_date = None
+        result, reasons = api._classify_submitted_competition(comp)
+        self.assertEqual(result.data_status, DataStatus.UNVERIFIED)
+        self.assertIsNone(result.evidence[0].acquired_date)
+        self.assertTrue(reasons)
+
+    def test_rag_write_routes_require_admin_token(self) -> None:
+        with patch.object(api, "_ADMIN_API_TOKEN", "unit-test-secret"), TestClient(api.app) as client:
+            for path in ("/api/rag/reseed", "/api/competitions/china_softcup_2026/ingest"):
+                with self.subTest(path=path):
+                    self.assertEqual(client.post(path).status_code, 401)
 
 
 if __name__ == "__main__":

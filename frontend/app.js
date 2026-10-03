@@ -556,7 +556,7 @@ async function renderQuality() {
     deadline_consistency: "截止日期一致率",
     eligibility_accuracy: "资格判断准确率",
     citation_accuracy: "官方证据引用正确率",
-    basic_data_availability: "基础资料可用率",
+    unverified_interception: "未核验赛事拦截率",
     insufficient_refusal_rate: "证据不足安全处理率",
   };
   const metricCards = Object.entries(metricLabels).map(([key, label]) => {
@@ -569,30 +569,30 @@ async function renderQuality() {
   }).join("");
 
   const scoreEvidence = [
-    ["30", "落地价值", "赛事情报 → 个性化推荐 → 参赛项目"],
-    ["25", "任务闭环", "输入、处理、输出、兜底全链路留痕"],
-    ["20", "工程质量", `${regressionTotal || 59} 项回归、日志、健康检查与降级`],
-    ["15", "交互体验", "运行剧场与四种项目视图"],
-    ["10", "安全合规", "签名会话、SSRF、最小数据与人工审核"],
+    ["01", "落地价值", "赛事情报 → 个性化推荐 → 参赛项目"],
+    ["02", "任务闭环", "输入、处理、输出、兜底全链路留痕"],
+    ["03", "工程质量", `${regressionTotal} 项回归、日志、健康检查与降级`],
+    ["04", "交互体验", "运行剧场与四种项目视图"],
+    ["05", "安全合规", "签名会话、SSRF、最小数据与人工审核"],
   ].map(([weight, label, detail]) => `<article><strong>${weight}</strong><div><b>${label}</b><span>${detail}</span></div></article>`).join("");
 
   host.innerHTML = `
     <section class="quality-hero-grid">
       <article class="quality-frozen-panel">
         <header><div><span>FROZEN EVALUATION</span><h3>冻结评测快照</h3></div><em>${escapeHtml(data.evaluated_at || "未记录")}</em></header>
-        <div class="quality-ring" style="--quality-rate:${frozenRate * 3.6}deg"><div><strong>${frozenRate}</strong><small>SCORE</small></div></div>
+        <div class="quality-ring" style="--quality-rate:${frozenRate * 3.6}deg"><div><strong>${frozenRate}</strong><small>PASS RATE</small></div></div>
         <div class="quality-frozen-stats">
           <span><b>${formalPassed}/${formalTotal || "—"}</b><small>正式指标</small></span>
           <span><b>${regressionPassed}/${regressionTotal || "—"}</b><small>自动回归</small></span>
-          <span><b>${Number(golden.cases || 0)}</b><small>金标问题</small></span>
+          <span><b>${Number(golden.cases || 0)}</b><small>模板问答</small></span>
         </div>
-        <p>这是固定数据与固定代码上的可复现结果，不伪装成实时指标。</p>
+        <p>${data.dataset?.evaluation_dataset_matches ? "评测数据、源码与运行赛事快照一致。" : "冻结评测与当前版本不一致，需要重新评测。"}</p>
       </article>
       <article class="quality-live-panel">
         <header><div><span>LIVE RUNTIME</span><h3>当前运行态</h3></div><em><i></i> LIVE</em></header>
         <div class="quality-live-stats">
           <span><small>监控来源</small><b>${Number(runtime.source_count || 0)}</b></span>
-          <span><small>高健康来源</small><b>${Number(runtime.healthy_sources || 0)}</b></span>
+          <span><small>已通过检查</small><b>${Number(runtime.healthy_sources || 0)}</b></span>
           <span><small>待人工审核</small><b>${Number(runtime.pending_human_reviews || 0)}</b></span>
         </div>
         <div class="quality-gates">
@@ -608,7 +608,7 @@ async function renderQuality() {
     </section>
     <section class="quality-bottom-grid">
       <article class="quality-section quality-golden-panel">
-        <div class="quality-section-head"><div><span>GOLDEN SET</span><h3>${Number(golden.cases || 0)} 条问答金标集</h3></div><small>防回归</small></div>
+        <div class="quality-section-head"><div><span>TEMPLATE REGRESSION</span><h3>全量模板问答评测</h3></div><small>${golden.current ? `${Number(golden.passed || 0)}/${Number(golden.cases || 0)} 通过` : "版本变化，需复测"}</small></div>
         <div class="quality-golden-stats">
           <span><b>${qualityRate(golden.intent_accuracy)}</b><small>意图准确率</small></span>
           <span><b>${qualityRate(golden.citation_recall)}</b><small>引用召回率</small></span>
@@ -616,7 +616,7 @@ async function renderQuality() {
         </div>
       </article>
       <article class="quality-section quality-score-panel">
-        <div class="quality-section-head"><div><span>JUDGING MATRIX</span><h3>评审分值证据映射</h3></div><small>总分 100</small></div>
+        <div class="quality-section-head"><div><span>ACCEPTANCE MATRIX</span><h3>验收证据映射</h3></div><small>分值待原始手册确认</small></div>
         <div class="quality-score-list">${scoreEvidence}</div>
       </article>
     </section>
@@ -626,14 +626,32 @@ async function renderQuality() {
 // ---------------------------------------------------------------------------
 // 画像页
 // ---------------------------------------------------------------------------
+let profileGradeOptions = {};
+function updateGradeOptions(education, selected = "") {
+  const grades = profileGradeOptions[education] || [];
+  const valid = grades.includes(selected);
+  $("#f-grade").innerHTML = `<option value="">${selected && !valid ? `请确认年级（原记录：${escapeHtml(selected)}）` : "请选择年级"}</option>`
+    + grades.map((grade) => `<option value="${escapeHtml(grade)}">${escapeHtml(grade)}</option>`).join("");
+  $("#f-grade").value = valid ? selected : "";
+}
+$("#f-education").addEventListener("change", () => {
+  updateGradeOptions($("#f-education").value, $("#f-grade").value);
+});
 async function renderProfile() {
   updateUserChip();
   renderTestPanel();
   if (!state.consent) { openConsentModal(); return; }
   try {
+    profileGradeOptions = (await apiGet("/api/profile/options")).grades_by_education;
+  } catch (err) {
+    $("#profile-msg").textContent = "学籍选项加载失败，请稍后重试。";
+    $("#profile-msg").className = "msg err";
+    return;
+  }
+  try {
     const p = await apiGet(`/api/users/${state.uid}/profile`);
     $("#f-education").value = p.education_level;
-    $("#f-grade").value = p.grade;
+    updateGradeOptions(p.education_level, p.grade);
     $("#f-major").value = p.major;
     $("#f-hours").value = p.weekly_available_hours;
     $("#f-team").value = p.expected_team_size;
@@ -643,6 +661,7 @@ async function renderProfile() {
     $("#profile-msg").textContent = "已加载已保存画像。";
     $("#profile-msg").className = "msg ok";
   } catch (_) {
+    updateGradeOptions($("#f-education").value);
     $("#profile-msg").textContent = "尚未保存画像，请填写后保存。";
     $("#profile-msg").className = "msg";
   }
@@ -758,12 +777,20 @@ function compMatchLevel(c, major) {
 // 报名状态标签：基于时间字段判断，给「已截止 / 已开赛 / 已结束」加灰色标识，
 // 与后端 recommend_for_user 的时间门控（只推报名中）前后呼应。
 function competitionStatus(c) {
-  const today = new Date().toISOString().slice(0, 10);
+  const now = new Date();
+  const today = todayStr();
   const sd = c.competition_start_date, ed = c.competition_end_date;
   const rd = c.registration_deadline, sub = c.submission_deadline;
   if (ed && ed < today) return { label: "已结束", cls: "status-ended" };
+  if (c.registration_deadline_at) {
+    return new Date(c.registration_deadline_at).getTime() <= now.getTime()
+      ? { label: "报名已截止", cls: "status-closed" }
+      : { label: "报名中", cls: "status-open" };
+  }
   if (rd && rd < today) return { label: "报名已截止", cls: "status-closed" };
+  if (rd) return { label: "报名中", cls: "status-open" };
   if (!rd && sub && sub < today) return { label: "报名已截止", cls: "status-closed" };
+  if (!rd && c.submission_deadline_at && new Date(c.submission_deadline_at).getTime() <= now.getTime()) return { label: "报名已截止", cls: "status-closed" };
   if (sd && sd <= today) return { label: "已开赛", cls: "status-progress" };
   if (!rd && !sub) return { label: "分赛区/滚动报名", cls: "status-open" };
   return { label: "报名中", cls: "status-open" };
@@ -774,7 +801,9 @@ function statusTag(c) {
 }
 
 function compCardHtml(c, matchLevel) {
-  const majorTag = matchLevel === 2
+  const majorTag = !c.recommendation_ready
+    ? `<span class="tag">目录信息 · 不评分</span>`
+    : matchLevel === 2
     ? `<span class="tag major-match">匹配你的专业</span>`
     : (matchLevel === 1 ? `<span class="tag major-open">不限专业</span>` : "");
   return `<article class="card comp-card" data-id="${escapeHtml(c.competition_id)}" tabindex="0">
@@ -788,7 +817,7 @@ function compCardHtml(c, matchLevel) {
         </div>
         <div class="card-open-hint">查看赛事详情 <i aria-hidden="true">↗</i></div>
       </div>
-      <div class="comp-card-side"><span>${c.registration_deadline ? "报名截止" : "赛程"}</span><strong>${escapeHtml(c.registration_deadline || "分赛区/以官网为准")}</strong><i aria-hidden="true">→</i></div>
+      <div class="comp-card-side" title="${escapeHtml(deadlineLabel(c))}"><span>${c.registration_deadline ? "报名截止" : "赛程"}</span><strong>${escapeHtml(c.registration_deadline || "分赛区/以官网为准")}</strong>${c.registration_deadline_at ? `<small class="deadline-clock">${escapeHtml(c.registration_deadline_at.slice(11, 19).replace(/:00$/, ""))}<br>${c.deadline_timezone_basis === "official" ? "官方时区" : "校园假设"}</small>` : ""}<i aria-hidden="true">→</i></div>
     </article>`;
 }
 
@@ -851,7 +880,7 @@ async function renderHall() {
     state.hallMajor = major;
     state.hallMajorLoaded = true;
   }
-  const levelOf = (c) => compMatchLevel(c, major);
+  const levelOf = (c) => c.recommendation_ready ? compMatchLevel(c, major) : 0;
 
   // 应用类别/年份筛选（客户端，便于专业优先排序）
   const cat = $("#filter-cat").value;
@@ -949,17 +978,66 @@ function detailScheduleHint(competition, notes) {
   return "赛程信息可能分阶段发布，建议以赛事官网的最新通知为准。";
 }
 
+function deadlineLabel(competition, field = "registration_deadline") {
+  const timestamp = competition[field + "_at"];
+  if (!timestamp) return competition[field] || "未明确";
+  const offset = timestamp.match(/([+-]\d{2}:\d{2}|Z)$/)?.[1] || "";
+  const basis = competition.deadline_timezone_basis === "official" ? "官方" : "校园假设";
+  return `${timestamp.slice(0, 10)} ${timestamp.slice(11, 19)}（${basis} UTC${offset === "Z" ? "+00:00" : offset}）`;
+}
+
+function teamSizeLabel(competition) {
+  const min = competition.team_min;
+  const max = competition.team_max;
+  if (min != null && max != null) return min === max ? `${min} 人` : `${min}–${max} 人`;
+  if (max != null) return `最多 ${max} 人，下限待确认`;
+  if (min != null) return `至少 ${min} 人，上限待确认`;
+  return "人数要求待官网确认";
+}
+
+function safeSourceUrl(value, page) {
+  try {
+    const url = new URL(value);
+    if (!["http:", "https:"].includes(url.protocol) || url.username || url.password) return "";
+    if (/\.pdf$/i.test(url.pathname) && Number.isInteger(page) && page > 0) url.hash = `page=${page}`;
+    return url.href;
+  } catch { return ""; }
+}
+
+function evidenceFieldLabel(field) {
+  const labels = { registration_deadline: "报名截止日期", registration_deadline_at: "报名截止时刻", submission_deadline_at: "提交截止时刻", deadline_timezone: "官方时区依据", eligible_students: "参赛对象", team_min: "团队人数下限", team_max: "团队人数上限", required_materials: "材料要求", competition_end_date: "比赛时间" };
+  return labels[field] || field || "官方资料";
+}
+
+function evidenceMarkup(citation) {
+  const url = safeSourceUrl(citation.source_url, citation.page);
+  const pdf = /\.pdf(?:[?#]|$)/i.test(citation.document_name || "") || /\.pdf(?:[?#]|$)/i.test(citation.source_url || "");
+  return `<div class="source-evidence">
+    <p class="source-location">${escapeHtml(evidenceFieldLabel(citation.field))} · ${citation.page ? `第 ${escapeHtml(citation.page)} 页` : pdf ? "页码尚未定位" : "网页原文"}</p>
+    <blockquote>${escapeHtml(citation.source_text || "未提供原文，不能作为完整字段证据。")}</blockquote>
+    <dl><dt>来源文件</dt><dd>${escapeHtml(citation.document_name || "官方页面")}</dd><dt>获取日期</dt><dd>${escapeHtml(citation.acquired_date || "未知")}</dd><dt>来源检查</dt><dd>${escapeHtml(citation.last_verified_at || "未知")}</dd></dl>
+    ${citation.document_sha256 ? `<p class="source-fingerprint">SHA-256: ${escapeHtml(citation.document_sha256)}</p>` : ""}
+    ${url ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">打开官方原文 ↗</a>` : `<p class="muted">暂无可访问的官方原文链接</p>`}
+  </div>`;
+}
+
+function openSourceEvidence(citation) {
+  const dialog = $("#source-dialog");
+  $("#source-dialog-body").innerHTML = evidenceMarkup(citation);
+  dialog.showModal();
+}
+
 function detailUserGuidanceMarkup(competition, detail) {
   const status = competitionStatus(competition);
-  const min = Number(competition.team_min ?? 1);
-  const max = Number(competition.team_max ?? min);
+  const min = competition.team_min;
+  const max = competition.team_max;
   const teamHint = min === 1 && max === 1
     ? "个人即可参加，不需要提前组队。"
     : competition.team_required
-      ? `需要组队参加，建议准备 ${min}—${max} 人的队伍。`
-      : `可个人参加，也可以组队（${min}—${max} 人）。`;
+      ? `资料记载为组队赛：${teamSizeLabel(competition)}。`
+      : `团队规模：${teamSizeLabel(competition)}，参赛方式以官网为准。`;
   const timeHint = status.cls === "status-open"
-    ? (competition.registration_deadline ? `当前仍可关注，报名截止 ${competition.registration_deadline}。` : "当前仍可关注，具体报名节点请查看官网。")
+    ? (competition.registration_deadline ? `当前仍可关注，报名截止 ${deadlineLabel(competition)}。` : "当前仍可关注，具体报名节点请查看官网。")
     : status.cls === "status-progress"
       ? "赛事已经开始，本届报名通常已结束，可关注后续赛程或下一届通知。"
       : "本届报名已结束，建议关注主办方发布的下一届通知。";
@@ -970,7 +1048,7 @@ function detailUserGuidanceMarkup(competition, detail) {
   ];
   const readyText = status.cls === "status-open"
     ? (detail.recommendation_ready
-      ? "符合基本展示条件，可以结合你的画像决定是否加入项目。"
+      ? "官网来源与关键证据完整，最终报名资格仍以官网审核为准。"
       : "报名前请打开官网核对资格与材料要求。")
     : "本届已结束，可以收藏官网，等待下一届通知。";
   return `<div class="section user-guidance-section"><h3>给你的参赛提示</h3><div class="card user-guidance-card">
@@ -998,22 +1076,27 @@ async function renderDetail(id) {
     return;
   }
   const c = detail.competition;
+  let canJoin = false;
+  let personalReasons = [];
+  if (detail.recommendation_ready && state.uid && state.consent) {
+    try {
+      const eligibility = await apiGet(`/api/users/${encodeURIComponent(state.uid)}/competitions/${encodeURIComponent(id)}/eligibility`);
+      canJoin = eligibility.can_create_project;
+      personalReasons = eligibility.reasons || [];
+    } catch (err) {
+      personalReasons = [err.message];
+    }
+  }
   const kv = (k, v) =>
     `<div class="kv"><span class="k">${escapeHtml(k)}</span><span class="v">${v}</span></div>`;
 
   const grades = c.allowed_grades && c.allowed_grades.length ? c.allowed_grades.join("、") : "不限年级";
   const majors = c.allowed_majors && c.allowed_majors.length ? c.allowed_majors.join("、") : "不限专业";
-  const teamMin = Number(c.team_min ?? 1);
-  const teamMax = Number(c.team_max ?? teamMin);
-  const teamTxt = teamMin === 1 && teamMax === 1
-    ? "个人参赛（1人）"
-    : c.team_required
-      ? `${teamMin}—${teamMax} 人（组队赛）`
-      : `${teamMin}—${teamMax} 人（个人或组队）`;
+  const teamTxt = teamSizeLabel(c);
 
   // 适合谁参加（基于资格要求自动拼接）
   const whoItems = [];
-  if (c.eligible_students && c.eligible_students.length) whoItems.push(c.eligible_students.join("、") + "可参加");
+  if (c.eligible_students && c.eligible_students.length) whoItems.push("资料记载：" + c.eligible_students.join("、"));
   if (grades !== "不限年级") whoItems.push(grades);
   if (majors !== "不限专业") whoItems.push(majors);
   whoItems.push(teamTxt);
@@ -1027,8 +1110,8 @@ async function renderDetail(id) {
 
   // 关键时间（按时间顺序排列）
   const keyTimeItems = [];
-  if (c.registration_deadline) keyTimeItems.push({ label: "报名截止", date: c.registration_deadline });
-  if (c.submission_deadline) keyTimeItems.push({ label: "提交截止", date: c.submission_deadline });
+  if (c.registration_deadline) keyTimeItems.push({ label: "报名截止", date: deadlineLabel(c) });
+  if (c.submission_deadline) keyTimeItems.push({ label: "提交截止", date: deadlineLabel(c, "submission_deadline") });
   if (compRange) keyTimeItems.push({ label: "比赛时间", date: compRange });
   if (c.result_announcement_date) keyTimeItems.push({ label: "成绩公布", date: String(c.result_announcement_date) });
   const keyTimeHtml = keyTimeItems.length
@@ -1047,11 +1130,11 @@ async function renderDetail(id) {
   }
 
   // 顶部“访问官网”链接
-  const officialUrl = c.official_source_url || (detail.sources && detail.sources[0] && detail.sources[0].url) || "";
+  const officialUrl = safeSourceUrl(c.official_source_url || (detail.sources && detail.sources[0] && detail.sources[0].url) || "");
 
 
   $("#detail-content").innerHTML = `
-    <div class="card">
+    <div class="competition-detail">
       <div class="detail-head"><div>
       <div class="comp-title detail-title">${escapeHtml(c.competition_name)}</div>
       <div class="comp-meta">
@@ -1062,10 +1145,12 @@ async function renderDetail(id) {
       </div>
       <div class="detail-actions">
         ${officialUrl ? `<a class="btn ghost" href="${escapeHtml(officialUrl)}" target="_blank" rel="noopener">访问官网</a>` : ""}
-        ${detail.recommendation_ready ? `<button id="join-project" class="btn primary">加入我的项目</button>` : ""}
+        ${canJoin ? `<button id="join-project" class="btn primary">加入我的项目</button>` : ""}
       </div>
     </div>
 
+    ${!detail.recommendation_ready ? `<aside class="source-readiness" role="status"><strong>目录信息，不参与正式推荐</strong><p>${escapeHtml((detail.readiness_reasons || []).join("；") || "当前不满足正式推荐条件")}</p><p>以下资料仅供查阅，不构成资格结论或匹配评分。</p></aside>` : ""}
+    ${personalReasons.length ? `<aside class="source-readiness" role="status"><strong>当前画像暂不能创建参赛项目</strong><p>${escapeHtml(personalReasons.join("；"))}</p></aside>` : ""}
     ${c.brief_description ? `<div class="section"><h3>比赛简介</h3><div class="card"><p class="brief-desc" style="line-height:1.7;color:#30343a;margin:0;white-space:pre-wrap;">${escapeHtml(c.brief_description)}</p></div></div>` : ""}
 
     <div class="section"><h3>适合谁参加</h3><div class="card"><p class="who-text" style="line-height:1.7;color:#30343a;margin:0;">${escapeHtml(whoText)}</p></div></div>
@@ -1091,7 +1176,9 @@ async function renderDetail(id) {
       ${(c.evaluation_dimensions && c.evaluation_dimensions.length) ? kv("评价维度", c.evaluation_dimensions.join("、")) : ""}
     </div></div>
 
-    <div class="section source-note"><p class="muted">以上信息来自赛事官方通知，请以学校官网或赛事官网最新发布为准。</p></div>
+    <section class="section source-evidence-list"><h3>字段证据</h3>${(c.evidence || []).length ? c.evidence.map((item) => `<details><summary>${escapeHtml(evidenceFieldLabel(item.field))} · ${item.page ? `第 ${escapeHtml(item.page)} 页` : "原文"}</summary>${evidenceMarkup(item)}</details>`).join("") : `<p class="muted">尚未补齐官方字段证据。</p>`}</section>
+    <div class="section source-note"><p class="muted">资料按来源状态展示，最终以赛事官网最新通知及官方资格审核为准。</p></div>
+    </div>
   `;
 
   const joinButton = $("#join-project");
@@ -1404,13 +1491,8 @@ function radarFreshnessHours(value) {
 }
 
 function radarHealthForWatch(watch) {
-  const status = String(watch.last_status || "new");
-  const failures = Number(watch.consecutive_failures || 0);
-  const freshness = radarFreshnessHours(watch.last_checked_at);
-  let score = status === "ok" ? 100 : status === "new" ? 78 : status === "error" ? 52 : 24;
-  score -= Math.min(35, failures * 10);
-  if (freshness !== Infinity && freshness > Number(watch.interval_hours || 24) * 2) score -= 15;
-  return Math.max(5, Math.min(100, Math.round(score)));
+  const score = Number(watch.health_score);
+  return Number.isFinite(score) ? Math.max(0, Math.min(100, Math.round(score))) : 0;
 }
 
 function radarWatchRules(watch) {
@@ -1644,23 +1726,24 @@ async function renderRadarOperations() {
   state.radarStatus = data;
   const watches = Array.isArray(data.watches) ? data.watches : [];
   const events = Array.isArray(data.events) ? data.events : [];
-  const healthy = data.healthy_count ?? watches.filter((watch) => ["new", "ok"].includes(watch.last_status)).length;
+  const healthy = data.healthy_count ?? watches.filter((watch) => watch.health_status === "healthy").length;
   const pending = data.pending_count ?? events.filter((event) => event.status === "pending").length;
   $("#radar-admin-watch-count").textContent = data.watch_count ?? watches.length;
   $("#radar-admin-healthy-count").textContent = healthy;
   $("#radar-admin-pending-count").textContent = pending;
 
-  const healthScores = watches.map(radarHealthForWatch);
+  const healthScores = watches.filter((watch) => !["unknown", "paused"].includes(watch.health_status)).map(radarHealthForWatch);
   const healthScore = healthScores.length ? Math.round(healthScores.reduce((sum, value) => sum + value, 0) / healthScores.length) : 0;
-  const degraded = watches.filter((watch) => ["error", "stale"].includes(watch.last_status)).length;
-  const stale = watches.filter((watch) => radarFreshnessHours(watch.last_checked_at) > Number(watch.interval_hours || 24) * 2).length;
+  const degraded = watches.filter((watch) => ["degraded", "critical"].includes(watch.health_status)).length;
+  const stale = watches.filter((watch) => watch.last_success_at && radarFreshnessHours(watch.last_success_at) > Number(watch.interval_hours || 24) * 2).length;
   $("#radar-admin-problem-count").textContent = degraded;
-  const signal = healthScore >= 90 ? "NOMINAL" : healthScore >= 65 ? "DEGRADED" : "CRITICAL";
+  const hasChecks = healthScores.length > 0;
+  const signal = !hasChecks ? "UNSCANNED" : healthScore >= 90 ? "NOMINAL" : healthScore >= 65 ? "DEGRADED" : "CRITICAL";
   $("#radar-signal").textContent = `SIGNAL ${signal}`;
   $("#radar-signal").dataset.signal = signal.toLowerCase();
-  $("#radar-health-overview").innerHTML = `<div class="health-dial" style="--health:${healthScore}"><div><b>${healthScore}</b><span>HEALTH</span></div></div>
+  $("#radar-health-overview").innerHTML = `<div class="health-dial" style="--health:${healthScore}"><div><b>${hasChecks ? healthScore : "—"}</b><span>${hasChecks ? "HEALTH" : "未检查"}</span></div></div>
     <div class="health-facts"><span><b>${healthy}</b>正常来源</span><span><b>${degraded}</b>降级来源</span><span><b>${stale}</b>超时来源</span><span><b>${watches.reduce((sum, watch) => sum + Number(watch.consecutive_failures || 0), 0)}</b>连续失败</span></div>
-    <div class="health-stream">${watches.slice(0, 6).map((watch) => `<span title="${escapeHtml(watch.competition_name || watch.competition_id)}"><i style="width:${radarHealthForWatch(watch)}%"></i><b>${escapeHtml(String(watch.competition_name || watch.competition_id).slice(0, 9))}</b><em>${radarHealthForWatch(watch)}</em></span>`).join("") || '<small>尚无健康样本</small>'}</div>`;
+    <div class="health-stream">${watches.slice(0, 6).map((watch) => `<span title="${escapeHtml(watch.competition_name || watch.competition_id)}"><i style="width:${radarHealthForWatch(watch)}%"></i><b>${escapeHtml(String(watch.competition_name || watch.competition_id).slice(0, 9))}</b><em>${["unknown", "paused"].includes(watch.health_status) ? "—" : radarHealthForWatch(watch)}</em></span>`).join("") || '<small>尚无健康样本</small>'}</div>`;
 
   $("#radar-rules").innerHTML = watches.slice(0, 5).map((watch, index) => `<article>
     <header><span>${String(index + 1).padStart(2, "0")}</span><b>${escapeHtml(watch.competition_name || watch.competition_id)}</b><em>${watch.enabled === false ? "PAUSED" : (watch.monitor_tier === "maintenance" ? "MAINTAIN" : "ACTION")}</em></header>
@@ -1677,7 +1760,7 @@ async function renderRadarOperations() {
 
   $("#radar-watches").innerHTML = watches.map((watch) => {
     const status = ({ new: "等待基线", ok: "正常", error: "暂时异常", stale: "连续失败" })[watch.last_status] || watch.last_status;
-    const health = radarHealthForWatch(watch);
+    const health = ["unknown", "paused"].includes(watch.health_status) ? "—" : radarHealthForWatch(watch);
     const tier = watch.monitor_tier === "maintenance" ? "维护" : "行动";
     return `<div class="radar-watch"><span class="radar-dot status-${escapeHtml(watch.last_status)}"></span><div><b>${escapeHtml(watch.competition_name || watch.competition_id)}</b><a href="${escapeHtml(watch.source_url)}" target="_blank" rel="noopener">${escapeHtml(watch.source_url)}</a><span class="watch-tags"><i>${escapeHtml(tier)}</i><i>${escapeHtml(String(watch.source_type || "auto").toUpperCase())}</i><i>${watch.interval_hours || 24}H</i>${watch.css_selector ? '<i>SELECTOR</i>' : ""}</span></div><small><b>${health}</b>${escapeHtml(status)} · ${escapeHtml(radarTime(watch.last_checked_at))}</small></div>`;
   }).join("") || '<div class="empty-state"><b>尚未配置监控来源</b><span>管理员可从已核验赛事创建监控项。</span></div>';
@@ -1824,7 +1907,7 @@ function renderProjectItems(project, items, empty) {
     return `<div class="project-item ${item.status === "done" ? "done" : ""} ${dependency.blocked ? "blocked" : ""}">
       <input class="item-toggle" type="checkbox" data-pid="${project.project_id}" data-iid="${item.item_id}" ${item.status === "done" ? "checked" : ""} ${dependency.blocked ? "disabled" : ""} />
       <span class="item-title">${escapeHtml(item.title)}${dependencyLabel ? `<small class="dependency-chip" title="${escapeHtml(dependencyLabel)}">${dependency.blocked ? "阻塞" : "依赖"} · ${escapeHtml(dependency.dependencies[0].title)}</small>` : ""}</span>
-      <span class="item-date">${escapeHtml(item.due_date || "无截止")}</span>
+      <span class="item-date">${item.due_date ? `计划 ${escapeHtml(item.due_date)}` : "计划日期待定"}</span>
       <button class="icon-btn item-delete" data-pid="${project.project_id}" data-iid="${item.item_id}" title="删除条目">×</button>
     </div>`;
   }).join("");
@@ -1845,12 +1928,12 @@ function renderProjectsList(projects) {
           <select class="project-status" data-pid="${p.project_id}" aria-label="更新项目状态">
             ${Object.entries(PROJECT_STATUS).map(([value, label]) => `<option value="${value}" ${p.status === value ? "selected" : ""}>${label}</option>`).join("")}
           </select>
-          <a class="btn" href="/api/users/${encodeURIComponent(state.uid)}/projects/${p.project_id}/calendar.ics">导出 ICS</a>
+          <button type="button" class="btn project-calendar-export" data-pid="${p.project_id}" title="下载项目日历">导出 ICS</button>
           <button class="btn danger project-delete" data-pid="${p.project_id}">删除项目</button>
         </div>
       </header>
-      ${p.recommendation_ready ? "" : `<div class="project-trust-warning">来源状态已变化：${escapeHtml((p.readiness_reasons || []).join("；"))}。项目数据已保留，请重新核对官网。</div>`}
-      <div class="deadline-strip"><span>报名截止 <b>${escapeHtml(p.registration_deadline || "未明确")}</b></span><span>提交截止 <b>${escapeHtml(p.submission_deadline || "未明确")}</b></span></div>
+      ${p.recommendation_ready ? "" : `<div class="project-trust-warning">参赛条件或来源状态已变化：${escapeHtml((p.readiness_reasons || []).join("；"))}。项目数据已保留，请确认画像并重新核对官网。</div>`}
+      <div class="deadline-strip"><span>报名截止 <b>${escapeHtml(deadlineLabel(p))}</b></span><span>提交截止 <b>${escapeHtml(deadlineLabel(p, "submission_deadline"))}</b></span></div>
       <div class="progress-line"><span style="width:${pct}%"></span></div><div class="progress-copy">已完成 ${done}/${p.items.length} · ${pct}%</div>
       <div class="project-columns">
         <section><h4>任务计划 <span>${tasks.length}</span></h4>${renderProjectItems(p, tasks, "暂无任务")}</section>
@@ -2006,6 +2089,23 @@ async function renderProjects() {
       renderProjects();
     } catch (error) { toast(error.message); }
   }));
+  $$(".project-calendar-export", box).forEach((button) => button.addEventListener("click", async () => {
+    button.disabled = true;
+    try {
+      const response = await fetch(`/api/users/${encodeURIComponent(state.uid)}/projects/${button.dataset.pid}/calendar.ics`, { headers: sessionAuthHeaders() });
+      if (!response.ok) throw new Error(`日历下载失败（${response.status}）`);
+      const url = URL.createObjectURL(await response.blob());
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `project-${button.dataset.pid}.ics`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      toast("项目日历已导出");
+    } catch (error) { toast(error.message); }
+    finally { button.disabled = false; }
+  }));
   $$(".item-toggle", box).forEach((el) => el.addEventListener("change", async () => {
     try {
       await apiPatch(`/api/users/${encodeURIComponent(state.uid)}/projects/${el.dataset.pid}/items/${el.dataset.iid}`, { status: el.checked ? "done" : "todo" });
@@ -2091,7 +2191,7 @@ function renderAgentInline(text) {
   return escapeHtml(text || "")
     .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
     .replace(/`([^`]+)`/g, "<code>$1</code>")
-    .replace(/\s*\[\d+\]/g, "");
+    .replace(/\[(\d+)\]/g, '<button type="button" class="source-cite" data-source-index="$1" title="查看官方原文" aria-label="查看引用 $1">[$1]</button>');
 }
 
 // 将回答整理成真正可读的段落与列表，避免把整段内容堆成一块文本。
@@ -2304,6 +2404,15 @@ const INTENT_LABEL = {
   team: "组队文案", teammate: "队友匹配", chat: "参赛建议", unknown: "需要补充信息",
 };
 
+let agentContext = null;
+document.getElementById("agent-context-clear").addEventListener("click", () => {
+  agentContext = null;
+  document.getElementById("agent-cid").value = "";
+  document.getElementById("agent-context-clear").hidden = true;
+  const option = document.querySelector('#agent-cid option[value=""]');
+  if (option) option.textContent = "自动识别";
+});
+
 async function agentAsk() {
   const qEl = $("#agent-q");
   const q = (qEl.value || "").trim();
@@ -2340,6 +2449,9 @@ async function agentAsk() {
   let url = `/api/agent/ask?question=${encodeURIComponent(q)}&top_k=4`;
   if (uid) url += `&user_id=${encodeURIComponent(uid)}`;
   if (cid) url += `&competition_id=${encodeURIComponent(cid)}`;
+  if (!cid && agentContext && agentContext.uid === state.uid) {
+    url += `&context_competition_id=${encodeURIComponent(agentContext.id)}`;
+  }
   const mdlEl = document.getElementById("agent-model");
   const mdl = mdlEl && !mdlEl.disabled && mdlEl.value ? mdlEl.value : "";
   if (mdl) url += `&model=${encodeURIComponent(mdl)}`;
@@ -2357,11 +2469,23 @@ async function agentAsk() {
   }
 
   const citeList = Array.isArray(data.citations) ? data.citations : [];
+  if (data.resolved_competition) {
+    agentContext = { id: data.resolved_competition, uid: state.uid };
+    const option = document.querySelector('#agent-cid option[value=""]');
+    if (option) option.textContent = `自动识别 · ${data.resolved_name || data.resolved_competition}`;
+    document.getElementById("agent-context-clear").hidden = false;
+  } else {
+    agentContext = null;
+    document.getElementById("agent-context-clear").hidden = true;
+    const option = document.querySelector('#agent-cid option[value=""]');
+    if (option) option.textContent = "自动识别";
+  }
 
   const intentTag = `<span class="intent-tag">${INTENT_LABEL[data.intent] || data.intent} · ${escapeHtml(data.resolved_name || "自动识别赛事")}</span>`;
 
   const traceHtml = renderDecisionTheater(data.trace, data);
-  const agentTaskHtml = (uid && data.resolved_competition && ["recommend", "chat", "team"].includes(data.intent))
+  const agentTaskHtml = (uid && data.resolved_competition && !data.pending_review
+    && data.gate?.eligible === true && ["recommend", "chat", "team"].includes(data.intent))
     ? `<div class="agent-action-strip"><span>把建议落到执行闭环</span><button type="button" class="btn primary agent-create-task" data-cid="${escapeHtml(data.resolved_competition)}" data-cite="${citeList[0] ? escapeHtml(citeList[0].citation_id || "") : ""}">一键转为我的任务</button></div>`
     : "";
   // 联网信息补充（与官方 [n] 引用区隔，明确标注仅供参考）
@@ -2383,7 +2507,7 @@ async function agentAsk() {
   currentTeammates = data.teammate_matches || [];
   const teammateHtml = (currentTeammates.length)
     ? `<div class="teammate-cards">
-        <div class="teammate-cards-head">🤝 为你匹配的互补队友</div>
+        <div class="teammate-cards-head">虚构画像匹配演示，不代表真实可联系队友</div>
         ${currentTeammates.map((m, idx) => `
           <div class="teammate-card">
             <div class="tm-avatar">${escapeHtml(m.avatar || "🙂")}</div>
@@ -2410,6 +2534,7 @@ async function agentAsk() {
     <div class="agent-answer-head"><strong>校园科创智能体</strong>${intentTag}</div>
     <div class="${bodyClass}">${answerHtml}</div>
     ${expandBtn}
+    ${citeList.length ? `<details class="source-evidence-list"><summary>官方字段证据 · ${citeList.length} 条</summary>${citeList.map((item, index) => `<button type="button" class="source-reference" data-source-index="${index + 1}">[${index + 1}] ${escapeHtml(evidenceFieldLabel(item.field))}${item.page ? ` · 第 ${escapeHtml(item.page)} 页` : ""}</button>`).join("")}</details>` : ""}
     ${webHtml}
     ${teammateHtml}
     ${agentTaskHtml}
@@ -2418,6 +2543,13 @@ async function agentAsk() {
   </div>`;
 
   bindDecisionTheater(aRow);
+  aRow.querySelectorAll("[data-source-index]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const citation = citeList[Number(button.dataset.sourceIndex) - 1];
+      if (citation) openSourceEvidence(citation);
+      else toast("该引用未提供原文证据，请查看赛事官网。");
+    });
+  });
   const agentTaskButton = $(".agent-create-task", aRow);
   if (agentTaskButton) agentTaskButton.addEventListener("click", async () => {
     try {
@@ -2505,6 +2637,14 @@ async function refreshLlmStatus() {
     el.dataset.on = on ? "1" : "0";
     const modelSelect = document.getElementById("agent-model");
     const modelWrap = modelSelect && modelSelect.closest(".model-select");
+    if (modelSelect) {
+      const available = r.models || [r.model];
+      const selected = modelSelect.value || localStorage.getItem("agent_model");
+      modelSelect.innerHTML = available.filter(Boolean).map((model) =>
+        `<option value="${escapeHtml(model)}">${escapeHtml(model)}</option>`).join("");
+      modelSelect.value = available.includes(selected) ? selected : r.model;
+      localStorage.setItem("agent_model", modelSelect.value);
+    }
     if (modelSelect) modelSelect.disabled = !on;
     if (modelWrap) modelWrap.classList.toggle("is-disabled", !on);
     const mdl = (modelSelect || {}).value || "";
@@ -2616,6 +2756,7 @@ function closeInviteModal() {
 let admFileId = null;
 let admDocName = null;
 let admDocumentId = null;
+let admDocumentSha = null;
 let admBlocks = [];
 let admEvidence = [];
 
@@ -2635,8 +2776,9 @@ function csv(s) {
   return (s || "").split(/[,，]/).map((x) => x.trim()).filter(Boolean);
 }
 function todayStr() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
+  const value = (type) => parts.find((part) => part.type === type).value;
+  return `${value("year")}-${value("month")}-${value("day")}`;
 }
 
 // 解析奖项比例文本：支持 "奖项 比例" 或 "奖项:比例"，多行/逗号/空格分隔
@@ -2669,7 +2811,8 @@ function setAdminStep(step) {
 }
 
 function renderAdminView() {
-  admFileId = null; admDocName = null; admDocumentId = null; admBlocks = []; admEvidence = [];
+  admFileId = null; admDocName = null; admDocumentId = null; admDocumentSha = null; admBlocks = []; admEvidence = [];
+  $("#adm-form").reset();
   $("#adm-parse-msg").textContent = "";
   $("#adm-step2").classList.add("hidden");
   $("#adm-step3").classList.add("hidden");
@@ -2693,6 +2836,8 @@ async function adminParse() {
   if (!fileInput.files.length) { toast("请先选择 PDF/Word 文件"); return; }
   $("#adm-parse-msg").textContent = "读取文件中…";
   const file = fileInput.files[0];
+  $("#adm-form").reset();
+  admEvidence = [];
   let b64;
   try {
     b64 = await fileToBase64(file);
@@ -2709,6 +2854,7 @@ async function adminParse() {
   }
   admFileId = up.file_id; admDocName = up.filename;
   admDocumentId = up.document_id || null;
+  admDocumentSha = up.sha256 || null;
   const payload = {
     file_id: up.file_id,
     document_id: up.document_id,
@@ -2744,7 +2890,10 @@ function renderAdminBlocks(blocks) {
     <option value="team_min">团队最少人数</option>
     <option value="team_max">团队最多人数</option>
     <option value="registration_deadline">报名截止</option>
+    <option value="registration_deadline_at">报名精确截止时刻</option>
     <option value="submission_deadline">提交截止</option>
+    <option value="submission_deadline_at">提交精确截止时刻</option>
+    <option value="deadline_timezone">官方时区依据</option>
     <option value="eligible_students">参赛对象</option>
     <option value="required_skills">所需技能</option>
     <option value="required_materials">所需材料</option>
@@ -2768,8 +2917,13 @@ function renderAdminBlocks(blocks) {
         page: b.page,
         source_text: b.text,
         document_name: admDocName,
+        document_id: admDocumentId,
+        document_sha256: admDocumentSha,
+        rects: b.rects || [],
+        anchor_quality: b.anchor_quality || "page_only",
         source_url: ($("#adm-url").value || "").trim() || null,
-        acquired_date: todayStr(),
+        acquired_date: $("#adm-acquired").value || null,
+        last_verified_at: $("#adm-checked").value || null,
       });
       renderAdminEvidence();
       toast("已关联「" + field + "」引用");
@@ -2807,9 +2961,12 @@ function prefillAdminForm(s, year) {
   if (s.submission_deadline && s.submission_deadline.value) {
     $("#adm-sub").value = s.submission_deadline.value;
   }
+  $("#adm-reg-time").value = s.registration_deadline_time?.value || "";
+  $("#adm-sub-time").value = s.submission_deadline_time?.value || "";
   if (s.eligible && s.eligible.value) {
+    const values = Array.isArray(s.eligible.value) ? s.eligible.value : [s.eligible.value];
     $$(".adm-education").forEach((el) => {
-      if (el.dataset.value === s.eligible.value) el.checked = true;
+      el.checked = values.includes(el.dataset.value);
     });
   }
 }
@@ -2823,6 +2980,26 @@ $("#adm-form").addEventListener("submit", async (e) => {
   if (!id || !name) { toast("请填写赛事ID和赛事名称"); return; }
   const elig = $$(".adm-education:checked").map((el) => el.dataset.value);
   const urlVal = ($("#adm-url").value || "").trim();
+  const acquired = $("#adm-acquired").value || null;
+  const checked = $("#adm-checked").value || null;
+  const confirmed = $("#adm-source-confirmed").checked;
+  if (confirmed && (!urlVal || !acquired || !checked || checked < acquired || checked > todayStr())) {
+    toast("请填写官网链接及有效的获取、检查日期"); return;
+  }
+  const basis = $("#adm-timezone-basis").value;
+  const offset = $("#adm-offset").value;
+  if (basis === "campus_default" && offset !== "+08:00") {
+    toast("校园假设使用 UTC+08:00；其他时区需官方依据"); return;
+  }
+  const exactDeadline = (prefix) => {
+    const date = $(`#adm-${prefix}`).value;
+    const time = $(`#adm-${prefix}-time`).value;
+    if (time && !date) throw new Error("填写精确时刻时必须同时填写对应日期");
+    return time ? `${date}T${time.length === 5 ? time + ":00" : time}${offset}` : null;
+  };
+  let registrationAt, submissionAt;
+  try { registrationAt = exactDeadline("reg"); submissionAt = exactDeadline("sub"); }
+  catch (err) { toast(err.message); return; }
   const comp = {
     competition_id: id,
     competition_name: name,
@@ -2836,7 +3013,10 @@ $("#adm-form").addEventListener("submit", async (e) => {
     team_min: $("#adm-tmin").value ? Number($("#adm-tmin").value) : null,
     team_max: $("#adm-tmax").value ? Number($("#adm-tmax").value) : null,
     registration_deadline: $("#adm-reg").value || null,
+    registration_deadline_at: registrationAt,
     submission_deadline: $("#adm-sub").value || null,
+    submission_deadline_at: submissionAt,
+    deadline_timezone_basis: basis,
     competition_start_date: $("#adm-comp-start").value || null,
     competition_end_date: $("#adm-comp-end").value || null,
     result_announcement_date: $("#adm-result").value || null,
@@ -2847,15 +3027,19 @@ $("#adm-form").addEventListener("submit", async (e) => {
     evaluation_dimensions: [],
     required_skills: csv($("#adm-skills").value),
     official_source_url: urlVal || null,
-    source_acquired_date: todayStr(),
-    evidence: admEvidence,
+    official_source_status: confirmed ? "found" : null,
+    source_acquired_date: acquired,
+    last_verified_at: confirmed ? checked : null,
+    evidence: admEvidence.map((item) => ({ ...item, source_url: urlVal || null, acquired_date: acquired, last_verified_at: confirmed ? checked : null })),
     doc_version: `${$("#adm-year").value || 2026}_v1`,
   };
   $("#adm-save-msg").textContent = "入库中…";
   setAdminStep(3);
   try {
     const d = await apiPost("/api/admin/competitions", comp, adminHeaders());
-    $("#adm-save-msg").textContent = `✓ 已入库 ${d.competition_id}（证据 ${d.evidence_count} 条，RAG ${d.rag_chunks} 块）`;
+    const sourceState = d.recommendation_ready ? "关键证据完整" : "待补充证据候选";
+    const ragState = d.rag_chunks < 0 ? "检索同步失败" : `RAG ${d.rag_chunks} 块`;
+    $("#adm-save-msg").textContent = `已入库 ${d.competition_id} · ${sourceState} · 证据 ${d.evidence_count} 条 · ${ragState}${d.readiness_reasons.length ? " · " + d.readiness_reasons.join("；") : ""}`;
     $("#adm-save-msg").className = "msg ok";
     setAdminStep(4);
     toast("入库成功，已刷新检索库");
@@ -2993,7 +3177,10 @@ $("#admin-entry-btn").addEventListener("click", async () => {
   const token = window.prompt("请输入管理员令牌：");
   if (!token) return;
   try {
-    await apiPost("/api/admin/verify", { token });
+    const response = await fetch("/api/admin/verify", {
+      method: "POST", headers: { "X-Admin-Token": token },
+    });
+    if (!response.ok) throw new Error("管理员验证失败");
     state.isAdmin = true;
     localStorage.setItem("cia_is_admin", "1");
     sessionStorage.setItem("cia_admin_token", token);

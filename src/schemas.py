@@ -11,11 +11,11 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime, timedelta
 from enum import Enum
 from typing import Any, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 # ---------------------------------------------------------------------------
 # 枚举与常量
@@ -59,6 +59,29 @@ class Grade(str, Enum):
     SOPHOMORE = "大二"
     JUNIOR = "大三"
     SENIOR = "大四"
+    FIFTH_YEAR = "大五"
+    MASTER_FIRST = "研一"
+    MASTER_SECOND = "研二"
+    MASTER_THIRD = "研三"
+    MASTER_FOURTH = "研四及以上"
+    DOCTOR_FIRST = "博一"
+    DOCTOR_SECOND = "博二"
+    DOCTOR_THIRD = "博三"
+    DOCTOR_FOURTH = "博四及以上"
+    GRADUATED = "已毕业"
+    UNKNOWN = "待确认"
+
+
+def grades_for_education(education: EducationLevel) -> tuple[Grade, ...]:
+    if education == EducationLevel.POSTGRADUATE:
+        return (Grade.MASTER_FIRST, Grade.MASTER_SECOND, Grade.MASTER_THIRD, Grade.MASTER_FOURTH,
+                Grade.DOCTOR_FIRST, Grade.DOCTOR_SECOND, Grade.DOCTOR_THIRD, Grade.DOCTOR_FOURTH)
+    if education == EducationLevel.RECENT_GRADUATE:
+        return (Grade.GRADUATED,)
+    grades = (Grade.FRESHMAN, Grade.SOPHOMORE, Grade.JUNIOR)
+    if education in {EducationLevel.UNDERGRADUATE, EducationLevel.VOCATIONAL_UNDERGRADUATE}:
+        return (*grades, Grade.SENIOR, Grade.FIFTH_YEAR)
+    return grades
 
 
 class TrustedLevel(str, Enum):
@@ -213,6 +236,9 @@ class Competition(BaseModel):
     # —— 时间相关 ——
     registration_deadline: Optional[date] = None
     submission_deadline: Optional[date] = None
+    registration_deadline_at: Optional[datetime] = None
+    submission_deadline_at: Optional[datetime] = None
+    deadline_timezone_basis: Literal["official", "campus_default"] = "campus_default"
     result_announcement_date: Optional[date] = None  # 成绩公布日期
     competition_start_date: Optional[date] = None    # 比赛开始日期
     competition_end_date: Optional[date] = None      # 比赛结束日期
@@ -245,6 +271,20 @@ class Competition(BaseModel):
 
     # —— 文档版本隔离用 ——
     doc_version: str = Field("1.0", description="同一赛事同一年份的文档版本，如 2026_v1")
+
+    @model_validator(mode="after")
+    def consistent_deadline_timestamps(self):
+        for name in ("registration_deadline", "submission_deadline"):
+            timestamp = getattr(self, name + "_at")
+            if timestamp is None:
+                continue
+            if timestamp.tzinfo is None or timestamp.utcoffset() is None:
+                raise ValueError(f"{name}_at requires an explicit UTC offset")
+            if getattr(self, name) != timestamp.date():
+                raise ValueError(f"{name}_at must match the official date field")
+            if self.deadline_timezone_basis == "campus_default" and timestamp.utcoffset() != timedelta(hours=8):
+                raise ValueError("campus_default requires UTC+08:00")
+        return self
 
     def is_registration_open(self, current: date) -> bool:
         return self.registration_deadline is not None and self.registration_deadline >= current
@@ -503,6 +543,9 @@ class UserProject(BaseModel):
     document_year: int
     registration_deadline: Optional[date] = None
     submission_deadline: Optional[date] = None
+    registration_deadline_at: Optional[datetime] = None
+    submission_deadline_at: Optional[datetime] = None
+    deadline_timezone_basis: Literal["official", "campus_default"] = "campus_default"
     status: ProjectStatus = ProjectStatus.PLANNED
     created_at: str
     recommendation_ready: bool = True

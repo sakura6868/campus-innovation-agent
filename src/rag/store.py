@@ -45,8 +45,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 # 才在 CompetitionRAG.__init__ 内惰性导入；未安装时自动降级到纯本地检索，避免启动失败。
 
 import db  # 延迟可用的数据访问层（用于 Chroma 不可用时的本地降级检索）
-from fact_formatting import format_team_size
-from schemas import Citation, Competition, TrustedLevel
+from schemas import Citation, Competition
 
 # ---------------------------------------------------------------------------
 # Embedding：优先 sentence-transformers，回退轻量哈希向量
@@ -205,9 +204,10 @@ class CompetitionRAG:
         # 仅在「真实 embedding + 远程 Chroma 服务」时才写 Chroma。
         # 否则（离线轻量向量，或本环境 Chroma 持久化不稳定）跳过 Chroma 写入，
         # 检索直接读 DB（本地关键词 / 语义本地余弦），引用更可靠且避免磁盘错误。
+        _SEM_CACHE.pop(comp.competition_id, None)
         use_chroma = _has_real_embedding() and str(self.backend).startswith("http")
         if not use_chroma:
-            return 0
+            return len(self._build_blocks(comp))
 
         collection = self._get_collection(comp.competition_id)
         # 幂等：清空该集合旧数据（按 competition_id 过滤删除）
@@ -221,7 +221,7 @@ class CompetitionRAG:
         metadatas: list[dict] = []
 
         def _add(seg_id: str, text: str, field: str, page, source_url, doc_name,
-                 acquired, verified, trusted):
+                 acquired, verified, trusted, evidence_index: int):
             if not text:
                 return
             documents.append(text)
@@ -230,34 +230,17 @@ class CompetitionRAG:
                 "competition_id": comp.competition_id,
                 "document_year": comp.document_year,
                 "doc_version": comp.doc_version or f"{comp.document_year}_v1",
+                "evidence_index": evidence_index,
                 "field": field,
                 "page": -1 if page is None else int(page),
                 "source_url": source_url or "",
-                "document_name": doc_name or f"{comp.competition_name}_{comp.document_year}_官方通知",
-                "acquired_date": acquired or (comp.source_acquired_date or ""),
-                "last_verified_at": verified or (comp.last_verified_at or ""),
+                "document_name": doc_name or "",
+                "acquired_date": acquired or "",
+                "last_verified_at": verified or "",
                 "trusted_level": trusted or (comp.trusted_level.value if hasattr(comp.trusted_level, "value") else str(comp.trusted_level)),
             })
 
-        # 1) 结构化字段生成的自然语言片段（可被语义检索命中）
-        team_txt = format_team_size(comp.team_min, comp.team_max)
-        eligible = "、".join(getattr(s, "value", str(s)) for s in (comp.eligible_students or [])) or "未明确"
-        majors = "、".join(comp.allowed_majors) if comp.allowed_majors else "不限专业"
-        grades = "、".join(getattr(g, "value", str(g)) for g in comp.allowed_grades) if comp.allowed_grades else "不限年级"
-        materials = "、".join(comp.required_materials) or "未明确"
-        skills = "、".join(comp.required_skills) or "未明确"
-
-        default_url = comp.official_source_url
-        _add("f_team", f"团队人数要求：{team_txt}。", "team_max", None, default_url, None, None, None, None)
-        _add("f_eligible", f"参赛对象：{eligible}。", "eligible_students", None, default_url, None, None, None, None)
-        _add("f_major", f"专业要求：{majors}。", "allowed_majors", None, default_url, None, None, None, None)
-        _add("f_grade", f"年级要求：{grades}。", "allowed_grades", None, default_url, None, None, None, None)
-        _add("f_reg", f"报名截止时间：{comp.registration_deadline or '未明确'}。", "registration_deadline", None, default_url, None, None, None, None)
-        _add("f_sub", f"提交截止时间：{comp.submission_deadline or '未明确'}。", "submission_deadline", None, default_url, None, None, None, None)
-        _add("f_mat", f"所需材料：{materials}。", "required_materials", None, default_url, None, None, None, None)
-        _add("f_skill", f"所需技能：{skills}。", "required_skills", None, default_url, None, None, None, None)
-
-        # 2) 逐条证据原文（真实原文，携带页码与链接，检索质量最高）
+        # Generated summaries are facts, not quotations. Index only saved source evidence.
         for i, e in enumerate(comp.evidence or []):
             _add(
                 f"ev_{i}",
@@ -269,6 +252,7 @@ class CompetitionRAG:
                 e.acquired_date,
                 e.last_verified_at,
                 e.trusted_level.value if hasattr(e.trusted_level, "value") else str(e.trusted_level),
+                i,
             )
 
         if documents:
@@ -303,6 +287,10 @@ class CompetitionRAG:
         三种路径都强制 competition_id 隔离。"""
         comp = db.get_competition(competition_id)  # type: ignore[name-defined]
         if comp is None:
+            return []
+        if document_year is not None and document_year != comp.document_year:
+            return []
+        if doc_version is not None and doc_version != comp.doc_version:
             return []
 
         if _has_real_embedding():
@@ -347,78 +335,29 @@ class CompetitionRAG:
             include=["documents", "metadatas", "distances"],
         )
         citations: list[Citation] = []
+        comp = db.get_competition(competition_id)
+        if comp is None:
+            return []
         docs = (res.get("documents") or [[]])[0]
         metas = (res.get("metadatas") or [[]])[0]
         for doc, meta in zip(docs, metas):
             meta = meta or {}
-            page = meta.get("page")
-            page = None if page in (None, -1) else int(page)
-            trusted = meta.get("trusted_level") or "A"
-            try:
-                trusted_enum = TrustedLevel(trusted)
-            except (ValueError, TypeError):
-                trusted_enum = TrustedLevel.A
-            citations.append(
-                Citation(
-                    field=meta.get("field") or "retrieved_chunk",
-                    page=page,
-                    source_text=doc,
-                    document_name=meta.get("document_name"),
-                    source_url=meta.get("source_url") or None,
-                    acquired_date=meta.get("acquired_date") or None,
-                    last_verified_at=meta.get("last_verified_at") or None,
-                    trusted_level=trusted_enum,
-                )
-            )
+            index = meta.get("evidence_index")
+            if type(index) is not int or not 0 <= index < len(comp.evidence):
+                continue
+            evidence = comp.evidence[index]
+            if (meta.get("document_year") != comp.document_year
+                    or meta.get("doc_version") != comp.doc_version
+                    or meta.get("field") != evidence.field or doc != evidence.source_text):
+                continue
+            citations.append(evidence.model_copy(deep=True))
         return citations
 
     # —— 降级 / 语义本地检索：不依赖 Chroma，直接基于 DB 块做隔离检索 ——
     def _build_blocks(self, comp: Competition) -> list[Citation]:
         """把一个赛事的可检索片段（结构化字段 + 证据原文）构造成 Citation 列表，
         供本地关键词检索与语义余弦检索共用。始终按 competition_id 隔离。"""
-        blocks: list[Citation] = []
-        team_txt = format_team_size(comp.team_min, comp.team_max)
-        default_doc = f"{comp.competition_name}_{comp.document_year}_官方通知"
-
-        def _mk(field: str, text: str, cit: Optional[Citation] = None) -> None:
-            blocks.append(
-                Citation(
-                    field=field,
-                    page=cit.page if cit else None,
-                    source_text=text,
-                    document_name=cit.document_name if cit else default_doc,
-                    source_url=cit.source_url if cit else comp.official_source_url,
-                    acquired_date=cit.acquired_date if cit else comp.source_acquired_date,
-                    last_verified_at=cit.last_verified_at if cit else comp.last_verified_at,
-                    trusted_level=cit.trusted_level if cit else comp.trusted_level,
-                )
-            )
-
-        _mk("team_max", f"团队人数要求：{team_txt}。")
-        _mk("eligible_students", f"参赛对象：{'、'.join(getattr(s, 'value', str(s)) for s in (comp.eligible_students or [])) or '未明确'}。")
-        _mk("allowed_majors", f"专业要求：{'、'.join(comp.allowed_majors) if comp.allowed_majors else '不限专业'}。")
-        _mk("allowed_grades", f"年级要求：{'、'.join(getattr(g, 'value', str(g)) for g in comp.allowed_grades) if comp.allowed_grades else '不限年级'}。")
-        _mk("registration_deadline", f"报名截止时间：{comp.registration_deadline or '未明确'}。")
-        _mk("submission_deadline", f"提交截止时间：{comp.submission_deadline or '未明确'}。")
-        if comp.required_materials:
-            _mk("required_materials", f"所需材料：{'、'.join(comp.required_materials)}。")
-        if comp.required_skills:
-            _mk("required_skills", f"所需技能：{'、'.join(comp.required_skills)}。")
-        # 证据原文（真实标注）也作为可检索块，且保留其原始引用元数据
-        for e in comp.evidence or []:
-            blocks.append(
-                Citation(
-                    field=e.field,
-                    page=e.page,
-                    source_text=e.source_text,
-                    document_name=e.document_name,
-                    source_url=e.source_url,
-                    acquired_date=e.acquired_date,
-                    last_verified_at=e.last_verified_at,
-                    trusted_level=e.trusted_level,
-                )
-            )
-        return blocks
+        return [item.model_copy(deep=True) for item in comp.evidence if item.source_text.strip()]
 
     def _local_query(self, comp: Competition, question: str, top_k: int) -> list[Citation]:
         """离线关键词重叠检索（不依赖任何外部服务）。"""

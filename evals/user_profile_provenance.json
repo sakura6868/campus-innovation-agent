@@ -1,0 +1,9 @@
+{
+  "profile_source": "real_user_profiles_confirmed_by_project_owner",
+  "confirmation_date": "2026-10-03",
+  "confirmation_basis": "项目负责人在对话中明确确认：这些是真人的数据。",
+  "independent_source_verification": false,
+  "execution_method": "automated_api_and_browser_reproduction",
+  "test_account_source": "generated_isolated_test_accounts",
+  "scope_note": "画像数据来源按负责人确认更正；既有测试响应、断言、耗时、通过率和执行指纹不变。不据此声明真人亲自操作、满意度或线上验收。"
+}

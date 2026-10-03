@@ -113,13 +113,38 @@ class SubmissionCases(unittest.TestCase):
         self.assertEqual(first.project_id, second.project_id)
         self.assertEqual(len(db.list_user_projects(self.user_id)), 1)
 
-    def test_03_unverified_competition_with_basics_can_become_project(self) -> None:
-        project = db.create_user_project(self.user_id, "accounting_2026")
-        self.assertEqual(project.competition_id, "accounting_2026")
+    def test_unknown_submission_date_is_not_replaced_by_registration(self) -> None:
+        project = db.create_user_project(self.user_id, self.OPEN_COMPETITION_ID)
+        self.assertIsNone(project.submission_deadline)
+        relevant = [item for item in project.items if item.phase == "submission"]
+        self.assertTrue(relevant)
+        self.assertTrue(all(item.due_date is None for item in relevant))
+
+    def test_03_unverified_competition_cannot_become_project(self) -> None:
+        candidate = db.get_competition(self.OPEN_COMPETITION_ID).model_copy(update={"data_status": DataStatus.UNVERIFIED})
+        db.upsert_competition(candidate)
+        try:
+            with self.assertRaisesRegex(ValueError, "competition_basic_info_incomplete"):
+                db.create_user_project(self.user_id, self.OPEN_COMPETITION_ID)
+        finally:
+            db.upsert_competition(candidate.model_copy(update={"data_status": DataStatus.VERIFIED}))
 
     def test_04_expired_competition_cannot_become_project(self) -> None:
         with self.assertRaisesRegex(ValueError, "competition_expired"):
             db.create_user_project(self.user_id, self.EXPIRED_COMPETITION_ID)
+
+    def test_downgraded_existing_project_is_preserved_with_warning(self) -> None:
+        original = db.get_competition(self.OPEN_COMPETITION_ID)
+        project = db.create_user_project(self.user_id, self.OPEN_COMPETITION_ID)
+        db.upsert_competition(original.model_copy(update={"data_status": DataStatus.UNVERIFIED}))
+        try:
+            saved = db.get_user_project(self.user_id, project.project_id)
+            self.assertIsNotNone(saved)
+            self.assertFalse(saved.recommendation_ready)
+            self.assertTrue(saved.readiness_reasons)
+            self.assertTrue(saved.items)
+        finally:
+            db.upsert_competition(original)
 
     def test_05_project_deadline_is_read_from_competition(self) -> None:
         project = db.create_user_project(self.user_id, self.OPEN_COMPETITION_ID)
@@ -177,13 +202,10 @@ class SubmissionCases(unittest.TestCase):
         self.assertTrue(any(c["field"] == "registration_deadline" for c in result["citations"]))
         self.assertTrue(result["citations"])
 
-    def test_13_no_year_resolves_latest_verified_version(self) -> None:
-        # 同名多年份且存在「已锚定官方来源」版本时，未指定年份默认按最新届作答
-        # （不再卡在「请明确年份」，避免常见赛事无法触发润色与引用）。
+    def test_13_no_year_requires_clarification_without_ready_version(self) -> None:
         result = run_agent("蓝桥杯报名截止")
-        self.assertEqual(result["resolved_competition"], "lanqiao_2026")
-        self.assertTrue(any(c["field"] == "registration_deadline" for c in result["citations"]))
-        self.assertTrue(result["answer"].strip())
+        self.assertIsNone(result["resolved_competition"])
+        self.assertIn("请明确年份", result["answer"])
 
     def test_14_explicit_year_resolves_requested_version(self) -> None:
         result = run_agent("2026年蓝桥杯报名截止")

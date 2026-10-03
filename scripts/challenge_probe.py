@@ -14,13 +14,14 @@
 可复现：venv/Scripts/python.exe scripts/challenge_probe.py
 """
 import json
+import os
 import re
 import time
 import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 
-BASE = "http://127.0.0.1:8011"
+BASE = os.getenv("EVAL_BASE_URL", "http://127.0.0.1:8011").rstrip("/")
 USER = "test"
 PASS = "test123"
 TIMEOUT = 30  # 秒；单题超时为失败（LLM 润色不超过此上限）

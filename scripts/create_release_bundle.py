@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import json
 from datetime import datetime
 from pathlib import Path, PurePosixPath
 from zipfile import ZIP_DEFLATED, ZipFile
@@ -24,6 +25,7 @@ DEFAULT_INCLUDE_DIRS = (
     "tests",
     "scripts",
     "data/ground_truth",
+    "data/official_sources",
     "demo",
 )
 DEFAULT_INCLUDE_FILES = (
@@ -35,26 +37,35 @@ DEFAULT_INCLUDE_FILES = (
     "render.yaml",
     "start.ps1",
     "start.sh",
+    "start_local.bat",
+    "data/core_competitions_manifest.json",
+    "requirements-dev.txt",
+    "pytest.ini",
     ".env.example",
     ".gitignore",
+    ".dockerignore",
 )
 EXCLUDED_PARTS = {
-    "__pycache__", ".git", ".github", "venv", "venv312", "design-concepts", "backups", "tmp", "voice-previews"
+    "__pycache__", ".git", ".github", "venv", "venv312", "design-concepts", "backups", "tmp", "voice-previews", "_archive", ".playwright-cli"
 }
-EXCLUDED_SUFFIXES = {".db", ".sqlite3", ".pyc", ".pyo", ".zip"}
+EXCLUDED_SUFFIXES = {".db", ".sqlite", ".sqlite3", ".pyc", ".pyo", ".zip"}
 EXCLUDED_NAMES = {".env", "campus_agent.db"}
 
 
 def should_include(path: Path) -> bool:
     """只保留可复现的源码、文档和 Ground Truth，不打包运行产物或密钥。"""
     relative = path.relative_to(PROJECT_ROOT)
+    if path.name.startswith(".env") and path.name != ".env.example":
+        return False
+    if any(marker in path.name.lower() for marker in (".db-", ".db.bak", ".sqlite-", ".sqlite3-")):
+        return False
     if any(part in EXCLUDED_PARTS for part in relative.parts):
         return False
     if path.name in EXCLUDED_NAMES or path.suffix.lower() in EXCLUDED_SUFFIXES:
         return False
     relative = path.relative_to(PROJECT_ROOT)
-    if relative.parts and relative.parts[0] == "demo" and path.suffix.lower() in {".mp4", ".mov", ".webm"}:
-        return False
+    if relative.parts and relative.parts[0] == "demo":
+        return relative.as_posix() == "demo/演示视频.mp4" and path.is_file()
     return path.is_file()
 
 
@@ -68,6 +79,15 @@ def collect_files() -> list[Path]:
         directory = PROJECT_ROOT / name
         if directory.is_dir():
             files.extend(path for path in directory.rglob("*") if should_include(path))
+    # Bundle only the public official documents explicitly listed in the core manifest.
+    manifest = json.loads((PROJECT_ROOT / "data/core_competitions_manifest.json").read_text(encoding="utf-8"))
+    for entry in manifest["competitions"]:
+        path = (PROJECT_ROOT / entry["document_path"]).resolve()
+        if not path.is_relative_to(PROJECT_ROOT / "data/official_sources") or not path.is_file():
+            raise ValueError(f"Missing or invalid official document: {entry['competition_id']}")
+        if sha256_file(path) != entry["sha256"]:
+            raise ValueError(f"Official document fingerprint mismatch: {entry['competition_id']}")
+        files.append(path)
     return sorted(set(files), key=lambda path: path.relative_to(PROJECT_ROOT).as_posix())
 
 

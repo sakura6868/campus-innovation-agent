@@ -49,7 +49,8 @@ except Exception:  # noqa: BLE001
     _USING_LANGGRAPH = False
 
 import db
-from fact_formatting import format_team_size
+from fact_formatting import format_deadline, format_team_size
+from contest_clock import contest_now
 from rag.store import get_rag
 from recommendation.engine import (
     data_validity_check,
@@ -59,7 +60,7 @@ from recommendation.engine import (
     soft_match_score,
 )
 from schemas import Citation, Competition, UserProfile
-from trust import assess_source_readiness
+from trust import assess_recommendation_readiness, assess_source_readiness
 from agent.llm import generate_answer as _llm_generate
 from agent.web_search import web_search as _web_search, is_web_search_enabled as _web_enabled
 
@@ -88,6 +89,7 @@ class AgentState(TypedDict, total=False):
     run_id: str
     user_id: Optional[str]
     competition_id: Optional[str]     # 可由前端直接指定，否则路由自动锁定
+    context_competition_id: Optional[str]
     top_k: int
     model: Optional[str]               # 可选：请求级覆盖默认 LLM 模型
 
@@ -402,7 +404,9 @@ def _competition_match_score(question: str, competition: Competition) -> float:
     # 模糊匹配时对「完整名」剥离年份再比 LCS，既保留「蓝桥杯」等品牌字，
     # 又避免赛事名里的「2026年」前缀与问题里的年份形成虚假公共子串。
     lcs = _lcs_len(_strip_year(q), _strip_year(name)) if name else 0
-    return 3 + lcs if lcs >= 3 else 0
+    brands = ("蓝桥杯", "挑战杯", "三创赛", "美赛", "国赛")
+    brand_match = any(brand in q and brand in name for brand in brands)
+    return 3 + lcs if lcs >= 4 or brand_match else 0
 
 
 def _resolve_competition_versioned(
@@ -410,14 +414,58 @@ def _resolve_competition_versioned(
 ) -> tuple[Optional[Competition], Optional[str], Optional[str]]:
     """锁定赛事并显式处理同名多年份版本。"""
     q = _norm(question)
+    year = contest_now().year
+    q = q.replace("今年", str(year)).replace("明年", str(year + 1)).replace("去年", str(year - 1))
     # 别名展开：把口语别名并入匹配查询，使「互联网+」等能命中库内正式名。
     q_match = _alias_expand(q)
     def _implicit_version_result(selected: Competition, pool: list[Competition]):
+        requested_years = {int(y) for y in re.findall(r"20\d{2}", q)}
+        if len(requested_years) > 1:
+            return None, None, "你提到了多个年份，请明确本次要查询的年份与赛事版本。"
+        if requested_years:
+            matches = [item for item in pool if item.document_year in requested_years]
+            if not matches:
+                return None, None, "库中没有你指定年份的该赛事通知，请确认年份或查看官网最新公告。"
+            if len(matches) > 1:
+                return None, None, "该年份存在多个赛道或通知版本，请补充赛道名称或赛事 ID：" + "、".join(item.competition_id for item in matches)
+            return max(matches, key=lambda item: item.document_year), None, None
         years = {item.document_year for item in pool}
         if not re.search(r"20\d{2}", q) and len(years) > 1:
+            ready = [item for item in pool if assess_source_readiness(item).ready]
+            if not ready:
+                return None, None, "该赛事存在多个年份，暂无官网来源与关键证据完整的版本。请明确年份后再查询。"
+            selected = max(ready, key=lambda item: item.document_year)
+            if sum(item.document_year == selected.document_year for item in ready) > 1:
+                return None, None, "最新官网来源已确认年份存在多个赛道或通知版本，请补充赛道名称或赛事 ID。"
             note = f"你没有指定年份，以下使用最新官网来源已确认版本：{selected.document_year}年（{selected.doc_version}）。"
             return selected, note, None
+        if len(pool) > 1:
+            return None, None, "该赛事存在多个赛道或通知版本，请补充赛道名称或赛事 ID：" + "、".join(item.competition_id for item in pool)
         return selected, None, None
+    id_matches = [item for item in comps if item.competition_id and item.competition_id in q]
+    if id_matches:
+        longest = max(len(item.competition_id) for item in id_matches)
+        matches = [item for item in id_matches if len(item.competition_id) == longest]
+        return _implicit_version_result(matches[0], matches)
+    # Full official names take precedence over broad brand/topic heuristics.
+    exact = [item for item in comps if _norm(item.competition_name) in q_match]
+    if exact:
+        longest = max(len(_norm(item.competition_name)) for item in exact)
+        exact = [item for item in exact if len(_norm(item.competition_name)) == longest]
+        names = {_norm(item.competition_name) for item in exact}
+        if len(names) > 1:
+            return None, None, "你提到了多个赛事，请明确本次要查询的赛事名称。"
+        return _implicit_version_result(exact[0], exact)
+    if "mathorcup" in q.lower():
+        pool = [c for c in comps if "mathorcup" in c.competition_name.lower()]
+        if "春季" in q and "大数据" in q:
+            return None, None, "MathorCup春季赛与大数据竞赛是独立赛项，请分别指定赛事和年份查询截止日期。"
+        if "大数据" in q:
+            pool = [c for c in pool if "大数据" in c.competition_name]
+        elif "春季" in q:
+            pool = [c for c in pool if "大数据" not in c.competition_name]
+        if pool:
+            return _implicit_version_result(pool[0], pool)
     # 建模类问法显式纠正：避免「全国大学生数学竞赛（CMC）」因名称含「数学」而被抢锁，
     # 导致用户问「数学建模怎么备赛」时路由到数学竞赛、起手纠结「你问的是哪个」，答非所问。
     if "数学建模" in q:
@@ -455,20 +503,20 @@ def _resolve_competition_versioned(
     if mentioned_years:
         year_matches = [(c, score) for c, score in scored if c.document_year in mentioned_years]
         if year_matches:
-            selected = max(year_matches, key=lambda item: item[1])[0]
-            return selected, None, None
+            best_score = max(score for _, score in year_matches)
+            matches = [item for item, score in year_matches if score == best_score]
+            return _implicit_version_result(matches[0], matches)
+        return None, None, "库中没有你指定年份的该赛事通知，请确认年份或查看官网最新公告。"
 
     best = max(scored, key=lambda item: item[1])[0]
+    best_score = max(score for _, score in scored)
+    if len({_norm(c.competition_name) for c, score in scored if score == best_score}) > 1:
+        return None, None, "问题可能指向多个赛事，请补充完整赛事名称或赛事 ID。"
     same_name = [c for c, _ in scored if _norm(c.competition_name) == _norm(best.competition_name)]
     if len(same_name) == 1:
         return best, None, None
 
     verified = [c for c in same_name if assess_source_readiness(c).ready]
-    if not verified:
-        # 兜底：即便评估未达「ready」（如 evidence 字段待补），只要已锚定官方来源
-        # （found），就默认按最新届作答，避免常见赛事因多版本直接掉进「请明确年份」
-        # 的澄清分支、从而完全不触发润色与引用。
-        verified = [c for c in same_name if c.official_source_status == "found"]
     years = "、".join(str(c.document_year) for c in sorted(same_name, key=lambda item: item.document_year, reverse=True))
     if verified:
         selected = max(verified, key=lambda item: item.document_year)
@@ -530,6 +578,8 @@ def _classify_intent(question: str, has_comp: bool) -> str:
         return "teammate"
     if any(k in q for k in _KW_TEAM):
         return "team"
+    if has_comp and "介绍" not in q and (_asks_registration_deadline(q) or _asks_team_size(q)):
+        return "qa"
     if has_comp and any(k in q for k in _KW_DETAIL):
         return "detail"
     # 开放/建议/评价/选型类问题（怎么准备、值不值得、含金量、选赛项、是否适合我…）
@@ -570,9 +620,34 @@ def _asks_registration_deadline(question: str) -> bool:
 def _asks_team_size(question: str) -> bool:
     """识别团队人数问法，优先返回对应结构化字段及页级证据。"""
     text = (question or "").strip().lower()
-    asks_team = any(word in text for word in ("团队", "队伍", "组队", "队员"))
-    asks_size = any(word in text for word in ("几人", "人数", "多少人", "规模"))
+    asks_team = any(word in text for word in ("团队", "队伍", "组队", "队员", "一队"))
+    asks_size = any(word in text for word in ("几人", "几个人", "人数", "多少人", "规模"))
     return asks_team and asks_size
+
+
+def is_followup_question(question: str) -> bool:
+    text = question.strip()
+    return bool(re.search(r"这个比赛|该赛事|这个赛事|上面.*比赛|它的|它还能", text)) or text in (
+        "报名还来得及吗？", "报名还来得及吗", "还能报名吗？", "还能报名吗",
+        "可以跨校和跨专业组队吗？", "几个人一队？",
+    )
+
+
+def _requested_fields(question: str) -> set[str]:
+    fields = set()
+    if _asks_registration_deadline(question):
+        fields.add("registration_deadline")
+    if _asks_team_size(question) or any(w in question for w in ("个人", "组队", "跨校", "专业")):
+        fields.update(("team_min", "team_max"))
+    if any(w in question for w in ("材料", "交哪些", "交什么", "哪些东西")):
+        fields.add("required_materials")
+    if any(w in question for w in ("专业", "学历", "毕业", "在读", "报名条件", "能报", "参加吗", "来得及")):
+        fields.update(("eligible_students", "allowed_majors", "allowed_grades"))
+    if any(w in question for w in ("比赛结束", "初赛结束", "竞赛结束")):
+        fields.add("competition_end_date")
+    if any(w in question for w in ("多少钱", "费用", "收费", "报名费", "参赛费")):
+        fields.add("registration_fee")
+    return fields
 
 
 # 仅含符号/空白、无任何可理解语义的输入（如纯标点、纯表情、乱敲的字符）。
@@ -627,6 +702,13 @@ def node_route_intent(state: AgentState) -> AgentState:
         resolved = db.get_competition(state["competition_id"])
     if resolved is None:
         resolved, version_note, clarification = _resolve_competition_versioned(question, comps)
+    if resolved is None and not clarification and is_followup_question(question):
+        context_id = state.get("context_competition_id")
+        resolved = db.get_competition(context_id) if context_id else None
+        if resolved:
+            version_note = f"沿用当前对话赛事：{resolved.competition_name}（{resolved.document_year}）。"
+    if resolved is None and not clarification and re.search(r"[\u4e00-\u9fffA-Za-z]+(?:杯|大赛|竞赛)", question):
+        clarification = "未能确认你提到的赛事名称或版本，请提供完整名称、年份或官方链接；不能用另一赛事的规则代答。"
 
     intent = _classify_intent(question, has_comp=resolved is not None)
     trace.append(
@@ -651,41 +733,14 @@ def node_route_intent(state: AgentState) -> AgentState:
 
 
 def _detail_fallback_citations(comp: Optional[Competition]) -> list[Citation]:
-    """detail 意图兜底：介绍/详情类问句的关键词不在赛事数据中，关键词重叠检索
-    易召回为空。此时用赛事「结构化关键字段」兜底，保证「介绍一下X」也带官方
-    引用（团队/参赛对象/截止/材料/技能），避免答案回退成"未检索到相关条款"。"""
+    """Return existing field evidence without disguising generated summaries as quotes."""
     if comp is None:
         return []
-    out: list[Citation] = []
-    doc = f"{comp.competition_name}_{comp.document_year}_官方通知"
-
-    def _add(field: str, text: str) -> None:
-        out.append(
-            Citation(
-                field=field,
-                page=None,
-                source_text=text,
-                document_name=doc,
-                source_url=comp.official_source_url,
-                acquired_date=comp.source_acquired_date,
-                last_verified_at=comp.last_verified_at,
-                trusted_level=comp.trusted_level,
-            )
-        )
-
-    if comp.team_min is not None or comp.team_max is not None:
-        _add("team_max", f"团队人数要求：{format_team_size(comp.team_min, comp.team_max)}。")
-    if comp.eligible_students:
-        _add("eligible_students", f"参赛对象：{'、'.join(getattr(s, 'value', str(s)) for s in comp.eligible_students)}。")
-    if comp.registration_deadline:
-        _add("registration_deadline", f"报名截止时间：{comp.registration_deadline}。")
-    if comp.submission_deadline:
-        _add("submission_deadline", f"提交截止时间：{comp.submission_deadline}。")
-    if comp.required_materials:
-        _add("required_materials", f"所需材料：{'、'.join(comp.required_materials)}。")
-    if comp.required_skills:
-        _add("required_skills", f"所需技能：{'、'.join(comp.required_skills)}。")
-    return out
+    fields = {"team_min", "team_max", "eligible_students", "registration_deadline",
+              "registration_deadline_at", "submission_deadline", "submission_deadline_at",
+              "required_materials", "required_skills"}
+    return [item.model_copy(deep=True) for item in comp.evidence if item.field in fields and item.source_text.strip()
+            and item.anchor_status not in ("invalid", "needs_review")]
 
 
 def _broad_retrieve(question: str, top_k: int = 5) -> tuple[list, list]:
@@ -693,7 +748,7 @@ def _broad_retrieve(question: str, top_k: int = 5) -> tuple[list, list]:
 
     不依赖 RAG 语义检索（本环境 RAG 为本地隔离实现），改用「赛事名模糊匹配 +
     关键字段（技能/对象/类别）关键词重叠」打分，取 top-k 赛事，再把每个赛事的
-    关键结构化字段转成 Citation 作为证据。返回 (相关赛事列表, 证据列表)。
+    已保存的原文作为证据。返回 (相关赛事列表, 证据列表)。
     """
     comps = db.get_all_competitions()
     scored = []
@@ -722,6 +777,9 @@ def _broad_retrieve(question: str, top_k: int = 5) -> tuple[list, list]:
 
 def node_retrieve(state: AgentState) -> AgentState:
     trace = list(state.get("trace") or [])
+    if state.get("clarification"):
+        trace.append("隔离检索：跳过（赛事版本尚未明确）")
+        return {**state, "citations": [], "trace": trace}
     cid = state.get("resolved_competition")
     if not cid:
         if (state.get("intent") or "") == "chat":
@@ -741,46 +799,28 @@ def node_retrieve(state: AgentState) -> AgentState:
     )
     # 截止日期只能由结构化 Ground Truth 给出；RAG 仅返回同字段的一条页级证据。
     # 这样既保留可追溯原文，又不会把报名开始日、校赛日或提交日误写成第二个截止日。
+    requested = _requested_fields(state.get("question") or "")
     if comp is not None and _asks_registration_deadline(state.get("question") or ""):
-        deadline_evidence = [e for e in comp.evidence if e.field == "registration_deadline"]
+        deadline_evidence = [e for e in comp.evidence if e.field == "registration_deadline"
+                             and e.source_text.strip() and e.anchor_status not in ("invalid", "needs_review")]
         if deadline_evidence:
-            hits = deadline_evidence[:1]
+            hits = deadline_evidence[:1] + [e for e in comp.evidence
+                if e.field in requested - {"registration_deadline"} and e.source_text.strip()
+                and e.anchor_status not in ("invalid", "needs_review")]
         else:
-            deadline_text = comp.registration_deadline.isoformat() if comp.registration_deadline else "未明确"
-            hits = [
-                Citation(
-                    field="registration_deadline",
-                    page=None,
-                    source_text=f"报名截止日期：{deadline_text}。",
-                    document_name=f"{comp.competition_name}_{comp.document_year}_官方通知",
-                    source_url=comp.official_source_url,
-                    acquired_date=comp.source_acquired_date,
-                    last_verified_at=comp.last_verified_at,
-                    trusted_level=comp.trusted_level,
-                )
-            ]
+            hits = []
         trace.append("隔离检索：报名截止问题仅保留 registration_deadline 单一证据")
     if (
         comp is not None
         and state.get("intent") == "qa"
         and _asks_team_size(state.get("question") or "")
     ):
-        team_evidence = [e for e in comp.evidence if e.field in {"team_min", "team_max"}]
+        team_evidence = [e for e in comp.evidence if e.field in {"team_min", "team_max"}
+                         and e.source_text.strip() and e.anchor_status not in ("invalid", "needs_review")]
         if team_evidence:
             hits = team_evidence[:top_k]
         else:
-            hits = [
-                Citation(
-                    field="team_max" if comp.team_max is not None else "team_min",
-                    page=None,
-                    source_text=f"团队人数要求：{format_team_size(comp.team_min, comp.team_max)}。",
-                    document_name=f"{comp.competition_name}_{comp.document_year}_官方通知",
-                    source_url=comp.official_source_url,
-                    acquired_date=comp.source_acquired_date,
-                    last_verified_at=comp.last_verified_at,
-                    trusted_level=comp.trusted_level,
-                )
-            ]
+            hits = []
         trace.append("隔离检索：团队人数问题仅保留 team_min/team_max 对应证据")
     # detail 介绍类：保证「介绍一下X」始终带完整官方结构化引用。
     # 语义/关键词检索为空 → 整段兜底；检索有结果 → 在其基础上补全缺失关键字段。
@@ -797,7 +837,9 @@ def node_retrieve(state: AgentState) -> AgentState:
     # qa 事实查询：语义检索为空时用赛事结构化关键字段兜底，避免「未检索到相关
     # 条款」式拒答——评价/开放类问题（已走 chat）更应如此；即便纯事实问法检索
     # 落空，也至少能基于团队/对象/截止/材料/技能给出可溯源答复。
-    if state.get("intent") == "qa" and not hits and comp is not None:
+    if (state.get("intent") == "qa" and not hits and comp is not None
+            and not _asks_registration_deadline(state.get("question") or "")
+            and not _asks_team_size(state.get("question") or "")):
         hits = _detail_fallback_citations(comp)
         if hits:
             trace.append("隔离检索：qa 兜底返回关键字段证据")
@@ -808,6 +850,14 @@ def node_retrieve(state: AgentState) -> AgentState:
         hits = _detail_fallback_citations(comp)
         if hits:
             trace.append("隔离检索：chat 兜底返回关键字段证据")
+    if comp is not None and state.get("intent") == "qa" and requested:
+        hits = [e for e in comp.evidence if e.field in requested and e.source_text.strip()
+                and e.anchor_status not in ("invalid", "needs_review")]
+        # Fees have no structured field in older data; only fee-specific official quotes qualify.
+        if "registration_fee" in requested:
+            hits += [e for e in comp.evidence if e not in hits and e.source_text.strip()
+                     and re.search(r"(?:参赛费|报名费|收费|费用|免费)", e.source_text)
+                     and e.anchor_status not in ("invalid", "needs_review")]
     trace.append(f"隔离检索：collection=rag_{cid}，命中 {len(hits)} 条证据")
     return {
         **state,
@@ -827,7 +877,7 @@ def node_web_augment(state: AgentState) -> AgentState:
     绝不与已核验的官方 [n] 引用混在一起。未启用 / 失败均返回空，不影响主链路。
     """
     trace = list(state.get("trace") or [])
-    if not _web_enabled():
+    if state.get("clarification") or not _web_enabled():
         return {**state, "web_results": []}
     intent = state.get("intent") or ""
     if intent not in ("qa", "detail", "chat"):
@@ -855,7 +905,23 @@ def _load_profile(state: AgentState) -> Optional[UserProfile]:
     uid = state.get("user_id")
     if not uid:
         return None
-    return db.get_user_profile(uid)
+    profile = db.get_user_profile(uid)
+    if profile is None:
+        return None
+    question = state.get("question") or ""
+    updates = {}
+    numbers = {"一": 1, "二": 2, "两": 2, "三": 3, "四": 4, "五": 5, "六": 6,
+               "七": 7, "八": 8, "九": 9, "十": 10}
+    match = re.search(r"(?:我们|队伍|团队|改成|现在是|我)(?:现在|已经|有|是|改成|共|一共|总共)*\s*(\d+|[一二两三四五六七八九十])\s*(?:个)?人", question)
+    if match:
+        raw = match.group(1)
+        size = int(raw) if raw.isdigit() else numbers[raw]
+        if size > 0:
+            updates["expected_team_size"] = size
+    if re.search(r"(?:我|我们).*?(?:已经)?毕业|不(?:再|是)在(?:校|读)", question):
+        updates.update(education_level="毕业生（毕业5年内）", grade="已毕业")
+    # Current-turn statements affect this answer only; never mutate the saved profile.
+    return profile.model_copy(update=updates) if updates else profile
 
 
 def node_gate(state: AgentState) -> AgentState:
@@ -868,10 +934,10 @@ def node_gate(state: AgentState) -> AgentState:
         trace.append("硬性门控：跳过（缺用户画像或赛事）")
         return {**state, "gate": {"skipped": True}, "pending_review": pending_review, "trace": trace}
 
-    today = date.today()
+    today = contest_now()
     problems = data_validity_check(comp, today)
     if problems:
-        # 来源尚未完全核验 ≠ 「数据不可用」：事实仍会照常展示，仅提示以官网为准。
+        # Candidate information remains readable, without an eligibility verdict.
         gate = {
             "eligible": False,
             "source_issues": [f"来源待核实：{p}" for p in problems],
@@ -911,12 +977,12 @@ def node_score(state: AgentState) -> AgentState:
     if not cid or profile is None:
         trace.append("软性评分：跳过（缺用户画像或赛事）")
         return {**state, "score": {"skipped": True}, "trace": trace}
-    if gate.get("eligible") is False:
+    if gate.get("eligible") is not True:
         trace.append("软性评分：跳过（门控未通过，不进入评分）")
         return {**state, "score": {"skipped": True, "reason": "门控未通过"}, "trace": trace}
 
     comp = db.get_competition(cid)
-    bd = soft_match_score(profile, comp, date.today())
+    bd = soft_match_score(profile, comp, contest_now())
     trace.append(f"软性评分：总分 {bd.total}（S{bd.skill_score}/E{bd.experience_score}/R{bd.resource_score}/W{bd.workload_score}）")
     return {**state, "score": bd.model_dump(mode="json"), "trace": trace}
 
@@ -942,9 +1008,21 @@ def node_team_copy(state: AgentState) -> AgentState:
         copy = "该赛事目前仅作为候选信息展示，关键字段证据尚不完整，暂不生成组队招募结论。请先查看赛事官网最新通知。"
         return {**state, "team_copy": copy, "pending_review": True, "trace": trace}
 
+    readiness = assess_recommendation_readiness(comp, contest_now())
+    if not readiness.ready:
+        trace.append("组队文案：跳过（当前不可报名）")
+        copy = "该赛事当前不处于可报名状态，暂不生成新的组队招募文案。请查看官网最新通知；历史材料仍可在赛事目录中查看。"
+        return {**state, "team_copy": copy, "trace": trace}
+    gate = state.get("gate") or {}
+    if gate.get("eligible") is not True:
+        reasons = "；".join(gate.get("reasons") or []) or "尚缺少可确认个人资格的画像"
+        copy = f"你暂不符合该赛事硬性条件或资格尚未确认：{reasons}。暂不生成可参赛招募，请先核对身份、人数与官网规则。"
+        trace.append("组队文案：跳过（个人资格未通过）")
+        return {**state, "team_copy": copy, "trace": trace}
+
     team_txt = format_team_size(comp.team_min, comp.team_max)
     skills = "、".join(comp.required_skills) if comp.required_skills else "相关技能不限"
-    deadline = comp.registration_deadline.isoformat() if comp.registration_deadline else "以官方通知为准"
+    deadline = format_deadline(comp)
     my_skills = "、".join(profile.skills) if profile and profile.skills else "（可在个人画像补充）"
 
     # 引用编号：把 team/skill 相关证据映射到 [n]
@@ -983,7 +1061,7 @@ def node_teammate_match(state: AgentState) -> AgentState:
         trace.append("队友推荐：跳过（无可用画像）")
         return {**state, "teammate_matches": [], "trace": trace}
 
-    candidates = db.list_user_profiles(exclude_user_id=seeker.user_id)
+    candidates = db.list_demo_profiles(exclude_user_id=seeker.user_id)
     matches = recommend_teammates(seeker, candidates, top_k=state.get("top_k") or 5)
     matches_dict = [m.model_dump(mode="json") for m in matches]
     trace.append(f"队友推荐：从 {len(candidates)} 名候选中匹配出 {len(matches)} 名互补队友")
@@ -1003,8 +1081,8 @@ def node_recommend_all(state: AgentState) -> AgentState:
         return {**state, "recommendations": [], "trace": trace}
 
     comps = db.get_all_competitions()
-    results = recommend_for_user(profile, comps, date.today())
-    formal = [r for r in results if r.eligible][:5]
+    results = recommend_for_user(profile, comps, contest_now())
+    formal = [r for r in results if r.eligible and r.score is not None][:5]
     selected = formal
 
     # 为每条可推荐赛事附 1 条最有代表性的引用（团队/技能）
@@ -1207,6 +1285,8 @@ def _is_engineering_comp(comp) -> bool:
     # 机械/工程 + 智能车/机器人（控制+嵌入式，属硬件工程）走工程模板
     if cat in ("engineering", "robotics_ai"):
         return True
+    if cat in ("software", "programming", "data", "math", "modeling", "english", "business"):
+        return False
     blob = " ".join(
         [comp.competition_name or ""]
         + list(getattr(comp, "required_skills", []) or [])
@@ -1292,7 +1372,7 @@ def _build_prep_guide(comp, web_results, profile) -> str:
 
     facts = []
     if comp.registration_deadline:
-        facts.append(f"报名/缴费截止约 {comp.registration_deadline.isoformat()}")
+        facts.append(f"报名/缴费截止 {format_deadline(comp)}")
     if comp.competition_start_date:
         facts.append(f"省赛/初赛时间约 {comp.competition_start_date.isoformat()}")
     if comp.eligible_students:
@@ -1641,14 +1721,23 @@ def _compose_chat_deterministic(state, comp, citations, web_results) -> Optional
     q = state.get("question") or ""
     profile = _load_profile(state)
     if _is_prep_question(q):
-        body = _build_prep_guide(comp, web_results, profile)
+        if "一周" in q or "7天" in q or "七天" in q:
+            body = (f"「{comp.competition_name}（{comp.document_year}）」一周准备建议（不是官方赛程）：\n"
+                    "第1天：阅读官网规则，确认个人资格、人数、截止和材料。\n"
+                    "第2天：盘点现有技能与样题，确定目标和分工。\n"
+                    "第3至4天：完成最小可运行方案或练习，记录问题与结果。\n"
+                    "第5天：补短板并复核结果，整理文档。\n"
+                    "第6天：按官方材料要求做一次完整演练。\n"
+                    "第7天：校对材料、备份并核对官网最新通知；不把建议日期当作官方截止。")
+        else:
+            body = _build_prep_guide(comp, web_results, profile)
     elif _is_eval_question(q):
         body = _build_eval_answer(comp, web_results, profile)
     elif _is_selection_question(q):
         body = _build_selection_answer(comp, profile)
     else:
         return None
-    answer = body + _citations_appendix(citations)
+    answer = body + _pending_review_notice(state, "chat") + _citations_appendix(citations)
     if state.get("version_resolution_note"):
         answer = state["version_resolution_note"] + "\n\n" + answer
     return answer
@@ -1663,6 +1752,12 @@ def _generate_grounded(state: AgentState, intent: str, citations: list, name: st
     profile = _load_profile(state)
     profile_summary = _profile_summary(profile) if profile else ""
     question = state.get("question") or ""
+    gate = state.get("gate") or {}
+    brief += (f"\n【系统锁定赛事】{name or '未锁定，不得替用户确定赛事'}\n"
+              f"【当前业务日期】{contest_now().isoformat()}\n"
+              f"【资格边界】eligible={gate.get('eligible')}；原因={gate.get('reasons', [])}；"
+              f"候选信息={bool(state.get('pending_review'))}。不得输出与系统相反的资格判断；"
+              "候选信息不能确定资格或匹配分数。个人画像不是官方证据。")
     out = _llm_generate(
         question, brief,
         intent=intent,
@@ -1670,6 +1765,11 @@ def _generate_grounded(state: AgentState, intent: str, citations: list, name: st
         model=state.get("model"),
     )
     if not out:
+        return None
+    if state.get("pending_review") or gate.get("eligible") is False:
+        if re.search(r"(?:你|您|你们|您们).{0,8}(?:符合|满足)(?:报名|参赛|硬性)|(?:可以|能)报名|可以参赛", out):
+            return None
+    if any(int(n) > len(citations) or int(n) < 1 for n in re.findall(r"\[(\d+)\]", out)):
         return None
     return _sanitize_citations(out, len(citations))
 
@@ -1680,11 +1780,16 @@ def _pending_review_notice(state: AgentState, intent: str) -> str:
     「单个事实已有官方原文」与「整体赛事证据已达推荐门槛」是两件事：
     前者可以照常展示引用，后者未满足时仍必须禁止资格结论与推荐评分。
     """
-    if not state.get("pending_review") or intent not in ("qa", "detail"):
+    if not state.get("pending_review") or intent not in ("qa", "detail", "chat"):
         return ""
     resolved_id = state.get("resolved_competition")
     comp = db.get_competition(resolved_id) if resolved_id else None
     if comp is not None and comp.official_source_status == "found":
+        if not state.get("citations"):
+            return (
+                "\n\nℹ️ 可信边界：该赛事已收录官方来源链接，但缺少可确认本次问题的官方原文，"
+                "目前仅作为候选信息；不构成资格判断或推荐评分，请以官网最新通知为准。"
+            )
         return (
             "\n\nℹ️ 可信边界：上述事实已关联官方原文，但该赛事的关键字段证据尚未齐全，"
             "目前仅作为候选信息；不构成资格判断或推荐评分，请以官网最新通知为准。"
@@ -1752,13 +1857,50 @@ def node_compose(state: AgentState) -> AgentState:
         trace.append("组装答案：歧义澄清（需用户明确年份/版本）")
         return {**state, "answer": answer, "trace": trace}
 
-    # ---- 混合模式核心：qa/detail 事实查询、chat 开放对话，均由 LLM 基于证据自由撰写 ----
+    requested = _requested_fields(state.get("question") or "")
+    if intent == "qa" and requested:
+        comp = db.get_competition(state.get("resolved_competition")) if state.get("resolved_competition") else None
+        lines = []
+        quote_lines = {}
+        for field in sorted(requested):
+            matching = [(i, c) for i, c in enumerate(citations) if c.get("field") == field]
+            if field == "registration_fee":
+                matching = [(i, c) for i, c in enumerate(citations)
+                            if re.search(r"参赛费|报名费|收费|费用|免费", c.get("source_text", ""))]
+            if matching:
+                for i, citation in matching:
+                    if field == "registration_deadline" and comp and comp.registration_deadline:
+                        lines.append(f"报名截止时间：{format_deadline(comp)}{_cite_marker(i)}。")
+                    else:
+                        text = citation["source_text"]
+                        if text in quote_lines:
+                            lines[quote_lines[text]] += _cite_marker(i)
+                        else:
+                            quote_lines[text] = len(lines)
+                            lines.append(f"{text}{_cite_marker(i)}")
+            elif field in ("registration_fee", "registration_deadline", "competition_end_date", "required_materials"):
+                labels = {"registration_fee": "报名费用", "registration_deadline": "报名截止",
+                          "competition_end_date": "比赛结束时间", "required_materials": "材料要求"}
+                refusal = "不能确认截止时间" if field == "registration_deadline" else "无法确认"
+                lines.append(f"{labels[field]}缺少官方原文证据，{refusal}，请查看官网最新通知。")
+        if lines:
+            answer = _finalize_grounded("\n".join(dict.fromkeys(lines)), state, citations, intent, trace)
+            trace[-1] = "组装答案：按所问字段返回官方原文与唯一结构化日期"
+            return {**state, "answer": answer, "trace": trace}
+
+    # Critical fact answers are deterministic; the model handles explanations and advice.
     if intent in ("qa", "detail") and citations:
         generated = _generate_grounded(state, intent, citations, name)
         if generated:
             answer = _finalize_grounded(generated, state, citations, intent, trace)
             return {**state, "answer": answer, "trace": trace}
     if intent == "chat":
+        if any(w in (state.get("question") or "") for w in ("一周", "7天", "七天")):
+            comp = db.get_competition(state.get("resolved_competition")) if state.get("resolved_competition") else None
+            det = _compose_chat_deterministic(state, comp, citations, state.get("web_results") or [])
+            if det:
+                trace.append("组装答案：按一周期限生成通用准备建议")
+                return {**state, "answer": det, "trace": trace}
         # 优先用 LLM 当参谋；未启用/失败时回退到确定性生成器（备赛/研判/选型也能真正回答）。
         generated = _generate_grounded(state, "chat", citations, name, allow_empty_evidence=True)
         if generated:
@@ -1791,7 +1933,7 @@ def node_compose(state: AgentState) -> AgentState:
                 "请告诉我具体赛事名称（例如「蓝桥杯报名截止日期」），或直接说「推荐适合我的比赛」。"
                 "启用智能模型后，这里还能就备赛规划、能力提升等开放问题给出建议。"
             )
-        answer += _citations_appendix(citations)
+        answer += _pending_review_notice(state, "chat") + _citations_appendix(citations)
         if state.get("version_resolution_note"):
             answer = state["version_resolution_note"] + "\n\n" + answer
         trace.append("组装答案：chat 回退提示（基于证据引导）")
@@ -1851,10 +1993,12 @@ def node_compose(state: AgentState) -> AgentState:
         mark = _cite_marker(0) if citations else ""
         if comp is None:
             answer = "没能定位到具体赛事，请补充赛事名称。"
+        elif not citations:
+            answer = f"「{comp.competition_name}」的报名截止字段缺少官方原文证据，不能确认截止时间。请查看官网最新通知。"
         elif comp.registration_deadline is None:
-            answer = f"「{comp.competition_name}」的官方文件未给出全国统一报名截止日期{mark}。"
+            answer = f"「{comp.competition_name}」的已存官方原文未能确认全国统一报名截止日期{mark}，请查看官网最新通知。"
         else:
-            answer = f"「{comp.competition_name}」的报名截止日期：{comp.registration_deadline.isoformat()}{mark}。"
+            answer = f"「{comp.competition_name}」的报名截止时间：{format_deadline(comp)}{mark}。"
         answer += _citations_appendix(citations)
 
         gate = state.get("gate") or {}
@@ -2044,6 +2188,7 @@ def run_agent(
     competition_id: Optional[str] = None,
     top_k: int = 4,
     model: Optional[str] = None,
+    context_competition_id: Optional[str] = None,
 ) -> dict:
     """一次问答，走完整闭环，返回可直接序列化的结果字典。
 
@@ -2097,6 +2242,7 @@ def run_agent(
         "run_id": run_id,
         "user_id": user_id,
         "competition_id": competition_id,
+        "context_competition_id": context_competition_id,
         "top_k": top_k,
         "model": model,
         "data_version": _catalog_data_version(),

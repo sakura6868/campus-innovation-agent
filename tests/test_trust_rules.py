@@ -63,6 +63,9 @@ def _competition(**overrides) -> Competition:
         "document_year": 2026,
         "category": CompetitionCategory.PROGRAMMING,
         "eligible_students": [EducationLevel.UNDERGRADUATE],
+        "team_min": 1,
+        "team_max": 3,
+        "required_materials": ["报名表"],
         "registration_deadline": date.today() + timedelta(days=30),
         "official_source_url": source_url,
         "official_source_status": "found",
@@ -115,7 +118,7 @@ class TrustRulesTests(unittest.TestCase):
                 self.assertFalse(result.eligible)
                 self.assertIsNone(result.score)
 
-    def test_unverified_competition_with_complete_basics_can_be_scored(self) -> None:
+    def test_unverified_competition_cannot_be_scored(self) -> None:
         candidate = _competition(
             data_status=DataStatus.UNVERIFIED,
             trusted_level=TrustedLevel.B,
@@ -123,11 +126,11 @@ class TrustRulesTests(unittest.TestCase):
         )
         result = recommend_for_user(_user(), [candidate], date.today())[0]
 
-        self.assertNotEqual(result.recommendation_status, "candidate_only")
+        self.assertEqual(result.recommendation_status, "candidate_only")
         self.assertTrue(result.pending_review)
-        self.assertIsNotNone(result.score)
-        self.assertIsNotNone(result.match_breakdown)
-        self.assertTrue(result.eligible)
+        self.assertIsNone(result.score)
+        self.assertIsNone(result.match_breakdown)
+        self.assertFalse(result.eligible)
 
     def test_education_levels_are_complete_and_unknown_values_fail(self) -> None:
         for path in sorted(GROUND_TRUTH_DIR.glob("*.json")):
@@ -172,7 +175,7 @@ class TrustRulesTests(unittest.TestCase):
             if raw.get("data_status") == "verified" and raw.get("trusted_level") == "A":
                 verified_records.append((path.stem, raw))
 
-        self.assertGreaterEqual(len(verified_records), 12)
+        self.assertGreaterEqual(len(verified_records), 1)
 
         for competition_id, raw in verified_records:
             self.assertEqual(raw["data_status"], "verified")
@@ -221,7 +224,7 @@ class TrustRulesTests(unittest.TestCase):
         # 须基于证据作答（引用存在），而非凭空捏造
         self.assertTrue(result["citations"])
 
-    def test_team_query_uses_team_evidence_with_product_default_minimum(self) -> None:
+    def test_team_query_preserves_unknown_minimum(self) -> None:
         result = run_agent("MathorCup 团队几人", competition_id="mathorcup_2026", top_k=4)
         self.assertTrue(result["citations"])
         self.assertTrue({c["field"] for c in result["citations"]} & {"team_min", "team_max"})
@@ -230,7 +233,8 @@ class TrustRulesTests(unittest.TestCase):
 
         detail = db.get_competition_detail("mathorcup_2026")
         self.assertIsNotNone(detail)
-        self.assertIn("1—3 人", detail.requirements[0].text)
+        self.assertIn("最多 3 人", detail.requirements[0].text)
+        self.assertIsNone(detail.competition.team_min)
 
 
 if __name__ == "__main__":
