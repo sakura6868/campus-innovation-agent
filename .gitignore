@@ -12,7 +12,7 @@ __pycache__/
 *.db.bak
 *.db.bak*
 *.zip
-!submission/releases/campus-innovation-agent-v1.2-competition-20261004-000425.zip
+!submission/releases/campus-innovation-agent-v1.2-competition-20261004-001230.zip
 *.pdf
 !data/official_sources/*.pdf
 !data/official_sources/**/*.pdf

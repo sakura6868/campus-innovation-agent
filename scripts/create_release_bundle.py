@@ -59,6 +59,8 @@ EXCLUDED_NAMES = {".env", "campus_agent.db"}
 def should_include(path: Path) -> bool:
     """只保留可复现的源码、文档和 Ground Truth，不打包运行产物或密钥。"""
     relative = path.relative_to(PROJECT_ROOT)
+    if relative.parts[:2] == ("submission", "releases"):
+        return False
     if path.name.startswith(".env") and path.name != ".env.example":
         return False
     if any(marker in path.name.lower() for marker in (".db-", ".db.bak", ".sqlite-", ".sqlite3-")):
