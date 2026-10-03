@@ -17,7 +17,7 @@
   "team_required": true,
   "team_min": 4,
   "team_max": 4,
-  "registration_deadline": "2026-05-31",
+  "registration_deadline": null,
   "submission_deadline": null,
   "competition_start_date": "2026-03-01",
   "competition_end_date": "2026-11-30",
@@ -113,6 +113,6 @@
       "trusted_level": "A"
     }
   ],
-  "notes": "由公开赛事名录整理的结构化参考字段，尚未完成人工核验；仅供导航参考，正式报名请以主办单位官方通知为准。\n【核验2026-07-18】已据官方赛事指南/通知更正：官方2026名称为“全国高等院校数智化企业经营沙盘大赛”（原名“新道杯全国大学生企业模拟沙盘大赛”为旧称/俗称）；主办单位为中国商业联合会、新道科技股份有限公司；团队4人（原team_min=1、team_max=5有误，已更正为4）；全国赛期窗口为报名3-5月、省赛5-8月、总决赛9-11月，故 competition_start_date=2026-03-01、competition_end_date/result=2026-11-30（约值），registration_deadline 取报名窗口末2026-05-31（具体以新道官方通知为准）；该赛事为模拟经营对抗，无统一作品提交截止，submission_deadline 置空。",
+  "notes": "由公开赛事名录整理的结构化参考字段，尚未完成人工核验；仅供导航参考，正式报名请以主办单位官方通知为准。\n【核验2026-07-18】已据官方赛事指南/通知更正：官方2026名称为“全国高等院校数智化企业经营沙盘大赛”（原名“新道杯全国大学生企业模拟沙盘大赛”为旧称/俗称）；主办单位为中国商业联合会、新道科技股份有限公司；团队4人（原team_min=1、team_max=5有误，已更正为4）；全国赛期窗口为报名3-5月、省赛5-8月、总决赛9-11月，故 competition_start_date=2026-03-01、competition_end_date/result=2026-11-30（约值），registration_deadline 取报名窗口末2026-05-31（具体以新道官方通知为准）；该赛事为模拟经营对抗，无统一作品提交截止，submission_deadline 置空。 无对应完整官方原文的报名/提交日期已清空为未知；不根据往年规律或候选占位日期推断。",
   "official_source_status": "found"
 }

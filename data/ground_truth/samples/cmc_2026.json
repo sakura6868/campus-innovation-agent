@@ -24,7 +24,7 @@
   "team_required": false,
   "team_min": 1,
   "team_max": 1,
-  "registration_deadline": "2026-10-02",
+  "registration_deadline": null,
   "submission_deadline": null,
   "competition_start_date": "2026-11-07",
   "competition_end_date": "2026-11-07",
@@ -113,6 +113,6 @@
       "trusted_level": "A"
     }
   ],
-  "notes": "经中国数学会官网(cmathc.cn)及多校通知核验：全国大学生数学竞赛每年一届，奇数届次跨年——第十七届初赛2025-11-08、决赛2026年春；第十八届(对应本2026记录)初赛2026-11-07、决赛2027年春(大连理工大学)。原记录team字段(个人赛)正确；报名截止各赛区不一(约2026年10月上旬)，本记录取某校通知2026-10-02作参考；初赛为笔试、无论文提交，submission_deadline置空；初赛获奖各赛区约2026年12月、决赛2027年春，result_announcement_date置空。",
+  "notes": "经中国数学会官网(cmathc.cn)及多校通知核验：全国大学生数学竞赛每年一届，奇数届次跨年——第十七届初赛2025-11-08、决赛2026年春；第十八届(对应本2026记录)初赛2026-11-07、决赛2027年春(大连理工大学)。原记录team字段(个人赛)正确；报名截止各赛区不一(约2026年10月上旬)，本记录取某校通知2026-10-02作参考；初赛为笔试、无论文提交，submission_deadline置空；初赛获奖各赛区约2026年12月、决赛2027年春，result_announcement_date置空。 无对应完整官方原文的报名/提交日期已清空为未知；不根据往年规律或候选占位日期推断。",
   "official_source_status": "found"
 }

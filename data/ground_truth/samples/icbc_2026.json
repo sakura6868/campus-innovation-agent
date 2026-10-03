@@ -17,8 +17,8 @@
   "team_required": false,
   "team_min": 1,
   "team_max": 3,
-  "registration_deadline": "2026-09-30",
-  "submission_deadline": "2026-09-30",
+  "registration_deadline": null,
+  "submission_deadline": null,
   "competition_start_date": "2026-05-01",
   "competition_end_date": "2026-12-31",
   "result_announcement_date": "2026-12-31",
@@ -123,6 +123,6 @@
       "trusted_level": "B"
     }
   ],
-  "notes": "2026年为第十七届“工行杯”全国大学生金融科技创新大赛，由中国工商银行主办，官网 gonghangbei.com 已公布赛程。官方明确“可个人参赛或组建不超过3人团队”，故 team_required 更正为 false、team_max 更正为 3。赛程为分段区间（报名5-9月、省赛10月、半决赛11月、总决赛12月），exact 截止日待官微公布，registration/submission 取9月末、competition_end/result 取12月末近似。原占位日期（9-10月）已更正。award_distribution比例为示意，非官方固定比例。",
+  "notes": "2026年为第十七届“工行杯”全国大学生金融科技创新大赛，由中国工商银行主办，官网 gonghangbei.com 已公布赛程。官方明确“可个人参赛或组建不超过3人团队”，故 team_required 更正为 false、team_max 更正为 3。赛程为分段区间（报名5-9月、省赛10月、半决赛11月、总决赛12月），exact 截止日待官微公布，registration/submission 取9月末、competition_end/result 取12月末近似。原占位日期（9-10月）已更正。award_distribution比例为示意，非官方固定比例。 无对应完整官方原文的报名/提交日期已清空为未知；不根据往年规律或候选占位日期推断。",
   "official_source_status": "found"
 }

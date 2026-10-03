@@ -25,7 +25,7 @@
   "team_min": 1,
   "team_max": 1,
   "registration_deadline": "2026-09-19",
-  "submission_deadline": "2026-09-19",
+  "submission_deadline": null,
   "competition_start_date": "2026-08-23",
   "competition_end_date": "2026-09-19",
   "result_announcement_date": null,
@@ -150,6 +150,6 @@
       "trusted_level": "A"
     }
   ],
-  "notes": "由公开赛事名录整理的结构化参考字段，尚未完成人工核验；仅供导航参考，正式报名请以主办单位官方通知为准。经2026-07-18核验：本赛事为个人赛（非组队），原team_required=true/team_max=3有误；决赛时间地点待定（result_announcement_date 置空）；初赛两场线上（8/23、9/19），报名截止9/19。",
+  "notes": "由公开赛事名录整理的结构化参考字段，尚未完成人工核验；仅供导航参考，正式报名请以主办单位官方通知为准。经2026-07-18核验：本赛事为个人赛（非组队），原team_required=true/team_max=3有误；决赛时间地点待定（result_announcement_date 置空）；初赛两场线上（8/23、9/19），报名截止9/19。 无对应完整官方原文的报名/提交日期已清空为未知；不根据往年规律或候选占位日期推断。",
   "official_source_status": "found"
 }

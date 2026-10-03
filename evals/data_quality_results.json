@@ -1,0 +1,479 @@
+{
+  "date": "2026-10-03",
+  "mode": "written",
+  "curated": [
+    "swb_autumn_2026",
+    "apmcm_autumn_2026",
+    "dmt_2026"
+  ],
+  "counts": {
+    "total": 196,
+    "source_complete": 12,
+    "registerable": 6,
+    "official_found": 160
+  },
+  "cleaned_records": 70,
+  "removed_date_fields": 110,
+  "audit": [
+    {
+      "competition_id": "2026华为云具身智能大赛_2026",
+      "removed_unsupported_dates": {
+        "registration_deadline": "2026-08-30"
+      }
+    },
+    {
+      "competition_id": "2026第五届UNIPP大学生英语应用大赛秋季赛_2026",
+      "removed_unsupported_dates": {
+        "registration_deadline": "2026-09-13"
+      }
+    },
+    {
+      "competition_id": "21century_2026",
+      "removed_unsupported_dates": {
+        "registration_deadline": "2026-04-20"
+      }
+    },
+    {
+      "competition_id": "HarmonyOS创新赛极客赛道_2026",
+      "removed_unsupported_dates": {
+        "registration_deadline": "2026-05-15",
+        "submission_deadline": "2026-05-15"
+      }
+    },
+    {
+      "competition_id": "accounting_2026",
+      "removed_unsupported_dates": {
+        "registration_deadline": "2026-11-25",
+        "submission_deadline": "2026-12-18"
+      }
+    },
+    {
+      "competition_id": "ad_cup_2026",
+      "removed_unsupported_dates": {
+        "registration_deadline": "2026-06-01"
+      }
+    },
+    {
+      "competition_id": "agri_bio_2026",
+      "removed_unsupported_dates": {
+        "registration_deadline": "2026-08-03",
+        "submission_deadline": "2026-08-28"
+      }
+    },
+    {
+      "competition_id": "ai4s_2026",
+      "removed_unsupported_dates": {
+        "submission_deadline": "2026-02-02"
+      }
+    },
+    {
+      "competition_id": "ai_creative_2026",
+      "removed_unsupported_dates": {
+        "registration_deadline": "2026-07-26"
+      }
+    },
+    {
+      "competition_id": "animation_2026",
+      "removed_unsupported_dates": {
+        "registration_deadline": "2026-08-15",
+        "submission_deadline": "2026-09-04"
+      }
+    },
+    {
+      "competition_id": "apmcm_2026",
+      "removed_unsupported_dates": {
+        "registration_deadline": "2026-06-12",
+        "submission_deadline": "2026-06-15"
+      }
+    },
+    {
+      "competition_id": "applied_math_2026",
+      "removed_unsupported_dates": {
+        "registration_deadline": "2026-12-22",
+        "submission_deadline": "2027-01-20"
+      }
+    },
+    {
+      "competition_id": "applied_physics_2026",
+      "removed_unsupported_dates": {
+        "registration_deadline": "2026-12-20",
+        "submission_deadline": "2027-01-18"
+      }
+    },
+    {
+      "competition_id": "astronomy_2026",
+      "removed_unsupported_dates": {
+        "registration_deadline": "2026-06-02"
+      }
+    },
+    {
+      "competition_id": "baidu_star_2026",
+      "removed_unsupported_dates": {
+        "submission_deadline": "2026-09-19"
+      }
+    },
+    {
+      "competition_id": "bi_comp_2026",
+      "removed_unsupported_dates": {
+        "registration_deadline": "2026-11-04",
+        "submission_deadline": "2026-12-07"
+      }
+    },
+    {
+      "competition_id": "bioinfo_2026",
+      "removed_unsupported_dates": {
+        "registration_deadline": "2026-09-01",
+        "submission_deadline": "2026-09-27"
+      }
+    },
+    {
+      "competition_id": "bme_2026",
+      "removed_unsupported_dates": {
+        "submission_deadline": "2026-06-15"
+      }
+    },
+    {
+      "competition_id": "cad_cam_2026",
+      "removed_unsupported_dates": {
+        "submission_deadline": "2026-07-08"
+      }
+    },
+    {
+      "competition_id": "carbon_2026",
+      "removed_unsupported_dates": {
+        "submission_deadline": "2026-09-13"
+      }
+    },
+    {
+      "competition_id": "cmc_2026",
+      "removed_unsupported_dates": {
+        "registration_deadline": "2026-10-02"
+      }
+    },
+    {
+      "competition_id": "comm_net_2026",
+      "removed_unsupported_dates": {
+        "registration_deadline": "2026-10-04",
+        "submission_deadline": "2026-11-05"
+      }
+    },
+    {
+      "competition_id": "condensed_2026",
+      "removed_unsupported_dates": {
+        "registration_deadline": "2026-09-12",
+        "submission_deadline": "2026-10-08"
+      }
+    },
+    {
+      "competition_id": "ctc_2026",
+      "removed_unsupported_dates": {
+        "submission_deadline": "2026-06-30"
+      }
+    },
+    {
+      "competition_id": "cupt_2026",
+      "removed_unsupported_dates": {
+        "submission_deadline": "2026-07-20"
+      }
+    },
+    {
+      "competition_id": "cxcx_2026",
+      "removed_unsupported_dates": {
+        "registration_deadline": "2026-11-02",
+        "submission_deadline": "2026-11-30"
+      }
+    },
+    {
+      "competition_id": "data_mining_2026",
+      "removed_unsupported_dates": {
+        "registration_deadline": "2026-11-24",
+        "submission_deadline": "2026-12-17"
+      }
+    },
+    {
+      "competition_id": "deep_learning_2026",
+      "removed_unsupported_dates": {
+        "registration_deadline": "2026-10-25",
+        "submission_deadline": "2026-11-16"
+      }
+    },
+    {
+      "competition_id": "dg_cup_2026",
+      "removed_unsupported_dates": {
+        "registration_deadline": "2026-05-20",
+        "submission_deadline": "2026-05-25"
+      }
+    },
+    {
+      "competition_id": "discrete_math_2026",
+      "removed_unsupported_dates": {
+        "registration_deadline": "2026-09-12",
+        "submission_deadline": "2026-10-13"
+      }
+    },
+    {
+      "competition_id": "embed_chip_2026",
+      "removed_unsupported_dates": {
+        "registration_deadline": "2026-04-20",
+        "submission_deadline": "2026-07-10"
+      }
+    },
+    {
+      "competition_id": "green_innov_2026",
+      "removed_unsupported_dates": {
+        "registration_deadline": "2026-09-25",
+        "submission_deadline": "2026-10-26"
+      }
+    },
+    {
+      "competition_id": "huaweicloud_dev_data_2026",
+      "removed_unsupported_dates": {
+        "registration_deadline": "2026-11-04",
+        "submission_deadline": "2026-12-02"
+      }
+    },
+    {
+      "competition_id": "icbc_2026",
+      "removed_unsupported_dates": {
+        "registration_deadline": "2026-09-30",
+        "submission_deadline": "2026-09-30"
+      }
+    },
+    {
+      "competition_id": "industrial_design_2026",
+      "removed_unsupported_dates": {
+        "submission_deadline": "2026-07-31"
+      }
+    },
+    {
+      "competition_id": "iot_app_2026",
+      "removed_unsupported_dates": {
+        "registration_deadline": "2026-08-21",
+        "submission_deadline": "2026-09-15"
+      }
+    },
+    {
+      "competition_id": "iot_design_2026",
+      "removed_unsupported_dates": {
+        "registration_deadline": "2026-06-15",
+        "submission_deadline": "2026-07-27"
+      }
+    },
+    {
+      "competition_id": "lanqiao_2025",
+      "removed_unsupported_dates": {
+        "registration_deadline": "2024-12-13"
+      }
+    },
+    {
+      "competition_id": "life_sci_2026",
+      "removed_unsupported_dates": {
+        "registration_deadline": "2026-01-15",
+        "submission_deadline": "2026-05-31"
+      }
+    },
+    {
+      "competition_id": "mai_2026",
+      "removed_unsupported_dates": {
+        "submission_deadline": "2026-07-06"
+      }
+    },
+    {
+      "competition_id": "may_cup_2026",
+      "removed_unsupported_dates": {
+        "registration_deadline": "2026-04-30",
+        "submission_deadline": "2026-05-04"
+      }
+    },
+    {
+      "competition_id": "metallography_2026",
+      "removed_unsupported_dates": {
+        "registration_deadline": "2026-03-31"
+      }
+    },
+    {
+      "competition_id": "million_2026",
+      "removed_unsupported_dates": {
+        "registration_deadline": "2026-05-31",
+        "submission_deadline": "2026-05-31"
+      }
+    },
+    {
+      "competition_id": "neccs_2026",
+      "removed_unsupported_dates": {
+        "submission_deadline": "2026-04-12"
+      }
+    },
+    {
+      "competition_id": "neuro_2026",
+      "removed_unsupported_dates": {
+        "registration_deadline": "2026-12-15",
+        "submission_deadline": "2027-01-18"
+      }
+    },
+    {
+      "competition_id": "new_material_2026",
+      "removed_unsupported_dates": {
+        "registration_deadline": "2026-09-15",
+        "submission_deadline": "2026-10-06"
+      }
+    },
+    {
+      "competition_id": "num_theory_2026",
+      "removed_unsupported_dates": {
+        "registration_deadline": "2026-10-03",
+        "submission_deadline": "2026-11-04"
+      }
+    },
+    {
+      "competition_id": "oral_eng_2026",
+      "removed_unsupported_dates": {
+        "registration_deadline": "2026-12-12",
+        "submission_deadline": "2027-01-10"
+      }
+    },
+    {
+      "competition_id": "process_equip_2026",
+      "removed_unsupported_dates": {
+        "submission_deadline": "2026-04-30"
+      }
+    },
+    {
+      "competition_id": "puyi_2026",
+      "removed_unsupported_dates": {
+        "submission_deadline": "2026-06-02"
+      }
+    },
+    {
+      "competition_id": "renewable_2026",
+      "removed_unsupported_dates": {
+        "registration_deadline": "2025-11-30",
+        "submission_deadline": "2025-12-31"
+      }
+    },
+    {
+      "competition_id": "robocup_2026",
+      "removed_unsupported_dates": {
+        "registration_deadline": "2026-03-31"
+      }
+    },
+    {
+      "competition_id": "robot_idea_2026",
+      "removed_unsupported_dates": {
+        "submission_deadline": "2026-05-10"
+      }
+    },
+    {
+      "competition_id": "sando_2026",
+      "removed_unsupported_dates": {
+        "registration_deadline": "2026-05-31"
+      }
+    },
+    {
+      "competition_id": "siemens_2026",
+      "removed_unsupported_dates": {
+        "submission_deadline": "2026-06-30"
+      }
+    },
+    {
+      "competition_id": "stat_model_2026",
+      "removed_unsupported_dates": {
+        "registration_deadline": "2026-05-17",
+        "submission_deadline": "2026-05-05"
+      }
+    },
+    {
+      "competition_id": "struct_design_2026",
+      "removed_unsupported_dates": {
+        "registration_deadline": "2026-11-15",
+        "submission_deadline": "2026-12-13"
+      }
+    },
+    {
+      "competition_id": "supply_chain_2026",
+      "removed_unsupported_dates": {
+        "registration_deadline": "2026-04-15",
+        "submission_deadline": "2026-04-15"
+      }
+    },
+    {
+      "competition_id": "中国大学生机械工程创新创意大赛微纳传感技术与智能应用赛_2026",
+      "removed_unsupported_dates": {
+        "registration_deadline": "2026-05-15",
+        "submission_deadline": "2026-05-31"
+      }
+    },
+    {
+      "competition_id": "全国大学生AIGC新媒体创作大赛_2026",
+      "removed_unsupported_dates": {
+        "registration_deadline": "2026-12-15",
+        "submission_deadline": "2026-12-15"
+      }
+    },
+    {
+      "competition_id": "全国大学生人工智能创新创业大赛_2026",
+      "removed_unsupported_dates": {
+        "registration_deadline": "2026-10-28",
+        "submission_deadline": "2026-11-05"
+      }
+    },
+    {
+      "competition_id": "全国大学生信息安全竞赛作品赛暨长城杯网数智安全大赛作品赛_2026",
+      "removed_unsupported_dates": {
+        "registration_deadline": "2026-07-05",
+        "submission_deadline": "2026-07-05"
+      }
+    },
+    {
+      "competition_id": "全国大学生技术创新创业大赛第六届_2026",
+      "removed_unsupported_dates": {
+        "registration_deadline": "2026-10-20",
+        "submission_deadline": "2026-10-20"
+      }
+    },
+    {
+      "competition_id": "全国大学生测绘学科创新创业智能大赛_2026",
+      "removed_unsupported_dates": {
+        "registration_deadline": "2026-06-20"
+      }
+    },
+    {
+      "competition_id": "华为ICT大赛中国区_2026",
+      "removed_unsupported_dates": {
+        "registration_deadline": "2025-11-30"
+      }
+    },
+    {
+      "competition_id": "华智高校大学生人工智能大赛_2026",
+      "removed_unsupported_dates": {
+        "registration_deadline": "2026-09-20"
+      }
+    },
+    {
+      "competition_id": "四川省天顺杯大学生智慧农牧与食品营养健康就业创业挑战赛首届_2026",
+      "removed_unsupported_dates": {
+        "registration_deadline": "2026-09-10",
+        "submission_deadline": "2026-09-10"
+      }
+    },
+    {
+      "competition_id": "大学生外交英语词汇大赛第四届_2026",
+      "removed_unsupported_dates": {
+        "registration_deadline": "2026-11-28"
+      }
+    },
+    {
+      "competition_id": "昇腾AI创新大赛-算子挑战赛S9赛季_2026",
+      "removed_unsupported_dates": {
+        "registration_deadline": "2026-09-15",
+        "submission_deadline": "2026-09-15"
+      }
+    },
+    {
+      "competition_id": "英语世界杯全国大学生英语听力大赛第六届_2026",
+      "removed_unsupported_dates": {
+        "registration_deadline": "2026-10-24"
+      }
+    }
+  ]
+}

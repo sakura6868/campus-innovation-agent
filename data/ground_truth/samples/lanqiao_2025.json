@@ -3,17 +3,36 @@
   "document_year": 2025,
   "organizer": "工业和信息化部人才交流中心",
   "category": "programming",
-  "eligible_students": ["本科生", "研究生", "高职高专学生"],
+  "eligible_students": [
+    "本科生",
+    "研究生",
+    "高职高专学生"
+  ],
   "allowed_grades": null,
   "allowed_majors": null,
   "team_required": false,
   "team_min": 1,
   "team_max": 1,
-  "registration_deadline": "2024-12-13",
+  "registration_deadline": null,
   "submission_deadline": null,
-  "required_materials": ["身份证正反面照片", "学生证电子版", "2寸彩色证件照"],
-  "evaluation_dimensions": ["算法与编程能力", "解题正确率", "代码质量"],
-  "required_skills": ["C/C++", "Java", "Python", "算法", "Web应用开发", "网络安全"],
+  "required_materials": [
+    "身份证正反面照片",
+    "学生证电子版",
+    "2寸彩色证件照"
+  ],
+  "evaluation_dimensions": [
+    "算法与编程能力",
+    "解题正确率",
+    "代码质量"
+  ],
+  "required_skills": [
+    "C/C++",
+    "Java",
+    "Python",
+    "算法",
+    "Web应用开发",
+    "网络安全"
+  ],
   "official_source_url": "https://dasai.lanqiao.cn/",
   "source_acquired_date": "2026-07-18",
   "trusted_level": "B",
@@ -73,5 +92,6 @@
       "trusted_level": "B"
     }
   ],
-  "notes": "【核实结论 2026-07-18】已找到官方依据（蓝桥杯大赛官网 dasai.lanqiao.cn 及高校官方转发）。第十六届蓝桥杯于2025年举办，省赛2025年4月，全国总决赛2025年6月中上旬，主办单位为工业和信息化部人才交流中心（组委会通知落款）。截止时间差异：不同赛项报名/作品提交截止不同——软件赛/电子赛/项目实战赛为2024-12-13，数字科技创新赛2025-03-28，视觉艺术设计赛2025-04-25，专项赛2024-11月；本标注取软件赛主赛项截止2024-12-13。官网主通知在 dasai.lanqiao.cn 检索未直接命中，registration_deadline 证据来自组委会通知的第三方镜像(saikr)及高校官方转发(首都经贸大学)，二者一致；总决赛通知则可于官网 dasai.lanqiao.cn/notices/1784/ 直接核实。2025年官方名称为“蓝桥杯全国软件和信息技术专业人才大赛”。"
+  "notes": "【核实结论 2026-07-18】已找到官方依据（蓝桥杯大赛官网 dasai.lanqiao.cn 及高校官方转发）。第十六届蓝桥杯于2025年举办，省赛2025年4月，全国总决赛2025年6月中上旬，主办单位为工业和信息化部人才交流中心（组委会通知落款）。截止时间差异：不同赛项报名/作品提交截止不同——软件赛/电子赛/项目实战赛为2024-12-13，数字科技创新赛2025-03-28，视觉艺术设计赛2025-04-25，专项赛2024-11月；本标注取软件赛主赛项截止2024-12-13。官网主通知在 dasai.lanqiao.cn 检索未直接命中，registration_deadline 证据来自组委会通知的第三方镜像(saikr)及高校官方转发(首都经贸大学)，二者一致；总决赛通知则可于官网 dasai.lanqiao.cn/notices/1784/ 直接核实。2025年官方名称为“蓝桥杯全国软件和信息技术专业人才大赛”。 无对应完整官方原文的报名/提交日期已清空为未知；不根据往年规律或候选占位日期推断。",
+  "competition_id": "lanqiao_2025"
 }

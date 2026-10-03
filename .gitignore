@@ -14,6 +14,7 @@ __pycache__/
 *.zip
 *.pdf
 !data/official_sources/*.pdf
+!data/official_sources/**/*.pdf
 output/
 demo/*
 # 正式演示视频（提交物之一，submission/README.md 直接引用，需入库）

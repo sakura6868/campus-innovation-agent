@@ -24,8 +24,8 @@
   "team_required": true,
   "team_min": 1,
   "team_max": 4,
-  "registration_deadline": "2026-06-15",
-  "submission_deadline": "2026-07-27",
+  "registration_deadline": null,
+  "submission_deadline": null,
   "competition_start_date": "2026-04-01",
   "competition_end_date": "2026-08-31",
   "result_announcement_date": "2026-08-31",
@@ -130,6 +130,6 @@
       "trusted_level": "A"
     }
   ],
-  "notes": "2026年为第十三届全国大学生物联网设计竞赛，主办方为“全国高等学校计算机教育研究会”（原占位“教育部高等学校计算机类教学指导委员会”已更正）；每队学生不超过4人（team_max 由3更正为4）。官网 iot.sjtu.edu.cn 已公布赛程：报名4月1日-6月15日，作品提交至7月27日，全国总决赛8月20-31日。award_distribution比例为示意，非官方固定比例。",
+  "notes": "2026年为第十三届全国大学生物联网设计竞赛，主办方为“全国高等学校计算机教育研究会”（原占位“教育部高等学校计算机类教学指导委员会”已更正）；每队学生不超过4人（team_max 由3更正为4）。官网 iot.sjtu.edu.cn 已公布赛程：报名4月1日-6月15日，作品提交至7月27日，全国总决赛8月20-31日。award_distribution比例为示意，非官方固定比例。 无对应完整官方原文的报名/提交日期已清空为未知；不根据往年规律或候选占位日期推断。",
   "official_source_status": "found"
 }

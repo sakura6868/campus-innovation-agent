@@ -17,8 +17,8 @@
   "team_required": true,
   "team_min": 3,
   "team_max": 3,
-  "registration_deadline": "2026-05-17",
-  "submission_deadline": "2026-05-05",
+  "registration_deadline": null,
+  "submission_deadline": null,
   "competition_start_date": "2026-03-01",
   "competition_end_date": "2026-08-31",
   "result_announcement_date": "2026-08-31",
@@ -113,6 +113,6 @@
       "trusted_level": "A"
     }
   ],
-  "notes": "由公开赛事名录整理的结构化参考字段，尚未完成人工核验；仅供导航参考，正式报名请以主办单位官方通知为准。\n【核验2026-07-18】已据中国统计教育学会官方通知（第十二届，2026）更正：团队须满3人（原team_min=1有误，已更正为3）；专业不限（原allowed_majors 列表有误，已置空）；赛程为3月启动、各校5月中旬前推荐省赛、省赛6月、国赛7-8月，故 registration_deadline 取各校推荐省赛截止2026-05-17、submission_deadline 取作品提交约2026-05-05（各省略有差异）、competition_end_date/result 取2026-08-31（约值，国赛7-8月）。具体日期以大赛官网 tjjmds.ai-learning.net 及各赛区通知为准。",
+  "notes": "由公开赛事名录整理的结构化参考字段，尚未完成人工核验；仅供导航参考，正式报名请以主办单位官方通知为准。\n【核验2026-07-18】已据中国统计教育学会官方通知（第十二届，2026）更正：团队须满3人（原team_min=1有误，已更正为3）；专业不限（原allowed_majors 列表有误，已置空）；赛程为3月启动、各校5月中旬前推荐省赛、省赛6月、国赛7-8月，故 registration_deadline 取各校推荐省赛截止2026-05-17、submission_deadline 取作品提交约2026-05-05（各省略有差异）、competition_end_date/result 取2026-08-31（约值，国赛7-8月）。具体日期以大赛官网 tjjmds.ai-learning.net 及各赛区通知为准。 无对应完整官方原文的报名/提交日期已清空为未知；不根据往年规律或候选占位日期推断。",
   "official_source_status": "found"
 }

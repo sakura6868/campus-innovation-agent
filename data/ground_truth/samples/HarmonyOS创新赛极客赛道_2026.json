@@ -15,8 +15,8 @@
   "team_required": false,
   "team_min": 1,
   "team_max": 4,
-  "registration_deadline": "2026-05-15",
-  "submission_deadline": "2026-05-15",
+  "registration_deadline": null,
+  "submission_deadline": null,
   "result_announcement_date": "2026-05-30",
   "competition_start_date": null,
   "competition_end_date": "2026-06-12",
@@ -52,7 +52,7 @@
   "data_status": "unverified",
   "last_verified_at": null,
   "official_source_status": "found",
-  "notes": "自动发现于 2026-08-10，来源 赛氪 saikr.com/vse/huaweiGeekTrack2026。2026 赛季报名已于 5-15 截止、6-12 决赛已完成，入库用于历史参考与下一赛季（2027）预告；下届时间以官方公告为准。数据待人工核验。",
+  "notes": "自动发现于 2026-08-10，来源 赛氪 saikr.com/vse/huaweiGeekTrack2026。2026 赛季报名已于 5-15 截止、6-12 决赛已完成，入库用于历史参考与下一赛季（2027）预告；下届时间以官方公告为准。数据待人工核验。 无对应完整官方原文的报名/提交日期已清空为未知；不根据往年规律或候选占位日期推断。",
   "evidence": [],
   "doc_version": "2026_v1"
 }

@@ -26,7 +26,7 @@
   "team_min": 1,
   "team_max": 3,
   "registration_deadline": "2026-07-31",
-  "submission_deadline": "2026-07-31",
+  "submission_deadline": null,
   "competition_start_date": "2026-05-26",
   "competition_end_date": "2026-11-30",
   "result_announcement_date": "2026-11-30",
@@ -121,6 +121,6 @@
       "trusted_level": "A"
     }
   ],
-  "notes": "2026年为第八届全国大学生工业设计大赛，由全国工业设计一流专业建设协同创新平台、广东省本科高校工业设计专业教学指导委员会主办，广州美术学院承办（原占位“教育部高等学校工业设计专业教学指导分委员会”已更正）。报名原定6月30日，官网延期通知延至7月31日；全国终评及颁奖11月（competition_end/result 取11月末近似）。eligible_students 据官网补充“专科生”。award_distribution比例为示意，非官方固定比例；team_max 3 为原值未单独核实。",
+  "notes": "2026年为第八届全国大学生工业设计大赛，由全国工业设计一流专业建设协同创新平台、广东省本科高校工业设计专业教学指导委员会主办，广州美术学院承办（原占位“教育部高等学校工业设计专业教学指导分委员会”已更正）。报名原定6月30日，官网延期通知延至7月31日；全国终评及颁奖11月（competition_end/result 取11月末近似）。eligible_students 据官网补充“专科生”。award_distribution比例为示意，非官方固定比例；team_max 3 为原值未单独核实。 无对应完整官方原文的报名/提交日期已清空为未知；不根据往年规律或候选占位日期推断。",
   "official_source_status": "found"
 }

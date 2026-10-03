@@ -14,8 +14,8 @@
   "team_required": false,
   "team_min": 1,
   "team_max": 1,
-  "registration_deadline": "2026-05-31",
-  "submission_deadline": "2026-05-31",
+  "registration_deadline": null,
+  "submission_deadline": null,
   "competition_start_date": "2026-04-01",
   "competition_end_date": "2026-05-31",
   "result_announcement_date": null,
@@ -104,6 +104,6 @@
       "trusted_level": "A"
     }
   ],
-  "notes": "依据批改网官网及西南石油大学转发通知核验。原记录日期（2026-09/10月）为错误占位，已更正为2026年真实活动期（4月1日-5月31日）。原required_materials中的“演讲稿、参赛视频”与英语写作大赛性质不符，已修正为线上英语作文提交（官方未单列材料清单，维度/技能为通用归纳）。eligible_students官方表述为“在校大、中学生”，本表列高校相关类别（含研究生），中学生不在校园导航范围。result_announcement_date：校级初赛后评选、全国决赛6月中下旬，未给确切日期，置空待补充。",
+  "notes": "依据批改网官网及西南石油大学转发通知核验。原记录日期（2026-09/10月）为错误占位，已更正为2026年真实活动期（4月1日-5月31日）。原required_materials中的“演讲稿、参赛视频”与英语写作大赛性质不符，已修正为线上英语作文提交（官方未单列材料清单，维度/技能为通用归纳）。eligible_students官方表述为“在校大、中学生”，本表列高校相关类别（含研究生），中学生不在校园导航范围。result_announcement_date：校级初赛后评选、全国决赛6月中下旬，未给确切日期，置空待补充。 无对应完整官方原文的报名/提交日期已清空为未知；不根据往年规律或候选占位日期推断。",
   "official_source_status": "found"
 }

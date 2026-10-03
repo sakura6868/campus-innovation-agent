@@ -41,14 +41,14 @@
       "metric": "deadline_consistency",
       "scenario": "报名日期与 Ground Truth 一致",
       "passed": true,
-      "detail": "194/194 项报名截止日期与 Ground Truth 一致"
+      "detail": "196/196 项报名截止日期与 Ground Truth 一致"
     },
     {
       "case_id": "FE-02",
       "metric": "deadline_consistency",
       "scenario": "提交日期与 Ground Truth 一致",
       "passed": true,
-      "detail": "194/194 项提交截止日期与 Ground Truth 一致"
+      "detail": "196/196 项提交截止日期与 Ground Truth 一致"
     },
     {
       "case_id": "FE-03",
@@ -83,14 +83,14 @@
       "metric": "citation_accuracy",
       "scenario": "核心字段均有证据",
       "passed": true,
-      "detail": "10/10 个官网来源已确认赛事的5类关键字段均有完整证据"
+      "detail": "12/12 个官网来源已确认赛事的5类关键字段均有完整证据"
     },
     {
       "case_id": "FE-08",
       "metric": "citation_accuracy",
       "scenario": "证据元数据完整",
       "passed": true,
-      "detail": "76/76 条推荐级证据具备定位信息、原文、链接、获取和来源检查日期"
+      "detail": "92/92 条推荐级证据具备定位信息、原文、链接、获取和来源检查日期"
     },
     {
       "case_id": "FE-09",
@@ -143,17 +143,17 @@
     }
   ],
   "regression": {
-    "tests_run": 147,
-    "passed": 147,
+    "tests_run": 152,
+    "passed": 152,
     "failures": 0,
     "errors": 0,
     "subtests_passed": 26,
     "successful": true,
-    "output": "147 passed, 26 subtests passed in 8.50s"
+    "output": "152 passed, 26 subtests passed in 8.99s"
   },
   "freeze": null,
   "fixture_date": "2026-10-03",
-  "dataset_sha256": "0d6cb3c5b0de18a1d37db2c654629a6593cada66191dbb47db3007b50063b43f",
-  "code_sha256": "d9978f3802433ee2037f557e4142103ec2a7476b1b4f6d32bd9fd4f7fa393306",
-  "competition_snapshot_sha256": "d2ed4386dafeb3680b39b0dad1a43ed132a238e63371d671dd61f959e1cff8ae"
+  "dataset_sha256": "99e1411397787e514e98f1b48b7e1a5cb9870cb92faed090eda94c78b5c491b5",
+  "code_sha256": "2c3188bdc1cdc119931f50dc531d2fd9f2c552f73bfb28da47924ed0f5a8b004",
+  "competition_snapshot_sha256": "6bb269e39fd6f504c0084a0531d4ba83a61a97fe490b3c5d945d654b791d1f56"
 }

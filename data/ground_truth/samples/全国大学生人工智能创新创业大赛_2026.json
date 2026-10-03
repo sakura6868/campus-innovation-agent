@@ -15,8 +15,8 @@
   "team_required": true,
   "team_min": 1,
   "team_max": 3,
-  "registration_deadline": "2026-10-28",
-  "submission_deadline": "2026-11-05",
+  "registration_deadline": null,
+  "submission_deadline": null,
   "result_announcement_date": "2026-12-07",
   "competition_start_date": null,
   "competition_end_date": "2026-12-06",
@@ -59,7 +59,7 @@
   "data_status": "unverified",
   "last_verified_at": null,
   "official_source_status": "found",
-  "notes": "自动发现于 2026-08-10，来源 大赛官网 rgzn.52jingsai.com。初赛报名至 2026-10-28，决赛作品截止 11-05，决赛评审 11-06 至 12-06，获奖公示 12-07。决赛收取评审费（个人70元/组队60元每人）。数据待人工核验。",
+  "notes": "自动发现于 2026-08-10，来源 大赛官网 rgzn.52jingsai.com。初赛报名至 2026-10-28，决赛作品截止 11-05，决赛评审 11-06 至 12-06，获奖公示 12-07。决赛收取评审费（个人70元/组队60元每人）。数据待人工核验。 无对应完整官方原文的报名/提交日期已清空为未知；不根据往年规律或候选占位日期推断。",
   "evidence": [],
   "doc_version": "2026_v1"
 }

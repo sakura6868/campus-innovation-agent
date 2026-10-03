@@ -1,111 +1,126 @@
 {
   "competition_id": "dmt_2026",
-  "competition_name": "全国大学生数字媒体科技作品及创意竞赛",
+  "competition_name": "2026年第十四届全国大学生数字媒体科技作品及创意竞赛（在校学生自主选题）",
   "document_year": 2026,
+  "organizer": "全国大学生数字媒体科技作品及创意竞赛组委会",
   "category": "design",
-  "organizer": "中国人工智能学会",
+  "official_source_url": "https://www.cmit.cn/wap/tongzhigonggao/show-144-45826-1.html",
+  "official_source_status": "found",
+  "source_acquired_date": "2026-10-03",
+  "last_verified_at": "2026-10-03",
+  "doc_version": "2026_autumn_20261003",
   "eligible_students": [
     "本科生",
     "研究生",
-    "专科生",
-    "毕业生（毕业5年内）"
+    "专科生"
   ],
-  "allowed_grades": [
-    "大一",
-    "大二",
-    "大三",
-    "大四"
-  ],
+  "allowed_grades": null,
   "allowed_majors": null,
   "team_required": true,
-  "team_min": 1,
+  "team_min": null,
   "team_max": 5,
-  "registration_deadline": null,
-  "submission_deadline": null,
-  "competition_start_date": null,
-  "competition_end_date": null,
-  "result_announcement_date": null,
-  "award_settings": "设一等奖、二等奖、三等奖、优秀奖，对获奖团队颁发证书并可推荐更高层级赛事。",
-  "award_distribution": [
-    {
-      "award": "一等奖",
-      "proportion": "约5%",
-      "note": "全国"
-    },
-    {
-      "award": "二等奖",
-      "proportion": "约15%",
-      "note": "全国"
-    },
-    {
-      "award": "三等奖",
-      "proportion": "约25%",
-      "note": "全国"
-    },
-    {
-      "award": "优秀奖",
-      "proportion": "其余",
-      "note": "省市赛"
-    }
-  ],
-  "brief_description": "全国大学生数字媒体科技作品及创意竞赛是由中国人工智能学会等主办的艺术设计类赛事，面向本科生、研究生、专科生及毕业5年内初创团队（专业不限）。以1-5人团队参赛，考察创意性、表现力、完整性与主题契合度。",
+  "registration_deadline": "2026-10-23",
+  "submission_deadline": "2026-10-23",
   "required_materials": [
-    "设计作品",
-    "创作说明",
-    "源文件",
-    "展示视频"
-  ],
-  "evaluation_dimensions": [
-    "创意性",
-    "表现力",
-    "完整性",
-    "主题契合"
+    "作品本体或可运行文件",
+    "作品说明文档",
+    "作品演示视频",
+    "图像佐证材料",
+    "原创性声明",
+    "知识产权说明",
+    "人工智能工具使用说明（使用时）"
   ],
   "required_skills": [
-    "平面设计",
-    "创意构思",
-    "排版",
+    "数字媒体",
     "视频制作",
-    "手绘"
+    "设计",
+    "软件开发"
   ],
-  "official_source_url": "http://www.cmit.cn",
-  "source_acquired_date": "2026-07-18",
-  "trusted_level": "B",
+  "evaluation_dimensions": [],
   "data_status": "unverified",
-  "last_verified_at": "2026-07-18",
-  "doc_version": "2026_v1",
+  "trusted_level": "B",
   "evidence": [
     {
-      "field": "competition_name",
+      "field": "registration_deadline",
+      "source_text": "赛程时间：截至2026年10月23日23:59:59",
       "page": null,
-      "source_text": "全国大学生数字媒体科技作品及创意竞赛",
-      "document_name": "数媒竞赛网（官方）",
-      "source_url": "http://www.cmit.cn",
-      "acquired_date": "2026-07-18",
-      "last_verified_at": "2026-07-18",
-      "trusted_level": "A"
+      "document_name": "dmt_2026_official.html",
+      "source_url": "https://www.cmit.cn/wap/tongzhigonggao/show-144-45826-1.html",
+      "trusted_level": "A",
+      "document_sha256": "8c05a90992f2ffdac519b41d41f5afd5fb2f77a2863f98b2df3775006a07b342",
+      "acquired_date": "2026-10-03",
+      "last_verified_at": "2026-10-03"
     },
     {
-      "field": "team_max",
+      "field": "registration_deadline_at",
+      "source_text": "赛程时间：截至2026年10月23日23:59:59",
       "page": null,
-      "source_text": "单支队伍参赛学生最少1人、最多5人",
-      "document_name": "2026全国大学生数字媒体科技作品及创意竞赛手机版作品提交流程使用说明",
-      "source_url": "http://www.cmit.cn/wap/liucheng/show-277-45691-1.html",
-      "acquired_date": "2026-07-18",
-      "last_verified_at": "2026-07-18",
-      "trusted_level": "A"
+      "document_name": "dmt_2026_official.html",
+      "source_url": "https://www.cmit.cn/wap/tongzhigonggao/show-144-45826-1.html",
+      "trusted_level": "A",
+      "document_sha256": "8c05a90992f2ffdac519b41d41f5afd5fb2f77a2863f98b2df3775006a07b342",
+      "acquired_date": "2026-10-03",
+      "last_verified_at": "2026-10-03"
+    },
+    {
+      "field": "submission_deadline",
+      "source_text": "赛程时间：截至2026年10月23日23:59:59",
+      "page": null,
+      "document_name": "dmt_2026_official.html",
+      "source_url": "https://www.cmit.cn/wap/tongzhigonggao/show-144-45826-1.html",
+      "trusted_level": "A",
+      "document_sha256": "8c05a90992f2ffdac519b41d41f5afd5fb2f77a2863f98b2df3775006a07b342",
+      "acquired_date": "2026-10-03",
+      "last_verified_at": "2026-10-03"
+    },
+    {
+      "field": "submission_deadline_at",
+      "source_text": "赛程时间：截至2026年10月23日23:59:59",
+      "page": null,
+      "document_name": "dmt_2026_official.html",
+      "source_url": "https://www.cmit.cn/wap/tongzhigonggao/show-144-45826-1.html",
+      "trusted_level": "A",
+      "document_sha256": "8c05a90992f2ffdac519b41d41f5afd5fb2f77a2863f98b2df3775006a07b342",
+      "acquired_date": "2026-10-03",
+      "last_verified_at": "2026-10-03"
     },
     {
       "field": "eligible_students",
+      "source_text": "本次竞赛报名面向普通高等学校全日制在校学生开放，参赛学生范围包括研究生、本科生及高职高专学生，参赛专业不受限制。",
       "page": null,
-      "source_text": "凡教育部批准设立的普通高等学校（含高职高专）各类在校生均可参赛；近5年及以内毕业生的大学生初创团队",
-      "document_name": "数媒竞赛网（官方）赛事介绍",
-      "source_url": "https://www.cmit.cn/wap/index.html",
-      "acquired_date": "2026-07-18",
-      "last_verified_at": "2026-07-18",
-      "trusted_level": "A"
+      "document_name": "dmt_2026_official.html",
+      "source_url": "https://www.cmit.cn/wap/tongzhigonggao/show-144-45826-1.html",
+      "trusted_level": "A",
+      "document_sha256": "8c05a90992f2ffdac519b41d41f5afd5fb2f77a2863f98b2df3775006a07b342",
+      "acquired_date": "2026-10-03",
+      "last_verified_at": "2026-10-03"
+    },
+    {
+      "field": "team_max",
+      "source_text": "每个参赛团队的学生人数不超过五人",
+      "page": null,
+      "document_name": "dmt_2026_official.html",
+      "source_url": "https://www.cmit.cn/wap/tongzhigonggao/show-144-45826-1.html",
+      "trusted_level": "A",
+      "document_sha256": "8c05a90992f2ffdac519b41d41f5afd5fb2f77a2863f98b2df3775006a07b342",
+      "acquired_date": "2026-10-03",
+      "last_verified_at": "2026-10-03"
+    },
+    {
+      "field": "required_materials",
+      "source_text": "参赛作品材料通常包含作品本体或可运行文件、作品说明文档、作品演示视频、图像佐证材料、原创性声明、知识产权说明以及人工智能工具使用说明等类别。",
+      "page": null,
+      "document_name": "dmt_2026_official.html",
+      "source_url": "https://www.cmit.cn/wap/tongzhigonggao/show-144-45826-1.html",
+      "trusted_level": "A",
+      "document_sha256": "8c05a90992f2ffdac519b41d41f5afd5fb2f77a2863f98b2df3775006a07b342",
+      "acquired_date": "2026-10-03",
+      "last_verified_at": "2026-10-03"
     }
   ],
-  "notes": "由公开赛事名录整理的结构化参考字段，尚未完成人工核验；仅供导航参考，正式报名请以主办单位官方通知为准。 已核实：官方名称、主办单位（官网显示为组委会/中国人工智能学会）、团队1-5人、参赛对象含专科生及毕业5年内初创团队；2026年具体报名与作品提交截止日期未在官网公开摘要中取得，原占位日期已置空，请以官网（cmit.cn）为准。",
-  "official_source_status": "found"
+  "registration_deadline_at": "2026-10-23T23:59:59+08:00",
+  "submission_deadline_at": "2026-10-23T23:59:59+08:00",
+  "deadline_timezone_basis": "campus_default",
+  "brief_description": "面向全日制在校学生的数字媒体自主选题赛事，具体材料按所选赛道核对附件。",
+  "notes": "删除旧的无证据主办方、奖项比例及仅限大一至大四条件。毕业五年内团队仅可报指定开放命题，不纳入本记录通用资格。指南PDF为扫描件，保存原件供用户查看；人数下限未明确，保持未知并维持候选。时区为校园假设，最终以官网最新通知为准。"
 }

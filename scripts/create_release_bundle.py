@@ -30,6 +30,9 @@ DEFAULT_INCLUDE_DIRS = (
 )
 DEFAULT_INCLUDE_FILES = (
     "README.md",
+    "SUBMISSION.md",
+    "VERSION",
+    "LICENSE",
     "参赛作品说明.md",
     "requirements.txt",
     "Dockerfile",
@@ -43,6 +46,7 @@ DEFAULT_INCLUDE_FILES = (
     "pytest.ini",
     ".env.example",
     ".gitignore",
+    ".gitattributes",
     ".dockerignore",
 )
 EXCLUDED_PARTS = {

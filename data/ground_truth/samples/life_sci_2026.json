@@ -20,8 +20,8 @@
   "team_required": true,
   "team_min": 1,
   "team_max": 5,
-  "registration_deadline": "2026-01-15",
-  "submission_deadline": "2026-05-31",
+  "registration_deadline": null,
+  "submission_deadline": null,
   "competition_start_date": null,
   "competition_end_date": "2026-07-31",
   "result_announcement_date": "2026-07-31",
@@ -105,6 +105,6 @@
       "trusted_level": "A"
     }
   ],
-  "notes": "依据官网culsc.cn及第十一届(2026)竞赛通知核实并订正：原eligible_students含研究生(错误，本竞赛仅面向本、专科生)、team_max=3(错误，应为不超过5名)、registration_deadline=2026-09-06、submission_deadline=2026-09-27均为占位错误，已更正(报名截止2026-01-15、材料上传截止2026-05-31、全国决赛2026年7月下旬)。第十一届设科学探究类与创新创业类两赛道，二者赛程略有差异(创新创业类网报2026-01-20至2026-04-20)，本标注以科学探究类为主。原award_distribution占位百分比无官方依据，已置空。",
+  "notes": "依据官网culsc.cn及第十一届(2026)竞赛通知核实并订正：原eligible_students含研究生(错误，本竞赛仅面向本、专科生)、team_max=3(错误，应为不超过5名)、registration_deadline=2026-09-06、submission_deadline=2026-09-27均为占位错误，已更正(报名截止2026-01-15、材料上传截止2026-05-31、全国决赛2026年7月下旬)。第十一届设科学探究类与创新创业类两赛道，二者赛程略有差异(创新创业类网报2026-01-20至2026-04-20)，本标注以科学探究类为主。原award_distribution占位百分比无官方依据，已置空。 无对应完整官方原文的报名/提交日期已清空为未知；不根据往年规律或候选占位日期推断。",
   "official_source_status": "found"
 }

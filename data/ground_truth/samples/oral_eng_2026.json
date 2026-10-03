@@ -18,8 +18,8 @@
   "team_required": false,
   "team_min": 1,
   "team_max": 1,
-  "registration_deadline": "2026-12-12",
-  "submission_deadline": "2027-01-10",
+  "registration_deadline": null,
+  "submission_deadline": null,
   "competition_start_date": "2026-12-26",
   "competition_end_date": "2027-01-16",
   "result_announcement_date": "2027-03-01",
@@ -73,5 +73,5 @@
   "last_verified_at": "2026-07-18",
   "doc_version": "2026_v1",
   "evidence": [],
-  "notes": "由公开赛事名录整理的结构化参考字段，尚未完成人工核验；仅供导航参考，正式报名请以主办单位官方通知为准。 2026-07-18 核验：未找到名为“全国大学生英语口语竞赛”的权威全国性赛事依据；检索到的相关赛事为“全国大学生英语竞赛（NECCS，chinaneccs.cn，含决赛口试）”与区域性的“讯飞杯全国高校英语口语大赛”（安徽）等。字段 organizer/eligible_students/team/dates 等均未能找到官方依据，保留原值待人工确认。【核实结论 2026-07-18】未找到官方链接，数据来源待确认，请勿当作定论。注：名称相近的真实赛事为“全国大学生英语竞赛(NECCS)”（chinaneccs.cn，含决赛口试环节）。"
+  "notes": "由公开赛事名录整理的结构化参考字段，尚未完成人工核验；仅供导航参考，正式报名请以主办单位官方通知为准。 2026-07-18 核验：未找到名为“全国大学生英语口语竞赛”的权威全国性赛事依据；检索到的相关赛事为“全国大学生英语竞赛（NECCS，chinaneccs.cn，含决赛口试）”与区域性的“讯飞杯全国高校英语口语大赛”（安徽）等。字段 organizer/eligible_students/team/dates 等均未能找到官方依据，保留原值待人工确认。【核实结论 2026-07-18】未找到官方链接，数据来源待确认，请勿当作定论。注：名称相近的真实赛事为“全国大学生英语竞赛(NECCS)”（chinaneccs.cn，含决赛口试环节）。 无对应完整官方原文的报名/提交日期已清空为未知；不根据往年规律或候选占位日期推断。"
 }

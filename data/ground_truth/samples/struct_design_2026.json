@@ -24,8 +24,8 @@
   "team_required": true,
   "team_min": 3,
   "team_max": 3,
-  "registration_deadline": "2026-11-15",
-  "submission_deadline": "2026-12-13",
+  "registration_deadline": null,
+  "submission_deadline": null,
   "competition_start_date": "2026-11-28",
   "competition_end_date": "2026-12-18",
   "result_announcement_date": "2027-01-20",
@@ -110,6 +110,6 @@
       "trusted_level": "A"
     }
   ],
-  "notes": "由公开赛事名录整理的结构化参考字段，尚未完成人工核验；仅供导航参考，正式报名请以主办单位官方通知为准。\n【核验2026-07-18】已据官方/省级通知更正：主办单位为相关教指委与学会（原“教育部高等学校土木工程专业教学指导分委员会”为旧称/不完整，已更正）；团队3人（原team_min=1、team_max=5有误，已更正为3）。字段registration_deadline/submission_deadline/competition_start_date/competition_end_date/result_announcement_date 未能从官方来源逐一确认（原文件 trusted_level C 的占位值，保留原值待人工确认）；分区赛多在夏季（如湖北赛区2026-07-08至07-10），全国总决赛时间请以 structurecontest.com 官方通知为准。",
+  "notes": "由公开赛事名录整理的结构化参考字段，尚未完成人工核验；仅供导航参考，正式报名请以主办单位官方通知为准。\n【核验2026-07-18】已据官方/省级通知更正：主办单位为相关教指委与学会（原“教育部高等学校土木工程专业教学指导分委员会”为旧称/不完整，已更正）；团队3人（原team_min=1、team_max=5有误，已更正为3）。字段registration_deadline/submission_deadline/competition_start_date/competition_end_date/result_announcement_date 未能从官方来源逐一确认（原文件 trusted_level C 的占位值，保留原值待人工确认）；分区赛多在夏季（如湖北赛区2026-07-08至07-10），全国总决赛时间请以 structurecontest.com 官方通知为准。 无对应完整官方原文的报名/提交日期已清空为未知；不根据往年规律或候选占位日期推断。",
   "official_source_status": "found"
 }

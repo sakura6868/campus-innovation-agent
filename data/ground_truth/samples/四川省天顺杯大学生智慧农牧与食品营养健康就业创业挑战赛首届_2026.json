@@ -13,8 +13,8 @@
   "team_required": true,
   "team_min": 1,
   "team_max": null,
-  "registration_deadline": "2026-09-10",
-  "submission_deadline": "2026-09-10",
+  "registration_deadline": null,
+  "submission_deadline": null,
   "result_announcement_date": null,
   "competition_start_date": null,
   "competition_end_date": null,
@@ -41,7 +41,7 @@
   "data_status": "unverified",
   "last_verified_at": null,
   "official_source_status": "found",
-  "notes": "自动发现于 2026-08-10，来源 成都大学创新创业学院通知 cxcyxy.cdu.edu.cn/info/1019/4352.htm（2026-07-19 发布）。报名截止 2026-09-10 24:00，报名网址 cp.moocollege.com。省级赛事但面向全国开放。数据待人工核验。",
+  "notes": "自动发现于 2026-08-10，来源 成都大学创新创业学院通知 cxcyxy.cdu.edu.cn/info/1019/4352.htm（2026-07-19 发布）。报名截止 2026-09-10 24:00，报名网址 cp.moocollege.com。省级赛事但面向全国开放。数据待人工核验。 无对应完整官方原文的报名/提交日期已清空为未知；不根据往年规律或候选占位日期推断。",
   "evidence": [],
   "doc_version": "2026_v1"
 }

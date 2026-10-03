@@ -26,7 +26,7 @@
   "team_min": 1,
   "team_max": 4,
   "registration_deadline": "2026-05-10",
-  "submission_deadline": "2026-05-10",
+  "submission_deadline": null,
   "competition_start_date": "2026-07-12",
   "competition_end_date": "2026-07-13",
   "result_announcement_date": "2026-07-13",
@@ -146,6 +146,6 @@
       "trusted_level": "A"
     }
   ],
-  "notes": "原记录主办'教育部高等学校计算机类教学指导委员会'不准确，已更正为'中国高校智能机器人创意大赛组委会'。原team_max=4、各round占位日期已据第九届(2026)通知更正：主题一/二每队1-3人、主题三1-4人（取最大值4），官方报名2026-05-10截止，全国赛2026-07-12至07-13。eligible_students补充专科生。原记录名称保持。",
+  "notes": "原记录主办'教育部高等学校计算机类教学指导委员会'不准确，已更正为'中国高校智能机器人创意大赛组委会'。原team_max=4、各round占位日期已据第九届(2026)通知更正：主题一/二每队1-3人、主题三1-4人（取最大值4），官方报名2026-05-10截止，全国赛2026-07-12至07-13。eligible_students补充专科生。原记录名称保持。 无对应完整官方原文的报名/提交日期已清空为未知；不根据往年规律或候选占位日期推断。",
   "official_source_status": "found"
 }

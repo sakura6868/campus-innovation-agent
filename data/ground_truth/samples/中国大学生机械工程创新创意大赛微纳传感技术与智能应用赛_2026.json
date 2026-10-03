@@ -14,8 +14,8 @@
   "team_required": true,
   "team_min": 2,
   "team_max": 5,
-  "registration_deadline": "2026-05-15",
-  "submission_deadline": "2026-05-31",
+  "registration_deadline": null,
+  "submission_deadline": null,
   "result_announcement_date": null,
   "competition_start_date": null,
   "competition_end_date": null,
@@ -59,7 +59,7 @@
   "data_status": "unverified",
   "last_verified_at": null,
   "official_source_status": "found",
-  "notes": "自动发现于 2026-07-19，来源 https://www.smee.uestc.edu.cn/info/1094/22882.htm（电子科技大学通知，赛事官网 https://mnems.xjtu.edu.cn）。2026年报名已于5月15日截止、作品提交5月31日截止，全国总决赛2026年8月中下旬于山东烟台，数据待人工核验。",
+  "notes": "自动发现于 2026-07-19，来源 https://www.smee.uestc.edu.cn/info/1094/22882.htm（电子科技大学通知，赛事官网 https://mnems.xjtu.edu.cn）。2026年报名已于5月15日截止、作品提交5月31日截止，全国总决赛2026年8月中下旬于山东烟台，数据待人工核验。 无对应完整官方原文的报名/提交日期已清空为未知；不根据往年规律或候选占位日期推断。",
   "evidence": [],
   "doc_version": "2026_v1"
 }

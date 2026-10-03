@@ -7,7 +7,7 @@ from pathlib import Path
 
 def dataset_sha256(root: Path) -> str:
     files = sorted((root / "data/ground_truth/samples").glob("*.json"))
-    return hashlib.sha256(b"".join(path.read_bytes() for path in files)).hexdigest()
+    return hashlib.sha256(b"".join(path.read_bytes().replace(b"\r\n", b"\n") for path in files)).hexdigest()
 
 
 def code_sha256(root: Path) -> str:

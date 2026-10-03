@@ -15,8 +15,8 @@
   "team_required": false,
   "team_min": 1,
   "team_max": null,
-  "registration_deadline": "2026-10-20",
-  "submission_deadline": "2026-10-20",
+  "registration_deadline": null,
+  "submission_deadline": null,
   "result_announcement_date": null,
   "competition_start_date": "2026-03-20",
   "competition_end_date": "2026-10-31",
@@ -42,7 +42,7 @@
   "data_status": "unverified",
   "last_verified_at": null,
   "official_source_status": "found",
-  "notes": "自动发现于 2026-08-10，来源 赛氪 saikr.com（国赛报名 2026-03-20 至 2026-10-20，省赛至 2026-10-31）。作品须由队长在电脑端提交。数据待人工核验。",
+  "notes": "自动发现于 2026-08-10，来源 赛氪 saikr.com（国赛报名 2026-03-20 至 2026-10-20，省赛至 2026-10-31）。作品须由队长在电脑端提交。数据待人工核验。 无对应完整官方原文的报名/提交日期已清空为未知；不根据往年规律或候选占位日期推断。",
   "evidence": [],
   "doc_version": "2026_v1"
 }

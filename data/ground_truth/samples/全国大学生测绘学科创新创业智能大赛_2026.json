@@ -16,7 +16,7 @@
   "team_required": true,
   "team_min": 1,
   "team_max": 2,
-  "registration_deadline": "2026-06-20",
+  "registration_deadline": null,
   "submission_deadline": null,
   "result_announcement_date": null,
   "competition_start_date": null,
@@ -62,7 +62,7 @@
   "data_status": "unverified",
   "last_verified_at": null,
   "official_source_status": "found",
-  "notes": "自动发现于 2026-07-19，来源 https://www.csgpc.org/detail/27080.html（中国测绘学会一号通知，2026-04-03 发布）。该赛事2026年报名已于6月20日截止，决赛于2026年7月底举行；registration_deadline 等日期以官方通知为准，数据待人工核验。",
+  "notes": "自动发现于 2026-07-19，来源 https://www.csgpc.org/detail/27080.html（中国测绘学会一号通知，2026-04-03 发布）。该赛事2026年报名已于6月20日截止，决赛于2026年7月底举行；registration_deadline 等日期以官方通知为准，数据待人工核验。 无对应完整官方原文的报名/提交日期已清空为未知；不根据往年规律或候选占位日期推断。",
   "evidence": [],
   "doc_version": "2026_v1"
 }

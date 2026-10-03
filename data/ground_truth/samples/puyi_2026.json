@@ -20,7 +20,7 @@
   "team_min": 1,
   "team_max": 1,
   "registration_deadline": "2026-06-02",
-  "submission_deadline": "2026-06-02",
+  "submission_deadline": null,
   "competition_start_date": "2026-05-26",
   "competition_end_date": "2026-07-16",
   "result_announcement_date": "2026-07-16",
@@ -129,6 +129,6 @@
       "trusted_level": "A"
     }
   ],
-  "notes": "原记录名称'普译奖全国大学生英语写作/翻译大赛'合并了两个独立赛事：'普译奖全国大学生翻译比赛'(puyi.52jingsai.com，2026为第十届)与'普译奖全国大学生英语写作大赛'(py.52jingsai.com，8-11月报名)。本记录已据实更正为'翻译比赛'并保留其2026年日程。原team_max=1、各round占位日期已据实更正。译文提交2026-05-26至06-02，国赛评审至07-15，获奖公示07-16。",
+  "notes": "原记录名称'普译奖全国大学生英语写作/翻译大赛'合并了两个独立赛事：'普译奖全国大学生翻译比赛'(puyi.52jingsai.com，2026为第十届)与'普译奖全国大学生英语写作大赛'(py.52jingsai.com，8-11月报名)。本记录已据实更正为'翻译比赛'并保留其2026年日程。原team_max=1、各round占位日期已据实更正。译文提交2026-05-26至06-02，国赛评审至07-15，获奖公示07-16。 无对应完整官方原文的报名/提交日期已清空为未知；不根据往年规律或候选占位日期推断。",
   "official_source_status": "found"
 }

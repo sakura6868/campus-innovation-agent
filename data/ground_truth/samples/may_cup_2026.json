@@ -14,8 +14,8 @@
   "team_required": true,
   "team_min": 1,
   "team_max": 3,
-  "registration_deadline": "2026-04-30",
-  "submission_deadline": "2026-05-04",
+  "registration_deadline": null,
+  "submission_deadline": null,
   "competition_start_date": "2026-05-01",
   "competition_end_date": "2026-05-04",
   "result_announcement_date": null,
@@ -136,6 +136,6 @@
       "trusted_level": "A"
     }
   ],
-  "notes": "依据五一数学建模竞赛官方网站（51mcm.cumt.edu.cn）及第二届十三届官方说明PDF核验。原记录中报名/竞赛日期（2026-12/2027-01）为错误占位值，已更正为2026年真实赛程（报名至4月30日、竞赛5月1-4日）。官方竞赛设研究生组、本科生组、专科生组、高中生组，本表仅列高校相关组别（本科生/研究生/专科生），高中生组未在校园导航范围内。各高校校内报名截止可能早于全国截止（如南京理工4月28日、南京财经4月12日），以各校通知为准。result_announcement_date官方说明未给出确切日期，置空待补充。",
+  "notes": "依据五一数学建模竞赛官方网站（51mcm.cumt.edu.cn）及第二届十三届官方说明PDF核验。原记录中报名/竞赛日期（2026-12/2027-01）为错误占位值，已更正为2026年真实赛程（报名至4月30日、竞赛5月1-4日）。官方竞赛设研究生组、本科生组、专科生组、高中生组，本表仅列高校相关组别（本科生/研究生/专科生），高中生组未在校园导航范围内。各高校校内报名截止可能早于全国截止（如南京理工4月28日、南京财经4月12日），以各校通知为准。result_announcement_date官方说明未给出确切日期，置空待补充。 无对应完整官方原文的报名/提交日期已清空为未知；不根据往年规律或候选占位日期推断。",
   "official_source_status": "found"
 }

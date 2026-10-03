@@ -15,7 +15,7 @@
   "team_min": 1,
   "team_max": 1,
   "registration_deadline": "2026-03-13",
-  "submission_deadline": "2026-04-12",
+  "submission_deadline": null,
   "competition_start_date": "2026-04-12",
   "competition_end_date": "2026-05-10",
   "result_announcement_date": null,
@@ -126,6 +126,6 @@
       "trusted_level": "A"
     }
   ],
-  "notes": "依据全国大学生英语竞赛官网（chinaneccs.cn）及赛氪报名页（neccs.saikr.com）核验。原记录日期（2026-10/11月）为错误占位，已更正为2026年真实赛程（报名至3月13日、初赛4月12日、决赛5月10日）。原required_materials/revaluation_dimensions/required_skills中“演讲稿、参赛视频、公众演讲”等内容与NECCS笔试（笔答+听力）性质不符，已按英语综合能力竞赛性质修正（官方未单列详细评分细则，相关维度为通用归纳）。result_announcement_date：官方称成绩查询为2026年5月下旬，未给确切日期，置空待补充。全国总决赛拟定2026年8月2日-7日在安徽合肥举办。",
+  "notes": "依据全国大学生英语竞赛官网（chinaneccs.cn）及赛氪报名页（neccs.saikr.com）核验。原记录日期（2026-10/11月）为错误占位，已更正为2026年真实赛程（报名至3月13日、初赛4月12日、决赛5月10日）。原required_materials/revaluation_dimensions/required_skills中“演讲稿、参赛视频、公众演讲”等内容与NECCS笔试（笔答+听力）性质不符，已按英语综合能力竞赛性质修正（官方未单列详细评分细则，相关维度为通用归纳）。result_announcement_date：官方称成绩查询为2026年5月下旬，未给确切日期，置空待补充。全国总决赛拟定2026年8月2日-7日在安徽合肥举办。 无对应完整官方原文的报名/提交日期已清空为未知；不根据往年规律或候选占位日期推断。",
   "official_source_status": "found"
 }
