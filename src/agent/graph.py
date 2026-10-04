@@ -2189,12 +2189,16 @@ def run_agent(
     top_k: int = 4,
     model: Optional[str] = None,
     context_competition_id: Optional[str] = None,
+    task_mode: bool = False,
 ) -> dict:
     """一次问答，走完整闭环，返回可直接序列化的结果字典。
 
     ``model`` 可选：请求级覆盖默认 LLM 模型（前端模型选择器透传），
     仅在已配置 LLM key 时生效；未配置或调用失败自动回退确定性模板。
     """
+    if task_mode:
+        from agent.planner import run_planning_task
+        return run_planning_task(question, user_id=user_id, competition_id=competition_id, model=model)
     run_id = f"agent_{uuid4().hex}"
     started = perf_counter()
 

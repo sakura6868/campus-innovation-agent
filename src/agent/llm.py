@@ -56,7 +56,7 @@ def configured_models() -> list[str]:
     return list(dict.fromkeys([default] + [value.strip() for value in optional if value.strip()]))
 
 
-def _post_chat(system: str, user: str, model: Optional[str] = None) -> Optional[str]:
+def _post_chat(system: str, user: str, model: Optional[str] = None, timeout: float = 20) -> Optional[str]:
     """调用 OpenAI 兼容 /chat/completions；任何异常都返回 None（优雅降级）。
 
     ``model`` 为可选请求级覆盖：传入时优先于环境变量 ``AGENT_LLM_MODEL``，
@@ -86,7 +86,7 @@ def _post_chat(system: str, user: str, model: Optional[str] = None) -> Optional[
         ],
     }
     try:
-        resp = requests.post(url, headers=headers, json=payload, timeout=20, allow_redirects=False)
+        resp = requests.post(url, headers=headers, json=payload, timeout=timeout, allow_redirects=False)
         resp.raise_for_status()
         data = resp.json()
         return (data["choices"][0]["message"]["content"] or "").strip() or None

@@ -14,6 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--archive", type=Path, required=True)
+    parser.add_argument("--base-url", default="http://127.0.0.1:8015")
     args = parser.parse_args()
     checks = []
 
@@ -37,7 +38,7 @@ def main():
                     secrets.append(value.strip().strip('"\'').encode())
         check("no_local_secrets", not any(secret in bundle.read(n) for n in names for secret in secrets))
 
-    base = "http://127.0.0.1:8015"
+    base = args.base_url.rstrip("/")
     def get(path, **kwargs):
         response = requests.get(base + path, timeout=30, **kwargs)
         response.raise_for_status()
@@ -77,7 +78,7 @@ def main():
         check("admin_closed_" + endpoint, response.status_code == 503)
     answer = get("/api/agent/ask", params={"question": "报名截止是什么时候？", "competition_id": "mathorcup_data_2026"})
     check("canonical_deadline", "2026-10-23 12:00" in answer["answer"] and bool(answer["citations"]))
-    report = {"generated_at": datetime.now(timezone.utc).isoformat(), "mode": "clean extracted release, fresh Python venv, offline HTTP", "archive_sha256": hashlib.sha256(args.archive.read_bytes()).hexdigest(), "records": len(all_items), "registerable": len(ready), "checks": checks, "passed": sum(c["passed"] for c in checks), "total": len(checks)}
+    report = {"generated_at": datetime.now(timezone.utc).isoformat(), "mode": "clean extracted release, isolated database, existing Python environment, offline HTTP", "archive_sha256": hashlib.sha256(args.archive.read_bytes()).hexdigest(), "records": len(all_items), "registerable": len(ready), "checks": checks, "passed": sum(c["passed"] for c in checks), "total": len(checks)}
     (ROOT / "evals/release_validation.json").write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     if report["passed"] != report["total"]:
         raise SystemExit(1)

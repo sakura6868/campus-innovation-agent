@@ -8,6 +8,10 @@ services:
     branch: master
     healthCheckPath: /health   # 对应 api.py 的 /health 端点
     envVars:
+      - key: APP_ENV
+        value: "production"
+      - key: ENABLE_DEMO_LOGIN
+        value: "0"
       - key: DATABASE_URL
         fromDatabase:
           name: campus-db
@@ -48,4 +52,4 @@ databases:
     plan: free                 # 免费 Postgres；数据持久化，重启不丢
     databaseName: campus
     user: campus
-    # 首次启动 api 的 lifespan 会自动 init_db() 建表 + seed（16 赛事 + 7 用户）
+    # 首次启动按当前 Ground Truth 建表灌库；生产环境默认关闭公开演示账号登录。

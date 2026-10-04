@@ -75,3 +75,10 @@ Invoke-RestMethod http://127.0.0.1:8000/health
 | Docker 找不到 `.env` | 从 `.env.example` 复制生成 |
 | 项目无法加入 | 确认已保存画像、赛事官网来源及五类关键证据完整，且仍可报名 |
 | 同名赛事未识别 | 在问题中写明年份，或先补齐该年份的官网关键证据 |
+
+
+## v1.3 生产配置
+
+`APP_ENV=production` 或 Render 环境会启用启动检查。`AUTH_TOKEN_SECRET` 与 `ADMIN_API_TOKEN` 必须分别设置，至少32字符，不得为占位值或相同值；禁止 `DEV_ADMIN_QUICK_LOGIN=1` 和 CORS 通配。`ENABLE_DEMO_LOGIN` 生产默认0，本地默认1。跨域按需设置 `CORS_ALLOWED_ORIGINS`，同源部署无需开启。Render 配置分别生成两个密钥，默认关闭演示登录。
+
+当前本地验收不代表已部署。旧的云数据库、模型凭据应分别在服务商控制台撤销/重新生成，更新平台私密配置后重启服务，并用旧值确认认证失败。只扫描仓库或删除聊天中的凭据不能证明已轮换；当前 `cloud_rotation_verified=false`。不要在报告或视频中粘贴任何密钥。

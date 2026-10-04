@@ -1,0 +1,9 @@
+{
+  "checked_at": "2026-10-04T06:09:53.783296+00:00",
+  "current_findings": [],
+  "historical_findings": [],
+  "current_clean": true,
+  "scope": "archive",
+  "limitations": "Pattern-based scan; not a full security audit. Historical exposure requires provider-side rotation.",
+  "cloud_rotation_verified": false
+}

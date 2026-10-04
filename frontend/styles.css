@@ -7543,3 +7543,15 @@ body.agent-fullscreen #view-agent.agent-codex,
 #agent-context-clear { width: 32px; height: 32px; flex: 0 0 32px; padding: 0; }
 #agent-context-clear[hidden] { display: none; }
 #view-agent.agent-codex .agent-titlebar h2 { white-space: nowrap; }
+.agent-planning-result { margin: 16px 0; padding: 14px; border: 1px solid rgba(187,134,51,.35); border-radius: 12px; }
+.agent-planning-result p { font-size: 13px; line-height: 1.7; }
+.agent-mode-field { flex: 0 0 212px; }
+#view-agent.agent-codex .agent-mode-field > span { white-space: nowrap; }
+#view-agent.agent-codex .agent-mode-field select { min-width: 140px; width: 140px; }
+.planning-options summary { cursor: pointer; padding: 8px 0; }
+@media (max-width: 640px) {
+  #view-agent.agent-codex .agent-context-bar { flex-wrap: wrap; }
+  #view-agent.agent-codex .agent-context-field:not(.agent-mode-field) { flex: 1 1 240px; min-width: 0; }
+  #view-agent.agent-codex .agent-context-field:not(.agent-mode-field) select { width: 100%; max-width: none; min-width: 0; }
+  #view-agent.agent-codex .agent-mode-field { flex: 0 1 140px; max-width: 140px; }
+}

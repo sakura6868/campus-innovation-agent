@@ -411,6 +411,7 @@ def save_agent_run(result: dict) -> str:
         "pending_review": bool(result.get("pending_review")),
         "citation_ids": [item.get("citation_id") for item in (result.get("citations") or []) if item.get("citation_id")],
         "data_version": result.get("metrics", {}).get("data_version") if isinstance(result.get("metrics"), dict) else None,
+        "planning": result.get("planning"),
     }
     try:
         with session_scope() as session:

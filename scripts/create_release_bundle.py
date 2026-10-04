@@ -59,6 +59,9 @@ EXCLUDED_NAMES = {".env", "campus_agent.db"}
 def should_include(path: Path) -> bool:
     """只保留可复现的源码、文档和 Ground Truth，不打包运行产物或密钥。"""
     relative = path.relative_to(PROJECT_ROOT)
+    # Archive verification is a sidecar: embedding its archive hash would be circular.
+    if relative.as_posix() == "evals/release_validation.json":
+        return False
     if relative.parts[:2] == ("submission", "releases"):
         return False
     if path.name.startswith(".env") and path.name != ".env.example":
@@ -108,7 +111,7 @@ def sha256_file(path: Path) -> str:
 def main() -> None:
     parser = argparse.ArgumentParser(description="生成校园科创导航智能体参赛源码包")
     parser.add_argument("--output-dir", default=str(PROJECT_ROOT / "backups"), help="归档输出目录")
-    parser.add_argument("--version", default="v0.5", help="归档文件名中的版本号")
+    parser.add_argument("--version", default=(PROJECT_ROOT / "VERSION").read_text().strip(), help="归档文件名中的版本号")
     args = parser.parse_args()
 
     output_dir = Path(args.output_dir).expanduser().resolve()
@@ -119,6 +122,13 @@ def main() -> None:
     manifest_path = output_dir / f"{bundle_name}.sha256"
     archive_root = PurePosixPath(bundle_name)
     files = collect_files()
+    try:
+        from scripts.security_audit import findings
+    except ModuleNotFoundError:
+        from security_audit import findings
+    exposed = [item for path in files for item in findings(path.relative_to(PROJECT_ROOT).as_posix(), path.read_bytes())]
+    if exposed:
+        raise SystemExit("Submission blocked: credential patterns found at " + ", ".join(item["path"] for item in exposed))
 
     with ZipFile(archive_path, "w", compression=ZIP_DEFLATED) as archive:
         for path in files:

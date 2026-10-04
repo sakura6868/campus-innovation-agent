@@ -95,6 +95,7 @@ from agent.graph import run_agent  # LangGraph 闭环：意图路由→隔离检
 from agent.llm import is_llm_enabled  # 可选 LLM 润色开关（无 key 自动关闭）
 from portfolio.optimizer import optimize_portfolios
 from radar.service import run_all as run_radar, validate_public_url, validate_watch_configuration
+from deployment_security import validate_production_configuration, demo_login_enabled, is_production
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 FRONTEND_DIR = PROJECT_ROOT / "frontend"
@@ -114,6 +115,7 @@ def _require_admin_token(token: str | None = Depends(_ADMIN_API_KEY)) -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    validate_production_configuration()
     # 启动时建表 + seed（幂等）
     db.init_db()
     # 从 DB 灌入赛事隔离 RAG（幂等：按 competition_id 覆盖），保证启动即可检索
@@ -129,7 +131,7 @@ app = FastAPI(title="校园科创导航智能体", version="0.3.0", lifespan=lif
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[v.strip() for v in os.getenv("CORS_ALLOWED_ORIGINS", "" if is_production() else "*").split(",") if v.strip()],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -595,6 +597,8 @@ def auth_login(payload: AuthLoginPayload) -> dict:
     """用户名 + 密码登录；返回账号信息与展示字段。"""
     username = (payload.username or "").strip()
     rec = db.get_auth_user(username)
+    if rec and rec.get("is_test") and not demo_login_enabled():
+        raise HTTPException(status_code=403, detail="当前部署未开放演示账号，请使用个人账号")
     if rec is None or not db.verify_password(payload.password, rec["password_hash"]):
         raise HTTPException(status_code=401, detail="用户名或密码错误")
     display_name = rec.get("display_name") or username
@@ -898,6 +902,7 @@ def agent_ask(
     context_competition_id: str | None = Query(None, description="当前对话上一轮赛事，仅用于自然追问"),
     top_k: int = Query(4, ge=1, le=10, description="隔离检索返回条数"),
     model: str | None = Query(None, description="可选：请求级覆盖默认 LLM 模型（如 qwen-plus/qwen-max/qwen-turbo），仅同源 key 可用"),
+    task_mode: bool = Query(False, description="按参赛目标执行受限工具规划与结果核验"),
 ) -> dict:
     """走完整 Agent 闭环，返回意图、答案、引用证据、门控/评分/推荐结果、执行轨迹。
 
@@ -908,12 +913,12 @@ def agent_ask(
         raise HTTPException(status_code=400, detail="所选模型未由服务端配置，请刷新模型列表")
     try:
         result = run_agent(question, user_id=user_id, competition_id=competition_id, top_k=top_k,
-                           model=model, context_competition_id=context_competition_id)
+                           model=model, context_competition_id=context_competition_id, task_mode=task_mode)
         result["user_id"] = user_id
         db.save_agent_run(result)
         return result
     except Exception as exc:  # 闭环异常不应崩服务
-        raise HTTPException(status_code=500, detail=f"Agent 执行异常：{exc}")
+        raise HTTPException(status_code=500, detail="Agent 执行未完成，请稍后重试")
 
 
 @app.get("/api/agent/llm-status", tags=["Agent"])
@@ -949,6 +954,7 @@ def replay_agent_run(run_id: str) -> dict:
         saved["question"],
         user_id=saved.get("user_id"),
         competition_id=saved.get("resolved_competition"),
+        task_mode=saved.get("intent") == "plan",
     )
     result["replayed_from"] = run_id
     result["user_id"] = saved.get("user_id")
@@ -965,7 +971,7 @@ def dev_admin_login(request: Request) -> dict:
     client_host = request.client.host if request.client else ""
     local_client = client_host in {"127.0.0.1", "::1", "localhost"}
     enabled = os.getenv("DEV_ADMIN_QUICK_LOGIN", "").strip().lower() in {"1", "true", "yes"}
-    if not enabled or not local_client:
+    if not enabled or not local_client or is_production():
         raise HTTPException(status_code=404, detail="本地调试入口未启用")
     if not _ADMIN_API_TOKEN:
         raise HTTPException(status_code=503, detail="本地管理员令牌未配置")

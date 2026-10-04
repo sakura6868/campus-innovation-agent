@@ -1,9 +1,7 @@
-# 参赛提交包
+# v1.3 当前交付包
 
-此目录保存 `v1.2-competition` 的完整提交包，包含源码、正式演示视频、官方资料、技术文档和评测结果，不含密钥或运行数据库。
+最新包：[完整参赛 ZIP](campus-innovation-agent-v1.3-competition-20261004-140856.zip)；[SHA256 清单](campus-innovation-agent-v1.3-competition-20261004-140856.sha256)。旧包属于历史或打包过程版本，提交请使用本页所链接的包。
 
-- [下载完整参赛 ZIP](campus-innovation-agent-v1.2-competition-20261004-001230.zip)
-- [SHA-256 校验清单](campus-innovation-agent-v1.2-competition-20261004-001230.sha256)
-- [提交材料入口](../../SUBMISSION.md)
+附件：[解压运行验收](v1.3-release-validation.json)（23/23）、[归档凭据模式扫描](v1.3-security-audit.json)（0项命中）。包内当前视频为3分40秒的实际浏览器演示，不含私密环境或运行数据库。
 
-解压后按根目录 README 配置环境并启动。此包以 `v1.2-competition` 为基础，同步了 2026-10-04 的提交文档修订，内容以本目录最新提交及 SHA-256 清单为准。固定标签仍保留原始冻结版，不包含本次文档修订。包内不包含本目录本身。
+源码与交付包发布到 `competition/v1.3-review` 评审分支；未合并到 Render 关联的 master，未云部署。云端旧数据库及模型凭据轮换尚未验证，不能用源码模式扫描代替撤销验证。真实用户效果与在线规划模型效果另待验收。完整边界见 [提交快照](../../docs/SUBMISSION_STATUS.md)。

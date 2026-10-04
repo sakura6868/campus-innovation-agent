@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>校园科创导航智能体</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='10' fill='%2316181d'/%3E%3Ctext x='32' y='40' text-anchor='middle' font-family='Arial' font-size='25' font-weight='700' fill='white'%3ECI%3C/text%3E%3C/svg%3E" />
-  <link rel="stylesheet" href="/static/styles.css?v=20261003.05" />
+  <link rel="stylesheet" href="/static/styles.css?v=20261004.01" />
 </head>
 <body class="theme-neumorphic">
   <header class="topnav">
@@ -317,6 +317,10 @@
             </select>
           </label>
           <button id="agent-context-clear" type="button" class="btn" title="清除对话赛事" aria-label="清除对话赛事" hidden>×</button>
+          <label class="agent-context-field agent-mode-field">
+            <span>使用方式</span>
+            <select id="agent-mode"><option value="answer">赛事问答</option><option value="plan">参赛规划</option></select>
+          </label>
           <label class="agent-profile-toggle">
             <input id="agent-use-profile" type="checkbox" checked />
             <span class="agent-toggle" aria-hidden="true"></span>
@@ -662,6 +666,6 @@
     <p class="muted">证据反映获取时的官方资料，报名请以官网最新通知为准。</p>
   </dialog>
 
-  <script src="/static/app.js?v=20261003.05"></script>
+  <script src="/static/app.js?v=20261004.01"></script>
 </body>
 </html>

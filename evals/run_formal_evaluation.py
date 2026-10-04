@@ -472,7 +472,7 @@ def render_report(payload: dict) -> str:
 
 def main() -> int:
     db.init_db()
-    from evaluation_provenance import code_sha256, competition_snapshot_sha256
+    from evaluation_provenance import code_sha256, competition_snapshot_sha256, dataset_sha256
 
     initial_snapshot_sha256 = competition_snapshot_sha256(db.list_competitions())
     results = []
@@ -513,7 +513,7 @@ def main() -> int:
         "regression": regression,
         "freeze": None,
         "fixture_date": EVALUATION_DATE.isoformat(),
-        "dataset_sha256": hashlib.sha256(b"".join(path.read_bytes() for path in sorted(GT_DIR.glob("*.json")))).hexdigest(),
+        "dataset_sha256": dataset_sha256(PROJECT_ROOT),
         "code_sha256": code_sha256(PROJECT_ROOT),
         "competition_snapshot_sha256": initial_snapshot_sha256,
     }

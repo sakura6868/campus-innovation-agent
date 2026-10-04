@@ -487,7 +487,7 @@ async function renderHome() {
 
   const radarMarkup = radarItems.length ? radarItems.slice(0, 3).map((item) => `<article class="home-update-item severity-${escapeHtml(item.severity || "low")}">
     <i></i><div><span>${item.kind === "impact" ? "影响我的计划" : "官方通知有变化"} · ${escapeHtml(radarTime(item.created_at))}</span><h3>${escapeHtml(item.title || "赛事更新")}</h3><p>${escapeHtml(item.message || "请查看赛事说明确认最新安排。")}</p></div><button type="button" data-home-route="#/radar">查看</button>
-  </article>`).join("") : `<div class="home-update-clear"><span>✓</span><div><b>当前没有需要立即处理的官方变化</b><small>赛事雷达仍在后台持续关注报名、赛程、材料与新赛季公告。</small></div><button class="btn ghost" data-home-route="#/radar">查看机会提醒</button></div>`;
+  </article>`).join("") : `<div class="home-update-clear"><span>✓</span><div><b>当前暂无已审核的官方变更</b><small>赛事雷达仍在后台持续关注报名、赛程、材料与新赛季公告。</small></div><button class="btn ghost" data-home-route="#/radar">查看机会提醒</button></div>`;
 
   const homeDueStat = dueSeven ? String(dueSeven) : "—";
   const homeOpenStat = allOpen.length ? String(allOpen.length) : "—";
@@ -505,7 +505,7 @@ async function renderHome() {
   <section class="home-stats" aria-label="今天的关键数字">
     <button type="button" data-home-route="#/projects"><span>未来 7 天关键节点</span><strong>${homeDueStat}</strong><small>${dueSeven ? "优先处理最近截止" : "本周暂无临近截止"}</small><i>01</i></button>
     <button type="button" data-home-route="#/projects"><span>待完成执行项</span><strong>${homeOpenStat}</strong><small>${blocked.length ? `${blocked.length} 项正在受阻` : "没有前置阻塞"}</small><i>02</i></button>
-    <button type="button" data-home-route="#/radar"><span>官方更新</span><strong>${homeRadarStat}</strong><small>${radarItems.length ? "查看是否影响计划" : "雷达持续关注中"}</small><i>03</i></button>
+    <button type="button" data-home-route="#/radar"><span>官方更新</span><strong>${homeRadarStat}</strong><small>${radarItems.length ? "查看是否影响计划" : "来源扫描状态待确认"}</small><i>03</i></button>
   </section>
   <div class="home-main-grid">
     <section class="home-panel home-projects"><header><div><span>MY PROJECTS</span><h2>我的项目</h2></div><button data-home-route="#/projects">查看全部 →</button></header><div>${projectMarkup}</div></section>
@@ -2402,6 +2402,7 @@ function bindDecisionTheater(root) {
 const INTENT_LABEL = {
   qa: "规则问答", detail: "赛事介绍", recommend: "个性化推荐",
   team: "组队文案", teammate: "队友匹配", chat: "参赛建议", unknown: "需要补充信息",
+  plan: "参赛规划",
 };
 
 let agentContext = null;
@@ -2455,6 +2456,7 @@ async function agentAsk() {
   const mdlEl = document.getElementById("agent-model");
   const mdl = mdlEl && !mdlEl.disabled && mdlEl.value ? mdlEl.value : "";
   if (mdl) url += `&model=${encodeURIComponent(mdl)}`;
+  if (document.getElementById("agent-mode").value === "plan") url += "&task_mode=true";
 
   let data;
   try {
@@ -2484,6 +2486,17 @@ async function agentAsk() {
   const intentTag = `<span class="intent-tag">${INTENT_LABEL[data.intent] || data.intent} · ${escapeHtml(data.resolved_name || "自动识别赛事")}</span>`;
 
   const traceHtml = renderDecisionTheater(data.trace, data);
+  const planningHtml = data.planning ? `<div class="agent-planning-result">
+    <strong>${data.planning.status === "completed" ? "可执行路线已生成" : "需要补充或调整条件"}</strong>
+    <p>${escapeHtml(data.planning.planner_mode === "model_assisted" ? "已根据各步结果调整规划。" : "已按本地规则完成核对。")}
+      本次未修改画像或创建项目。</p>
+    ${data.planning.status === "completed" ? `<details class="planning-options"><summary>查看三套路线和执行清单</summary>
+      ${(data.planning.plans || []).map(plan => `<p><strong>${escapeHtml(plan.label)}</strong> · 峰值每周 ${escapeHtml(plan.peak_weekly_load)} 小时<br>
+        ${(plan.items || []).map(item => escapeHtml(item.competition_name)).join("、") || "当前条件下无可行组合"}</p>`).join("")}
+      ${(data.planning.checklist || []).map(item => `<p>${item.actions.map(escapeHtml).join(" → ")}</p>`).join("")}
+      </details><p>${data.planning.uses_temporary_profile ? "本轮使用临时时间或人数；采用方案前请先在能力画像中确认这些条件。" : "行动路线会按已保存画像重新核验。"}</p>
+      <a class="btn primary" href="${data.planning.uses_temporary_profile ? "#/profile" : "#/portfolio"}">${data.planning.uses_temporary_profile ? "确认能力画像" : "前往行动路线采用方案"}</a>` : ""}
+  </div>` : "";
   const agentTaskHtml = (uid && data.resolved_competition && !data.pending_review
     && data.gate?.eligible === true && ["recommend", "chat", "team"].includes(data.intent))
     ? `<div class="agent-action-strip"><span>把建议落到执行闭环</span><button type="button" class="btn primary agent-create-task" data-cid="${escapeHtml(data.resolved_competition)}" data-cite="${citeList[0] ? escapeHtml(citeList[0].citation_id || "") : ""}">一键转为我的任务</button></div>`
@@ -2538,6 +2551,7 @@ async function agentAsk() {
     ${webHtml}
     ${teammateHtml}
     ${agentTaskHtml}
+    ${planningHtml}
     ${traceHtml}
     <div class="agent-meta"><span>处理耗时 ${elapsed}s</span><span>${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span></div>
   </div>`;
